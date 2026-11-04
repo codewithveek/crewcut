@@ -91,7 +91,7 @@ The hackathon rules allow prior code but require naming what existed before 27 O
 | Emil Kowalski's skills | MIT | Motion and design rules | Proofcut's motion kit, preset library and motion lint |
 | Remotion 4.0.536 | Remotion licence (free for teams ≤ 3) | Player and renderer | — |
 
-No source files were copied from Cutroom or vid-skills; their code was studied (see [`docs/prior-work-analysis.md`](docs/prior-work-analysis.md)) and rewritten for this architecture. Commits after the 9 November deadline will be listed here.
+No source files were copied from Cutroom or vid-skills; their code was studied and rewritten for this architecture. Commits after the 9 November deadline will be listed here.
 
 ## Credits
 
