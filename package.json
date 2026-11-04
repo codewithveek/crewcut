@@ -1,0 +1,27 @@
+{
+  "name": "proofcut",
+  "private": true,
+  "type": "module",
+  "description": "Agent-native video studio: agents research, script, fact-check, animate, voice, publish and learn; a person approves every stage.",
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @proofcut/studio dev",
+    "build": "pnpm --filter @proofcut/studio build",
+    "start": "pnpm --filter @proofcut/studio start",
+    "worker": "pnpm --filter @proofcut/render-worker start",
+    "render": "pnpm --filter @proofcut/render-worker render",
+    "typecheck": "pnpm -r --filter \"./packages/**\" --filter @proofcut/render-worker typecheck",
+    "typecheck:studio": "pnpm --filter @proofcut/studio typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^24.2.1",
+    "tsx": "^4.20.3",
+    "typescript": "5.9.3",
+    "vitest": "^4.1.5"
+  }
+}

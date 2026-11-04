@@ -1,0 +1,37 @@
+packages:
+  - "packages/*"
+  - "apps/*"
+
+# Agent-Native's scaffolds refuse packages younger than a day; its own
+# packages ship daily, so they are excluded (mirrors `agent-native create`).
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - "@agent-native/*"
+  - "@modelcontextprotocol/client"
+  - "@modelcontextprotocol/core"
+  - "@modelcontextprotocol/node"
+  - "@modelcontextprotocol/server"
+  - "@typescript/*"
+  - "@sentry/*"
+  - "fast-xml-parser"
+  - "typescript"
+
+overrides:
+  "@assistant-ui/store": ">=0.2.9 <0.2.14"
+  "@assistant-ui/tap": "^0.5.14"
+  better-auth: "1.7.6"
+  nf3: "0.3.17"
+  "@tanstack/react-query": "^5.101.2"
+  esbuild: "^0.28.1"
+  srvx: "^0.12.4"
+  zod: "^4.4.3"
+
+onlyBuiltDependencies:
+  - "@swc/core"
+  - esbuild
+  - lightningcss
+
+allowBuilds:
+  "@swc/core": true
+  esbuild: true
+  lightningcss: true
