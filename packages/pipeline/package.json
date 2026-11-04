@@ -1,0 +1,20 @@
+{
+  "name": "@proofcut/pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@proofcut/contracts": "workspace:*",
+    "@proofcut/claim-audit": "workspace:*",
+    "@proofcut/composition": "workspace:*",
+    "@proofcut/motion": "workspace:*",
+    "zod": "^4.4.3",
+    "@proofcut/voice": "workspace:*"
+  }
+}
