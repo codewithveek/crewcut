@@ -1,0 +1,75 @@
+import { defineAction } from "@agent-native/core/action";
+import { publishCopySchema, privacySchema } from "@proofcut/contracts";
+import { eq } from "drizzle-orm";
+import { z } from "zod";
+
+import { getDb, schema } from "../server/db/index.js";
+import { requireHuman } from "../server/lib/identity.js";
+import { nowIso, toJson } from "../server/lib/json.js";
+import { loadVideo, recordApproval, saveStages, updateVideo } from "../server/lib/store.js";
+import { storagePath } from "../server/lib/storage.js";
+import { fileVideoSource, youtubeClientFor, youtubeConnectionFor } from "../server/lib/youtube.js";
+import { approveStage } from "@proofcut/pipeline";
+import { runWithRequestContext } from "@agent-native/core/server";
+
+/**
+ * Publishing always needs a person: hidden from the agent, gated by approval,
+ * and re-checked at run time. The upload runs in the background.
+ */
+export default defineAction({
+  description: "Publish a prepared post (people only). Uploads the render to YouTube with the approved copy and privacy.",
+  schema: z.object({ publishJobId: z.string(), privacy: privacySchema.optional() }),
+  agentTool: false,
+  uiOnly: true,
+  toolCallable: false,
+  needsApproval: true,
+  run: async ({ publishJobId, privacy }, ctx) => {
+    const who = requireHuman(ctx, "Publishing");
+    const db = getDb();
+    const [job] = await db.select().from(schema.publishJobs).where(eq(schema.publishJobs.id, publishJobId)).limit(1);
+    if (!job) throw new Error("No such post.");
+    const video = await loadVideo(job.videoId, ctx, "editor");
+    if (job.status !== "awaiting_approval" && job.status !== "failed") throw new Error(`This post is ${job.status}.`);
+    const connection = await youtubeConnectionFor(video.row.ownerEmail);
+    if (!connection) throw new Error("Connect YouTube in Settings → Connections first.");
+    const [render] = await db.select().from(schema.renderJobs).where(eq(schema.renderJobs.id, job.renderJobId)).limit(1);
+    if (!render?.outputFile) throw new Error("The render for this post is missing.");
+
+    const finalPrivacy = privacy ?? (job.privacy as "private" | "unlisted" | "public");
+    await db.update(schema.publishJobs).set({ status: "uploading", privacy: finalPrivacy, approvedBy: who.email, approvedAt: nowIso(), error: null }).where(eq(schema.publishJobs.id, job.id));
+    await recordApproval(video, { stage: "publish", decision: "approved", subject: `${job.platform} (${finalPrivacy})`, actor: who });
+    if (video.stages.publish.status === "awaiting_approval") {
+      video.stages = approveStage(video.stages, "publish", { now: nowIso(), actor: { kind: "human", id: who.email } });
+      await saveStages(video.row.id, video.stages);
+    }
+
+    const copy = publishCopySchema.parse(JSON.parse(job.copy));
+    // The upload outlives this request: re-establish the owner's context for its writes.
+    const owner = { userEmail: video.row.ownerEmail, ...(video.row.orgId ? { orgId: video.row.orgId } : {}) };
+    void runWithRequestContext(owner, async () => {
+      try {
+        const youtube = youtubeClientFor(connection);
+        const source = await fileVideoSource(storagePath("renders", render.outputFile as string));
+        const result = await youtube.upload({
+          video: source,
+          copy,
+          privacy: finalPrivacy,
+          containsSyntheticMedia: true,
+          shorts: job.platform === "youtube_shorts",
+          ...(job.scheduledAt ? { publishAt: job.scheduledAt } : {}),
+        });
+        await db
+          .update(schema.publishJobs)
+          .set({ status: "published", platformPostId: result.videoId, url: result.url, warnings: toJson(result.warnings) })
+          .where(eq(schema.publishJobs.id, job.id));
+        await db.update(schema.connections).set({ lastUsedAt: nowIso(), status: "healthy" }).where(eq(schema.connections.id, connection.id));
+        await updateVideo(video.row.id, { status: "published" });
+        await recordApproval(video, { stage: "publish", decision: "published", subject: result.url, reason: result.warnings.join(" ") || `Uploaded as ${result.privacyStatus}`, actor: who });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        await db.update(schema.publishJobs).set({ status: "failed", error: message.slice(0, 2000) }).where(eq(schema.publishJobs.id, job.id));
+      }
+    });
+    return { publishJobId: job.id, status: "uploading", privacy: finalPrivacy };
+  },
+});
