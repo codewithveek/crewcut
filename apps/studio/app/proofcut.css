@@ -1,0 +1,189 @@
+/*
+ * Proofcut design system on top of the Agent-Native toolkit.
+ * Masterplan: translucent floating chrome over the canvas (never two
+ * translucent layers stacked), hairlines with alpha instead of solid borders,
+ * tabular numbers for every timecode, claim status colours from Cutroom,
+ * press feedback at scale(0.97), and every motion/transparency/contrast
+ * preference respected.
+ */
+@theme inline {
+  --color-pc-accent: var(--pc-accent);
+  --color-pc-accent-soft: var(--pc-accent-soft);
+  --color-pc-on-accent: var(--pc-on-accent);
+  --color-supported: var(--pc-supported);
+  --color-weak: var(--pc-weak);
+  --color-unsupported: var(--pc-unsupported);
+  --color-pc-canvas: var(--pc-canvas);
+  --color-pc-track: var(--pc-track);
+  --color-pc-clip: var(--pc-clip);
+  --color-pc-playhead: var(--pc-playhead);
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+}
+
+html,
+body {
+  font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* No input zoom on iOS: inputs stay at 16px on touch devices. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+.pc-display {
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.pc-hairline {
+  box-shadow: 0 0 0 1px var(--pc-hairline);
+}
+
+.pc-panel {
+  background: hsl(var(--card));
+  border-radius: 14px;
+  box-shadow: var(--pc-shadow), 0 0 0 1px var(--pc-hairline);
+}
+
+/* Floating chrome over the preview and timeline. */
+.pc-glass {
+  background: color-mix(in oklab, hsl(var(--card)) 72%, transparent);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow: 0 0 0 1px var(--pc-hairline), 0 10px 30px -14px rgb(0 0 0 / 0.45);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .pc-glass {
+    background: hsl(var(--card));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --pc-hairline: rgb(0 0 0 / 0.35);
+  }
+  .dark {
+    --pc-hairline: rgb(255 255 255 / 0.35);
+  }
+}
+
+/* Press feedback on pointer-down (never on keyboard-driven actions). */
+.pc-press {
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+.pc-press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.pc-focus:focus-visible,
+.pc-press:focus-visible {
+  outline: 2px solid var(--pc-accent);
+  outline-offset: 2px;
+}
+
+/* Skeletons while loading. */
+.pc-skeleton {
+  background: linear-gradient(90deg, hsl(var(--muted)) 0%, hsl(var(--accent)) 50%, hsl(var(--muted)) 100%);
+  background-size: 200% 100%;
+  animation: pc-shimmer 1.4s linear infinite;
+  border-radius: 8px;
+}
+@keyframes pc-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* "Agent is working" on whatever it is changing. */
+.pc-agent-working {
+  position: relative;
+}
+.pc-agent-working::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--pc-accent-soft), transparent);
+  background-size: 200% 100%;
+  animation: pc-shimmer 1.6s linear infinite;
+  box-shadow: 0 0 0 1px var(--pc-accent);
+}
+
+/* Entrances for UI panels: ease-out, from 0.97, short (UI is faster than video). */
+.pc-enter {
+  animation: pc-enter 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@keyframes pc-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Timeline */
+.pc-timeline-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+}
+.pc-clip {
+  background: var(--pc-clip);
+  box-shadow: 0 0 0 1px var(--pc-hairline);
+}
+.pc-clip[data-selected="true"] {
+  box-shadow: 0 0 0 2px var(--pc-accent);
+}
+.pc-trim-handle {
+  cursor: ew-resize;
+  touch-action: none;
+}
+@media (pointer: coarse) {
+  .pc-trim-handle {
+    width: 22px !important;
+  }
+  .pc-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+.pc-safe-bottom {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pc-press,
+  .pc-enter,
+  .pc-skeleton,
+  .pc-agent-working::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .pc-press:active:not(:disabled) {
+    transform: none;
+  }
+}

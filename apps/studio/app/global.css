@@ -1,0 +1,311 @@
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+@import "tailwindcss";
+@import "@agent-native/toolkit/styles.css";
+@import "./proofcut.css";
+
+@source "./**/*.{ts,tsx}";
+
+:root {
+  /* Proofcut light: warm paper canvas, ink, one violet accent (masterplan: own accent). */
+  --background: 60 6% 93%;
+  --foreground: 240 6% 9.5%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 6% 9.5%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 6% 9.5%;
+  --primary: 246 84% 61%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 60 5% 96%;
+  --secondary-foreground: 240 6% 12%;
+  --muted: 60 5% 95%;
+  --muted-foreground: 240 4% 37%;
+  --accent: 60 5% 91%;
+  --accent-foreground: 240 6% 12%;
+  --destructive: 0 75% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 60 5% 87%;
+  --input: 60 5% 84%;
+  --ring: 246 84% 61%;
+  --radius: 0.625rem;
+  --sidebar-background: 60 6% 95.5%;
+  --sidebar-foreground: 240 4% 37%;
+  --sidebar-primary: 246 84% 61%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 60 5% 90%;
+  --sidebar-accent-foreground: 240 6% 12%;
+  --sidebar-border: 60 5% 87%;
+  --sidebar-ring: 246 84% 61%;
+  --pc-accent: #5b4bef;
+  --pc-accent-soft: #5b4bef1f;
+  --pc-on-accent: #ffffff;
+  --pc-supported: #1e9e5a;
+  --pc-weak: #b97a07;
+  --pc-unsupported: #d83a3a;
+  --pc-canvas: #e9e9e5;
+  --pc-hairline: rgb(0 0 0 / 0.08);
+  --pc-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -16px rgb(0 0 0 / 0.18);
+  --pc-track: #f6f6f3;
+  --pc-clip: #ffffff;
+  --pc-playhead: #5b4bef;
+  --chat-sidebar-width: 17.5rem;
+  --chat-sidebar-content-inset: 0.5rem;
+  --chat-sidebar-row-padding: 0.75rem;
+  --chat-sidebar-title-fade: 1.25rem;
+}
+
+.chat-layout-shell {
+  --agent-layout-left-drawer-expanded-width: var(--chat-sidebar-width);
+  --agent-layout-left-drawer-collapsed-width: 3rem;
+  --agent-native-lower-surface: var(--agent-kit-nav-surface);
+}
+
+/* Phones get one app bar: the layout bar carries the thread title and
+   toolbar, so the AgentKit header would stack a second 48px bar. */
+@media (max-width: 47.99rem) {
+  [data-chat-header-in-app-bar="true"] .agentkit-chat-header {
+    display: none;
+  }
+}
+
+.agentkit-chat-empty-copy {
+  text-align: center;
+}
+
+.agentkit-chat-empty-copy h1 {
+  margin: 0;
+  color: hsl(var(--foreground));
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.agent-kit-chat-footer-stack {
+  /* Matches the transcript text lane (the lane minus its 1rem padding). */
+  inline-size: min(
+    100%,
+    calc(var(--agent-kit-conversation-max-width, 47rem) - 2rem)
+  );
+  margin-inline: auto;
+  pointer-events: auto;
+}
+
+.agent-kit-chat-footer-stack > .agentkit-composer-stack {
+  inline-size: 100%;
+}
+
+.agent-kit-chat-guided-question {
+  max-block-size: min(32rem, 58dvh);
+  overflow: auto;
+  margin-block-end: 0.5rem;
+  border: 1px solid var(--agentkit-border);
+  border-radius: var(--agentkit-radius);
+  background: var(--agentkit-surface);
+  box-shadow: var(--agentkit-elevation);
+}
+
+.chat-sidebar-history .an-chat-history__list {
+  padding-top: 0;
+}
+
+.chat-sidebar-history .an-chat-history__section-label {
+  padding: 8px
+    calc(var(--chat-sidebar-content-inset) + var(--chat-sidebar-row-padding))
+    5px;
+  color: hsl(var(--sidebar-foreground));
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.chat-sidebar-history.an-chat-history--rail .an-chat-history-row {
+  margin-inline: var(--chat-sidebar-content-inset);
+  border-radius: calc(var(--radius) + 2px);
+}
+
+.chat-sidebar-history.an-chat-history--rail .an-chat-history__skeleton-row {
+  min-height: 32px;
+  margin-inline: var(--chat-sidebar-content-inset);
+  padding-inline: var(--chat-sidebar-row-padding);
+}
+
+.chat-sidebar-history.an-chat-history--rail .an-chat-history-row__button {
+  min-height: 32px;
+  padding-block: 6px;
+  padding-inline: var(--chat-sidebar-row-padding);
+  color: hsl(var(--sidebar-foreground));
+}
+
+/* The ⋯ trigger sits 3px in from the row edge and is 24px wide, so it
+   reaches 15px into the title line past the row padding. */
+.chat-sidebar-history.an-chat-history--rail {
+  --an-chat-history-menu-clearance: calc(
+    1.6875rem - var(--chat-sidebar-row-padding)
+  );
+}
+
+/* Pinned rows hide their trigger until hover here, so they fade only then. */
+.chat-sidebar-history.an-chat-history--rail
+  .an-chat-history-row--pinned:not(
+    :hover,
+    :focus-within,
+    .an-chat-history-row--menu-open
+  )
+  .an-chat-history-row__topline {
+  mask-image: none;
+}
+
+.chat-sidebar-history .an-chat-history-row__title {
+  flex: 1 1 auto;
+  color: hsl(var(--sidebar-accent-foreground));
+  font-size: 13px;
+  font-weight: 400;
+  text-overflow: clip;
+}
+
+.chat-sidebar-thread-title-shell {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-sidebar-thread-title {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.chat-sidebar-thread-running {
+  color: hsl(var(--sidebar-foreground) / 0.72);
+}
+
+.chat-sidebar-thread-title[data-overflow="true"] {
+  mask-image: linear-gradient(
+    to right,
+    hsl(var(--foreground)) 0,
+    hsl(var(--foreground)) calc(100% - var(--chat-sidebar-title-fade)),
+    hsl(var(--foreground) / 0) 100%
+  );
+}
+
+.chat-sidebar-thread-title__content {
+  display: block;
+  width: max-content;
+  transform: translateX(0);
+}
+
+.an-chat-history-row:hover
+  .chat-sidebar-thread-title[data-overflow="true"]
+  .chat-sidebar-thread-title__content {
+  animation: chat-sidebar-title-reveal
+    var(--chat-sidebar-title-duration, 1800ms) ease-in-out 350ms;
+}
+
+.chat-sidebar-history.an-chat-history--rail
+  .an-chat-history-row__menu-trigger--pinned {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.chat-sidebar-history.an-chat-history--rail
+  .an-chat-history-row:hover
+  .an-chat-history-row__menu-trigger--pinned,
+.chat-sidebar-history.an-chat-history--rail
+  .an-chat-history-row:focus-within
+  .an-chat-history-row__menu-trigger--pinned,
+.chat-sidebar-history.an-chat-history--rail
+  .an-chat-history-row__menu-trigger--pinned[aria-expanded="true"] {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+@keyframes chat-sidebar-title-reveal {
+  to {
+    transform: translateX(calc(-1 * var(--chat-sidebar-title-shift, 0px)));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .an-chat-history-row:hover .chat-sidebar-thread-title__content {
+    animation: none;
+  }
+}
+
+.chat-sidebar-history.an-chat-history--rail
+  .an-chat-history-row--active
+  .an-chat-history-row__button {
+  background: hsl(var(--sidebar-accent));
+  color: hsl(var(--sidebar-accent-foreground));
+}
+
+.dark {
+  /* Proofcut dark (default for the editor): Cutroom's warm near-black, raised panels. */
+  --background: 240 4% 4.7%;
+  --foreground: 240 5% 95.5%;
+  --card: 240 5% 8.6%;
+  --card-foreground: 240 5% 95.5%;
+  --popover: 240 5% 10%;
+  --popover-foreground: 240 5% 95.5%;
+  --primary: 247 100% 71%;
+  --primary-foreground: 250 40% 8%;
+  --secondary: 240 5% 12%;
+  --secondary-foreground: 240 5% 95.5%;
+  --muted: 240 5% 11%;
+  --muted-foreground: 240 4% 65.5%;
+  --accent: 240 5% 14.5%;
+  --accent-foreground: 240 5% 95.5%;
+  --destructive: 0 100% 68%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 240 5% 16%;
+  --input: 240 5% 19%;
+  --ring: 247 100% 71%;
+  --radius: 0.625rem;
+  --sidebar-background: 240 5% 6.5%;
+  --sidebar-foreground: 240 4% 62%;
+  --sidebar-primary: 247 100% 71%;
+  --sidebar-primary-foreground: 250 40% 8%;
+  --sidebar-accent: 240 5% 12%;
+  --sidebar-accent-foreground: 240 5% 95.5%;
+  --sidebar-border: 240 5% 13%;
+  --sidebar-ring: 247 100% 71%;
+  --pc-accent: #8b7bff;
+  --pc-accent-soft: #8b7bff26;
+  --pc-on-accent: #0d0a1f;
+  --pc-supported: #3ccf7f;
+  --pc-weak: #f2b13c;
+  --pc-unsupported: #ff5d5d;
+  --pc-canvas: #0b0b0c;
+  --pc-hairline: rgb(255 255 255 / 0.07);
+  --pc-shadow: 0 1px 0 0 rgb(255 255 255 / 0.03) inset, 0 12px 32px -16px rgb(0 0 0 / 0.6);
+  --pc-track: #111113;
+  --pc-clip: #1d1d20;
+  --pc-playhead: #8b7bff;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Inter Variable", "Inter", sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.22);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.34);
+}
