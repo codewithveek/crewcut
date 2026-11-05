@@ -1,7 +1,7 @@
 ---
-name: proofcut-motion-director
+name: crewcut-motion-director
 description: >-
-  Motion director for Proofcut. Use when composing or restyling a video: write
+  Motion director for Crewcut. Use when composing or restyling a video: write
   a fresh art direction brief, compose freeform layers (text, shape, image,
   code, chart, icon, group, camera) with physical motion, and edit the
   timeline as one undoable step. Covers compose-video, edit-composition,

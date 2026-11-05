@@ -24,7 +24,7 @@ describe("speech timing", () => {
   });
 
   it("spreads word timings inside the duration, in order", () => {
-    const words = estimateWordTimings("Hello there, this is Proofcut.", 2000, 1000);
+    const words = estimateWordTimings("Hello there, this is Crewcut.", 2000, 1000);
     expect(words).toHaveLength(5);
     expect(words[0]?.startMs).toBeGreaterThanOrEqual(1000);
     expect(words.at(-1)?.endMs).toBeLessThanOrEqual(3000);

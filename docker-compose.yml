@@ -1,22 +1,22 @@
 # Local Postgres shared by the studio and the render worker (queue mode).
 #   docker compose up -d postgres
-#   DATABASE_URL=postgres://proofcut:proofcut@localhost:5432/proofcut pnpm dev
-#   DATABASE_URL=postgres://proofcut:proofcut@localhost:5432/proofcut pnpm worker
+#   DATABASE_URL=postgres://crewcut:crewcut@localhost:5432/crewcut pnpm dev
+#   DATABASE_URL=postgres://crewcut:crewcut@localhost:5432/crewcut pnpm worker
 services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: proofcut
-      POSTGRES_PASSWORD: proofcut
-      POSTGRES_DB: proofcut
+      POSTGRES_USER: crewcut
+      POSTGRES_PASSWORD: crewcut
+      POSTGRES_DB: crewcut
     ports:
       - "5432:5432"
     volumes:
-      - proofcut-pg:/var/lib/postgresql/data
+      - crewcut-pg:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U proofcut"]
+      test: ["CMD-SHELL", "pg_isready -U crewcut"]
       interval: 5s
       retries: 10
 
 volumes:
-  proofcut-pg:
+  crewcut-pg:

@@ -1,4 +1,4 @@
-import { demoMetrics, demoPublishedComposition } from "@proofcut/pipeline";
+import { demoMetrics, demoPublishedComposition } from "@crewcut/pipeline";
 import { describe, expect, it } from "vitest";
 
 import { explainPerformance, groupComments, learningsFromInsights } from "./explain";

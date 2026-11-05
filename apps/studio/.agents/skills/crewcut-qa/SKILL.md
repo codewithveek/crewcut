@@ -1,7 +1,7 @@
 ---
-name: proofcut-qa
+name: crewcut-qa
 description: >-
-  QA agent for Proofcut. Use when checking a video: audit every claim against
+  QA agent for Crewcut. Use when checking a video: audit every claim against
   the dossier, and review hook, pacing, reading speed, licences, platform
   rules, motion and sameness via audit-claims; fix with apply-fix or send the
   script back.

@@ -1,5 +1,5 @@
 {
-  "name": "@proofcut/renderer",
+  "name": "@crewcut/renderer",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,8 +12,8 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@proofcut/composition": "workspace:*",
-    "@proofcut/motion": "workspace:*",
+    "@crewcut/composition": "workspace:*",
+    "@crewcut/motion": "workspace:*",
     "remotion": "4.0.536",
     "@remotion/fonts": "4.0.536",
     "@fontsource-variable/inter": "5.3.0",

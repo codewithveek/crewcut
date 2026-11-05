@@ -8,9 +8,9 @@ import {
   type StyleFingerprint,
   composeVideo,
   generateArtDirectionBrief,
-} from "@proofcut/composition";
-import { type Beat, type Dossier, type Script, type ScriptLine } from "@proofcut/contracts";
-import { claimIdForLine, extractNumbers } from "@proofcut/claim-audit";
+} from "@crewcut/composition";
+import { type Beat, type Dossier, type Script, type ScriptLine } from "@crewcut/contracts";
+import { claimIdForLine, extractNumbers } from "@crewcut/claim-audit";
 
 import { type LineAudio, applyNarration, estimateLineAudio } from "./timing";
 

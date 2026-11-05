@@ -6,7 +6,7 @@ import {
   layerWindow,
   lintMotion,
   styleFingerprint,
-} from "@proofcut/composition";
+} from "@crewcut/composition";
 import {
   type AuditReport,
   type Dossier,
@@ -19,7 +19,7 @@ import {
   scriptLines,
   scriptWordCount,
   wordBudget,
-} from "@proofcut/contracts";
+} from "@crewcut/contracts";
 
 /**
  * The QA agent's deterministic checks: claims, hook, pacing, reading speed,

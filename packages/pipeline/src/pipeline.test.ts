@@ -1,6 +1,6 @@
-import { applyFix, auditClaims, findApprovalBlockers, suggestFixes } from "@proofcut/claim-audit";
-import { TRACK_IDS, lintMotion, styleFingerprint, trimClip, requireVisualClip } from "@proofcut/composition";
-import { DEFAULT_GATE_POLICY } from "@proofcut/contracts";
+import { applyFix, auditClaims, findApprovalBlockers, suggestFixes } from "@crewcut/claim-audit";
+import { TRACK_IDS, lintMotion, styleFingerprint, trimClip, requireVisualClip } from "@crewcut/composition";
+import { DEFAULT_GATE_POLICY } from "@crewcut/contracts";
 import { describe, expect, it } from "vitest";
 
 import { DEMO_SOURCE, demoDossier, demoIdeas, demoScript } from "./demo";

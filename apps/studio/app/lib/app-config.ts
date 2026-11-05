@@ -1,5 +1,5 @@
-const rawAppName = "proofcut";
-const rawAppTitle = "Proofcut";
+const rawAppName = "crewcut";
+const rawAppTitle = "Crewcut";
 
 const APP_NAME_PLACEHOLDER = "{" + "{APP_NAME}}";
 const APP_TITLE_PLACEHOLDER = "{" + "{APP_TITLE}}";

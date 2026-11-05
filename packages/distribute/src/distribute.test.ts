@@ -1,4 +1,4 @@
-import { publishCopySchema } from "@proofcut/contracts";
+import { publishCopySchema } from "@crewcut/contracts";
 import { describe, expect, it, vi } from "vitest";
 
 import { adaptCopy } from "./copy";

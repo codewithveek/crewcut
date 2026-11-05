@@ -7,6 +7,8 @@ const agentNativePlugins = agentNative as unknown as (
   options?: Parameters<typeof agentNative>[0],
 ) => any[];
 export default defineConfig({
+  // The design checker rewrites its cache on every edit; don't reload open pages for it.
+  server: { watch: { ignored: ["**/.impeccable/**", "**/storage/**", "**/data/**"] } },
   optimizeDeps: {
     entries: [
       "app/entry.client.tsx",

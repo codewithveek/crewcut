@@ -1,7 +1,7 @@
 ---
-name: proofcut-trend
+name: crewcut-trend
 description: >-
-  Trend agent for Proofcut. Use when a video is at the trend stage or the
+  Trend agent for Crewcut. Use when a video is at the trend stage or the
   person asks for video ideas: find topics from outliers in the niche, search
   interest, questions people ask and the channel's own winners, then save 3–5
   ranked ideas with evidence via find-trends.

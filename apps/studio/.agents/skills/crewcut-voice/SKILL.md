@@ -1,7 +1,7 @@
 ---
-name: proofcut-voice
+name: crewcut-voice
 description: >-
-  Voice and sound agent for Proofcut. Use when adding narration, music or
+  Voice and sound agent for Crewcut. Use when adding narration, music or
   sound: synthesize-voice re-times narration-locked clips, rebuilds captions
   and ducks music; set-music adds a bed from an uploaded asset.
 scope: runtime

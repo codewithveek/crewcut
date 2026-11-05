@@ -3,8 +3,8 @@ import {
   TRACK_IDS,
   normalizeComposition,
   parseComposition,
-} from "@proofcut/composition";
-import { type Script, scriptLines } from "@proofcut/contracts";
+} from "@crewcut/composition";
+import { type Script, scriptLines } from "@crewcut/contracts";
 import {
   type CaptionOptions,
   LONG_FORM_CAPTIONS,
@@ -14,7 +14,7 @@ import {
   estimateSpeechMs,
   estimateWordTimings,
   estimatedPeaks,
-} from "@proofcut/voice";
+} from "@crewcut/voice";
 
 /**
  * Narration drives timing by default (Cutroom's solver, in ms): a scene lasts
@@ -154,6 +154,7 @@ export function applyNarration(
           src: audio.src ?? `${ESTIMATED_AUDIO_PREFIX}${line.lineId}`,
           trimStartMs: 0,
           volume: 1,
+          playbackRate: 1,
           fadeInMs: 0,
           fadeOutMs: 0,
           envelope: [],

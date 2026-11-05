@@ -1,5 +1,5 @@
-import { type Composition, clipEndMs, formatTimecode } from "@proofcut/composition";
-import type { RetentionPoint } from "@proofcut/contracts";
+import { type Composition, clipEndMs, formatTimecode } from "@crewcut/composition";
+import type { RetentionPoint } from "@crewcut/contracts";
 
 export interface RetentionDrop {
   /** 0..1 through the video. */

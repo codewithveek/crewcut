@@ -1,5 +1,5 @@
-import { verifyQuote } from "@proofcut/claim-audit";
-import { type Composition, VIDEO_PRESETS, composeVideo, requireVisualClip } from "@proofcut/composition";
+import { verifyQuote } from "@crewcut/claim-audit";
+import { type Composition, VIDEO_PRESETS, composeVideo, requireVisualClip } from "@crewcut/composition";
 import {
   type Dossier,
   type Idea,
@@ -10,23 +10,23 @@ import {
   ideaSchema,
   metricsSchema,
   scriptSchema,
-} from "@proofcut/contracts";
+} from "@crewcut/contracts";
 
 import { draftScenes } from "./director";
 import { applyNarration, estimateLineAudio } from "./timing";
 
 /**
  * Demo workspace seed. Everything here is labelled as sample data in the UI.
- * The research source is real: the motion section of the Proofcut masterplan,
+ * The research source is real: the motion section of the Crewcut masterplan,
  * stored as plain text. Every fact quotes it verbatim and is verified
  * mechanically; one script line is deliberately unsourced so QA has a real
  * flag to show.
  */
 export const DEMO_SOURCE = {
   id: "s1",
-  title: "Proofcut Masterplan — Motion system",
-  publisher: "Proofcut masterplan (Nov 2026)",
-  text: `Proofcut's motion follows Emil Kowalski's emil-design-eng, apple-design and animation-vocabulary skills, applied in two places: the rendered video and the editor UI. The agent loads these skills before composing, and the QA agent reviews motion against them.
+  title: "Crewcut Masterplan — Motion system",
+  publisher: "Crewcut masterplan (Nov 2026)",
+  text: `Crewcut's motion follows Emil Kowalski's emil-design-eng, apple-design and animation-vocabulary skills, applied in two places: the rendered video and the editor UI. The agent loads these skills before composing, and the QA agent reviews motion against them.
 
 Rules for the video
 Springs first. Think in Apple's two parameters: damping ratio (1.0 = no overshoot) and response (seconds to reach the target). Default to critically damped, response 0.35–0.5 s. Use damping about 0.8 only where the motion implies momentum, such as a card thrown in.
@@ -35,7 +35,7 @@ Ease-out for entrances, ease-in-out for moves. Entrances use cubic-bezier(0.23, 
 Symmetric paths. An element leaves the way it came, and grows from the thing that caused it (origin-aware).
 Stagger lists by 40–80 ms per item so they read as one motion.
 Blur bridges crossfades. A 2–8 px blur during a crossfade makes two states read as one change; Emil's ceiling is 20 px.
-Video is slower than UI. Emil's under-300 ms rule is for interfaces. Viewers must read on screen, so Proofcut's default entrance is 400–700 ms; tune it with real renders.
+Video is slower than UI. Emil's under-300 ms rule is for interfaces. Viewers must read on screen, so Crewcut's default entrance is 400–700 ms; tune it with real renders.
 Reduced-motion render. An export option swaps slides and springs for short crossfades.`,
 } as const;
 
@@ -100,14 +100,14 @@ export function demoDossier(retrievedAt: string): Dossier {
     { id: "f4", statement: "Entrances use the ease-out curve cubic-bezier(0.23, 1, 0.32, 1)", quote: "Entrances use cubic-bezier(0.23, 1, 0.32, 1)", confidence: "high" },
     { id: "f5", statement: "List items stagger by 40–80 ms so they read as one motion", quote: "Stagger lists by 40–80 ms per item so they read as one motion.", confidence: "high" },
     { id: "f6", statement: "A 2–8 px blur bridges a crossfade into one change; the ceiling is 20 px", quote: "A 2–8 px blur during a crossfade makes two states read as one change; Emil's ceiling is 20 px.", confidence: "high" },
-    { id: "f7", statement: "Video entrances (400–700 ms) are slower than UI animation (under 300 ms)", quote: "Viewers must read on screen, so Proofcut's default entrance is 400–700 ms", confidence: "high" },
+    { id: "f7", statement: "Video entrances (400–700 ms) are slower than UI animation (under 300 ms)", quote: "Viewers must read on screen, so Crewcut's default entrance is 400–700 ms", confidence: "high" },
     { id: "f8", statement: "Underdamped springs (about 0.8) are for motion that implies momentum", quote: "Use damping about 0.8 only where the motion implies momentum, such as a card thrown in.", confidence: "medium" },
   ].map((fact) => ({ ...fact, sourceId: DEMO_SOURCE.id, verified: verifyQuote(fact.quote, DEMO_SOURCE.text).found }));
 
   return dossierSchema.parse({
     topic: "Why good motion feels physical",
     angle: "Curves fake motion; springs model it — and the numbers are specific.",
-    summary: "Motion rules for video from Proofcut's masterplan (after Emil Kowalski's skills and Apple's fluid interfaces): springs with damping ratio and response, entrances from 0.9–0.95, staggered lists, blur-bridged crossfades and slower video timing.",
+    summary: "Motion rules for video from Crewcut's masterplan (after Emil Kowalski's skills and Apple's fluid interfaces): springs with damping ratio and response, entrances from 0.9–0.95, staggered lists, blur-bridged crossfades and slower video timing.",
     sources: [{ id: DEMO_SOURCE.id, kind: "document", title: DEMO_SOURCE.title, publisher: DEMO_SOURCE.publisher, retrievedAt, length: DEMO_SOURCE.text.length }],
     facts,
     analogies: ["A door closer: it never slams, never bounces — that's critical damping."],

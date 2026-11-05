@@ -8,7 +8,7 @@ import {
   type Fact,
   type Script,
   type ScriptLine,
-} from "@proofcut/contracts";
+} from "@crewcut/contracts";
 
 import { findOverclaims } from "./overclaim-lexicon";
 import { extractNumbers, keywordOverlap, numbersMatch, properNouns } from "./text";

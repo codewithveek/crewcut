@@ -1,10 +1,10 @@
 {
-  "name": "Chat",
-  "short_name": "Chat",
-  "description": "Chat-first agent-native app ready to customize",
+  "name": "Crewcut",
+  "short_name": "Crewcut",
+  "description": "A crew of agents makes your video; you approve every step, and every claim links to its source.",
   "start_url": "./home",
-  "background_color": "#111111",
-  "theme_color": "#18181B",
+  "background_color": "#09090b",
+  "theme_color": "#5b4bef",
   "icons": [
     {
       "src": "icon-192.svg",

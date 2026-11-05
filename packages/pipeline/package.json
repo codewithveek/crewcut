@@ -1,5 +1,5 @@
 {
-  "name": "@proofcut/pipeline",
+  "name": "@crewcut/pipeline",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,11 +10,11 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@proofcut/contracts": "workspace:*",
-    "@proofcut/claim-audit": "workspace:*",
-    "@proofcut/composition": "workspace:*",
-    "@proofcut/motion": "workspace:*",
+    "@crewcut/contracts": "workspace:*",
+    "@crewcut/claim-audit": "workspace:*",
+    "@crewcut/composition": "workspace:*",
+    "@crewcut/motion": "workspace:*",
     "zod": "^4.4.3",
-    "@proofcut/voice": "workspace:*"
+    "@crewcut/voice": "workspace:*"
   }
 }

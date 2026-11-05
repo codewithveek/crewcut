@@ -1,7 +1,7 @@
 ---
-name: proofcut-research
+name: crewcut-research
 description: >-
-  Research agent for Proofcut. Use when building a video's dossier: add sources
+  Research agent for Crewcut. Use when building a video's dossier: add sources
   (URLs, docs, pasted notes), read them, and save facts that quote their source
   word for word via build-dossier. Every fact is verified mechanically.
 scope: runtime

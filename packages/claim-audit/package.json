@@ -1,5 +1,5 @@
 {
-  "name": "@proofcut/claim-audit",
+  "name": "@crewcut/claim-audit",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,6 +10,6 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@proofcut/contracts": "workspace:*"
+    "@crewcut/contracts": "workspace:*"
   }
 }

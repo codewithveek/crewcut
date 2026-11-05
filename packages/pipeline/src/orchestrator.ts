@@ -6,7 +6,7 @@ import {
   type Stage,
   type StageStates,
   stageStatesSchema,
-} from "@proofcut/contracts";
+} from "@crewcut/contracts";
 
 /**
  * The orchestrator: runs stages in order, stops at gates, and can loop back

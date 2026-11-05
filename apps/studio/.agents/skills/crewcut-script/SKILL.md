@@ -1,7 +1,7 @@
 ---
-name: proofcut-script
+name: crewcut-script
 description: >-
-  Script agent for Proofcut. Use when writing or revising a video's narration:
+  Script agent for Crewcut. Use when writing or revising a video's narration:
   hook, beats and lines within the word budget, with dossier fact ids on every
   factual line. Saves via write-script, edit-line or rewrite-hook.
 scope: runtime

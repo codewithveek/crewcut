@@ -1,4 +1,4 @@
-import { type Metrics, PLATFORM_SPECS, type Privacy, type PublishCopy, metricsSchema } from "@proofcut/contracts";
+import { type Metrics, PLATFORM_SPECS, type Privacy, type PublishCopy, metricsSchema } from "@crewcut/contracts";
 
 import { adaptCopy } from "./copy";
 
@@ -251,7 +251,7 @@ export class YouTubeClient {
 
   /** Upload captions after processing (call from a follow-up job). */
   async uploadCaptions(videoId: string, srt: string, language: string): Promise<void> {
-    const boundary = `proofcut${Date.now().toString(36)}`;
+    const boundary = `crewcut${Date.now().toString(36)}`;
     const body =
       `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ snippet: { videoId, language, name: language.toUpperCase(), isDraft: false } })}\r\n` +
       `--${boundary}\r\nContent-Type: application/octet-stream\r\n\r\n${srt}\r\n--${boundary}--`;

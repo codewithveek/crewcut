@@ -1,7 +1,7 @@
 ---
-name: proofcut-publish
+name: crewcut-publish
 description: >-
-  Publish agent for Proofcut. Use when preparing a video for YouTube: render a
+  Publish agent for Crewcut. Use when preparing a video for YouTube: render a
   cut with render-video, check platform specs, and write the title,
   description, hashtags and sources with prepare-post. Publishing itself is
   always the person's click.

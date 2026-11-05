@@ -33,13 +33,13 @@ importers:
 
   apps/render-worker:
     dependencies:
-      '@proofcut/composition':
+      '@crewcut/composition':
         specifier: workspace:*
         version: link:../../packages/composition
-      '@proofcut/pipeline':
+      '@crewcut/pipeline':
         specifier: workspace:*
         version: link:../../packages/pipeline
-      '@proofcut/renderer':
+      '@crewcut/renderer':
         specifier: workspace:*
         version: link:../../packages/renderer
       '@remotion/bundler':
@@ -97,6 +97,33 @@ importers:
       '@ai-sdk/openai':
         specifier: ^3.0.53
         version: 3.0.135(zod@4.6.7)
+      '@crewcut/analytics':
+        specifier: workspace:*
+        version: link:../../packages/analytics
+      '@crewcut/claim-audit':
+        specifier: workspace:*
+        version: link:../../packages/claim-audit
+      '@crewcut/composition':
+        specifier: workspace:*
+        version: link:../../packages/composition
+      '@crewcut/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@crewcut/distribute':
+        specifier: workspace:*
+        version: link:../../packages/distribute
+      '@crewcut/motion':
+        specifier: workspace:*
+        version: link:../../packages/motion
+      '@crewcut/pipeline':
+        specifier: workspace:*
+        version: link:../../packages/pipeline
+      '@crewcut/renderer':
+        specifier: workspace:*
+        version: link:../../packages/renderer
+      '@crewcut/voice':
+        specifier: workspace:*
+        version: link:../../packages/voice
       '@electric-sql/pglite':
         specifier: ^0.5.8
         version: 0.5.14
@@ -112,33 +139,6 @@ importers:
       '@openrouter/ai-sdk-provider':
         specifier: ^2.9.1
         version: 2.10.0(ai@6.0.258(zod@4.6.7))(zod@4.6.7)
-      '@proofcut/analytics':
-        specifier: workspace:*
-        version: link:../../packages/analytics
-      '@proofcut/claim-audit':
-        specifier: workspace:*
-        version: link:../../packages/claim-audit
-      '@proofcut/composition':
-        specifier: workspace:*
-        version: link:../../packages/composition
-      '@proofcut/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@proofcut/distribute':
-        specifier: workspace:*
-        version: link:../../packages/distribute
-      '@proofcut/motion':
-        specifier: workspace:*
-        version: link:../../packages/motion
-      '@proofcut/pipeline':
-        specifier: workspace:*
-        version: link:../../packages/pipeline
-      '@proofcut/renderer':
-        specifier: workspace:*
-        version: link:../../packages/renderer
-      '@proofcut/voice':
-        specifier: workspace:*
-        version: link:../../packages/voice
       '@react-router/dev':
         specifier: 8.1.0
         version: 8.1.0(react-router@8.1.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(typescript@5.9.3)(vite@8.1.0(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
@@ -350,26 +350,26 @@ importers:
 
   packages/analytics:
     dependencies:
-      '@proofcut/composition':
+      '@crewcut/composition':
         specifier: workspace:*
         version: link:../composition
-      '@proofcut/contracts':
+      '@crewcut/contracts':
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
-      '@proofcut/pipeline':
+      '@crewcut/pipeline':
         specifier: workspace:*
         version: link:../pipeline
 
   packages/claim-audit:
     dependencies:
-      '@proofcut/contracts':
+      '@crewcut/contracts':
         specifier: workspace:*
         version: link:../contracts
 
   packages/composition:
     dependencies:
-      '@proofcut/motion':
+      '@crewcut/motion':
         specifier: workspace:*
         version: link:../motion
       zod:
@@ -384,7 +384,7 @@ importers:
 
   packages/distribute:
     dependencies:
-      '@proofcut/contracts':
+      '@crewcut/contracts':
         specifier: workspace:*
         version: link:../contracts
       zod:
@@ -395,19 +395,19 @@ importers:
 
   packages/pipeline:
     dependencies:
-      '@proofcut/claim-audit':
+      '@crewcut/claim-audit':
         specifier: workspace:*
         version: link:../claim-audit
-      '@proofcut/composition':
+      '@crewcut/composition':
         specifier: workspace:*
         version: link:../composition
-      '@proofcut/contracts':
+      '@crewcut/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@proofcut/motion':
+      '@crewcut/motion':
         specifier: workspace:*
         version: link:../motion
-      '@proofcut/voice':
+      '@crewcut/voice':
         specifier: workspace:*
         version: link:../voice
       zod:
@@ -416,6 +416,12 @@ importers:
 
   packages/renderer:
     dependencies:
+      '@crewcut/composition':
+        specifier: workspace:*
+        version: link:../composition
+      '@crewcut/motion':
+        specifier: workspace:*
+        version: link:../motion
       '@fontsource-variable/dm-sans':
         specifier: 5.3.0
         version: 5.3.0
@@ -446,12 +452,6 @@ importers:
       '@fontsource/instrument-serif':
         specifier: 5.3.0
         version: 5.3.0
-      '@proofcut/composition':
-        specifier: workspace:*
-        version: link:../composition
-      '@proofcut/motion':
-        specifier: workspace:*
-        version: link:../motion
       '@remotion/fonts':
         specifier: 4.0.536
         version: 4.0.536(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -483,7 +483,7 @@ importers:
 
   packages/voice:
     dependencies:
-      '@proofcut/contracts':
+      '@crewcut/contracts':
         specifier: workspace:*
         version: link:../contracts
 

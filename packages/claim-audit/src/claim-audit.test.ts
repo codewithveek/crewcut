@@ -1,4 +1,4 @@
-import { type Dossier, type Script, dossierSchema, scriptSchema } from "@proofcut/contracts";
+import { type Dossier, type Script, dossierSchema, scriptSchema } from "@crewcut/contracts";
 import { describe, expect, it } from "vitest";
 
 import { ApprovalBlockedError, applyFix, assertApprovable, findApprovalBlockers, overrideClaim, suggestFixes } from "./approval-gate";

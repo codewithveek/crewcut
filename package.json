@@ -1,5 +1,5 @@
 {
-  "name": "proofcut",
+  "name": "crewcut",
   "private": true,
   "type": "module",
   "description": "Agent-native video studio: agents research, script, fact-check, animate, voice, publish and learn; a person approves every stage.",
@@ -8,13 +8,13 @@
     "node": ">=22.22.0"
   },
   "scripts": {
-    "dev": "pnpm --filter @proofcut/studio dev",
-    "build": "pnpm --filter @proofcut/studio build",
-    "start": "pnpm --filter @proofcut/studio start",
-    "worker": "pnpm --filter @proofcut/render-worker start",
-    "render": "pnpm --filter @proofcut/render-worker render",
-    "typecheck": "pnpm -r --filter \"./packages/**\" --filter @proofcut/render-worker typecheck",
-    "typecheck:studio": "pnpm --filter @proofcut/studio typecheck",
+    "dev": "pnpm --filter @crewcut/studio dev",
+    "build": "pnpm --filter @crewcut/studio build",
+    "start": "pnpm --filter @crewcut/studio start",
+    "worker": "pnpm --filter @crewcut/render-worker start",
+    "render": "pnpm --filter @crewcut/render-worker render",
+    "typecheck": "pnpm -r --filter \"./packages/**\" --filter @crewcut/render-worker typecheck",
+    "typecheck:studio": "pnpm --filter @crewcut/studio typecheck",
     "test": "vitest run",
     "test:watch": "vitest"
   },

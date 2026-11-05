@@ -1,4 +1,4 @@
-import { PLATFORM_SPECS, type Platform, type PublishCopy } from "@proofcut/contracts";
+import { PLATFORM_SPECS, type Platform, type PublishCopy } from "@crewcut/contracts";
 
 /** Per-platform copy limits (vid-skills `copy.ts`). */
 export interface AdaptedCopy {

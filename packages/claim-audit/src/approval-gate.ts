@@ -1,4 +1,4 @@
-import type { AuditReport, ClaimResult, Dossier, Script } from "@proofcut/contracts";
+import type { AuditReport, ClaimResult, Dossier, Script } from "@crewcut/contracts";
 
 import { bestFactsFor } from "./audit-claims";
 import { OVERCLAIM_LEXICON, findOverclaims } from "./overclaim-lexicon";

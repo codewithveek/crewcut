@@ -1,5 +1,5 @@
-import type { Composition } from "@proofcut/composition";
-import type { Insight, Learning, Metrics, MetricWindow } from "@proofcut/contracts";
+import type { Composition } from "@crewcut/composition";
+import type { Insight, Learning, Metrics, MetricWindow } from "@crewcut/contracts";
 
 import { describeMoment, findRetentionDrops, momentAt, ratioAt } from "./retention";
 

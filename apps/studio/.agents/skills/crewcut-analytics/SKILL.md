@@ -1,7 +1,7 @@
 ---
-name: proofcut-analytics
+name: crewcut-analytics
 description: >-
-  Analytics agent for Proofcut. Use when a video has results: pull metrics at
+  Analytics agent for Crewcut. Use when a video has results: pull metrics at
   48 h, 7 d or 28 d, explain why it worked or didn't (retention drops mapped to
   the exact scene and line), save learnings, and seed the next idea. Also use
   for dashboards or mini-apps over list-metrics.
