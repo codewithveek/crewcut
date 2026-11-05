@@ -1,8 +1,8 @@
-# Proofcut
+# Crewcut
 
 **An agent-native video studio.** Agents research, script, fact-check, animate, voice, publish and learn from analytics — and a person sees and approves every stage. Every claim in a video links to the source line that proves it.
 
-Built for the Builder.io Agent-Native Hackathon (Nov 2026) on [Agent-Native](https://www.agent-native.com), Remotion 4 and the ideas of [Cutroom](https://github.com/codewithveek/cutroom) and [vid-skills](https://github.com/codewithveek/vid-skills). The plan is in [`Proofcut Masterplan.md`](./Proofcut%20Masterplan.md).
+Built for the Builder.io Agent-Native Hackathon (Nov 2026) on [Agent-Native](https://www.agent-native.com), Remotion 4 and the ideas of [Cutroom](https://github.com/codewithveek/cutroom) and [vid-skills](https://github.com/codewithveek/vid-skills). The plan is in [`Crewcut Masterplan.md`](./Crewcut%20Masterplan.md).
 
 ## What it does
 
@@ -12,7 +12,7 @@ idea → trend → research → script → QA ⇄ (send back) → motion → voi
                                       unsupported claims                            a person
 ```
 
-- **Eight specialist agents, one action layer.** The Agent-Native agent loads a stage skill (`proofcut-trend` … `proofcut-analytics`) and works only through typed actions — the same actions the UI buttons, MCP, A2A and the CLI call.
+- **Eight specialist agents, one action layer.** The Agent-Native agent loads a stage skill (`crewcut-trend` … `crewcut-analytics`) and works only through typed actions — the same actions the UI buttons, MCP, A2A and the CLI call.
 - **Proof over claims.** Research stores sources (secrets redacted, SSRF-safe fetch) and every fact quotes its source verbatim — checked mechanically. The claim audit (from Cutroom) blocks numbers the evidence doesn't contain, unsourced facts and unqualified absolutes; QA offers one-click fixes; overrides need a person and a reason.
 - **Freeform motion, not templates.** The motion director writes an art direction brief and composes layers (text, shape, image, video, code, chart, icon, group, camera) with keyframes. Cutroom's ten blocks survive only as editable recipes. A variety guard compares each video's style fingerprint with the last ten.
 - **Physical motion.** Apple-style springs (damping ratio + response, converted to Remotion stiffness/damping), entrances from 0.9–0.95, ease-out entrances, symmetric exits, 40–80 ms stagger, blur-bridged crossfades — enforced by a motion lint in QA.
@@ -57,15 +57,17 @@ pnpm worker                               # claims render jobs from Postgres
 pnpm render --demo --ratio 9:16 --out storage/renders/demo.mp4   # one-off render, no database
 ```
 
-If Remotion can't download Chrome Headless Shell, point it at a local browser: `PROOFCUT_BROWSER_EXECUTABLE=/path/to/chrome`.
+If Remotion can't download Chrome Headless Shell, point it at a local browser: `CREWCUT_BROWSER_EXECUTABLE=/path/to/chrome`.
+
+Files (uploads, voice-overs, library sounds, renders) stay on local disk by default. To run on more than one server, or with render workers on other machines, configure a Cloudflare R2 bucket (`R2_*`, or `S3_*` for any S3-compatible bucket; see `.env.example`). `CREWCUT_STORAGE=auto` then stores new files there, and finished renders move there the first time someone opens their link. `CREWCUT_STORAGE=local` forces disk; `CREWCUT_STORAGE=remote` requires a provider (Builder's file storage counts) and never falls back to disk.
 
 ### Checks
 
 ```bash
-pnpm test                                 # 91 unit tests across the domain packages
+pnpm test                                 # 109 unit tests across the domain packages
 pnpm typecheck                            # packages + render worker
-pnpm --filter @proofcut/studio typecheck  # the app
-pnpm --filter @proofcut/studio e2e        # 19-step pipeline check through the real actions on a throwaway DB
+pnpm --filter @crewcut/studio typecheck  # the app
+pnpm --filter @crewcut/studio e2e        # 27-check pipeline + storage run through the real actions on a throwaway DB
 ```
 
 ## Demo script (≈ 3 minutes)
@@ -87,8 +89,8 @@ The hackathon rules allow prior code but require naming what existed before 27 O
 | --- | --- | --- | --- |
 | Cutroom (`codewithveek/cutroom`) | MIT | Ideas and rules re-implemented: claim audit checks and approval gate, overclaim lexicon, timing solver, secret redaction, four looks, editor layout and design tokens, Remotion lessons | Layer composition schema and renderer; freeform motion director; springs; pro timeline; redesigned responsive editor |
 | vid-skills (`codewithveek/vid-skills`) | Apache-2.0 | YouTube uploader and OAuth (ported and fixed: PKCE, revoke, single-flight refresh, 308 resume, quota errors), caption chunking, word timing, number normalisation, QA checks, platform specs, prompts | Connections page, publish approvals, analytics and trend agents |
-| Agent-Native (`@agent-native/core` 0.223.0) | MIT | App shell, actions, auth, vault, sharing, extensions, agent chat | All Proofcut actions, skills, pipeline board, gates, authorship log |
-| Emil Kowalski's skills | MIT | Motion and design rules | Proofcut's motion kit, preset library and motion lint |
+| Agent-Native (`@agent-native/core` 0.223.0) | MIT | App shell, actions, auth, vault, sharing, extensions, agent chat | All Crewcut actions, skills, pipeline board, gates, authorship log |
+| Emil Kowalski's skills | MIT | Motion and design rules | Crewcut's motion kit, preset library and motion lint |
 | Remotion 4.0.536 | Remotion licence (free for teams ≤ 3) | Player and renderer | — |
 
 No source files were copied from Cutroom or vid-skills; their code was studied and rewritten for this architecture. Commits after the 9 November deadline will be listed here.

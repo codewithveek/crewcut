@@ -19,7 +19,7 @@ function findWorkspaceRoot(start: string): string {
   return path.resolve(start);
 }
 
-export const STORAGE_DIR = path.resolve(process.env.PROOFCUT_STORAGE_DIR ?? path.join(findWorkspaceRoot(process.cwd()), "storage"));
+export const STORAGE_DIR = path.resolve(process.env.CREWCUT_STORAGE_DIR ?? path.join(findWorkspaceRoot(process.cwd()), "storage"));
 export const WORKSPACE_ROOT = findWorkspaceRoot(process.cwd());
 
 export type StorageArea = "assets" | "renders" | "jobs";
@@ -49,9 +49,9 @@ export function sha256(text: string | Uint8Array): string {
 const devSecret = randomBytes(32).toString("hex");
 
 function mediaSecret(): string {
-  const secret = process.env.PROOFCUT_MEDIA_SECRET ?? process.env.BETTER_AUTH_SECRET;
+  const secret = process.env.CREWCUT_MEDIA_SECRET ?? process.env.BETTER_AUTH_SECRET;
   if (secret) return secret;
-  if (process.env.NODE_ENV === "production") throw new Error("Set PROOFCUT_MEDIA_SECRET to sign media URLs.");
+  if (process.env.NODE_ENV === "production") throw new Error("Set CREWCUT_MEDIA_SECRET to sign media URLs.");
   return devSecret;
 }
 

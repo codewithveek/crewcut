@@ -1,7 +1,7 @@
 /**
- * End-to-end check of the Proofcut pipeline through its real actions, against
+ * End-to-end check of the Crewcut pipeline through its real actions, against
  * a throwaway PGlite database:
- *   pnpm --filter @proofcut/studio e2e
+ *   pnpm --filter @crewcut/studio e2e
  *
  * Walks the masterplan's demo: idea → ideas → pick → source → dossier →
  * script → QA flags the unsourced claim → apply its fix → compose → edit on
@@ -13,15 +13,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const scratch = mkdtempSync(path.join(os.tmpdir(), "proofcut-e2e-"));
+const scratch = mkdtempSync(path.join(os.tmpdir(), "crewcut-e2e-"));
 process.env.DATABASE_URL = `pglite:${path.join(scratch, "db")}`;
-process.env.PROOFCUT_STORAGE_DIR = path.join(scratch, "storage");
-process.env.PROOFCUT_RENDER_MODE = "queue"; // queue only: don't launch Chromium in the check
+process.env.CREWCUT_STORAGE_DIR = path.join(scratch, "storage");
+process.env.CREWCUT_RENDER_MODE = "queue"; // queue only: don't launch Chromium in the check
 process.env.NODE_ENV = "development";
 
 type Ctx = { caller: "frontend" | "tool"; userEmail: string; orgId: null };
-const human: Ctx = { caller: "frontend", userEmail: "e2e@proofcut.test", orgId: null };
-const agent: Ctx = { caller: "tool", userEmail: "e2e@proofcut.test", orgId: null };
+const human: Ctx = { caller: "frontend", userEmail: "e2e@crewcut.test", orgId: null };
+const agent: Ctx = { caller: "tool", userEmail: "e2e@crewcut.test", orgId: null };
 
 interface ActionModule {
   default: { run: (args: unknown, ctx: Ctx) => Promise<unknown> };
@@ -54,7 +54,7 @@ async function expectFailure(promise: Promise<unknown>, pattern: RegExp, message
 async function main(): Promise<void> {
   const migrate = (await import("../server/plugins/db.ts")).default as unknown as () => Promise<void>;
   await migrate();
-  const { DEMO_SOURCE, demoDossier, demoIdeas, demoScript } = await import("@proofcut/pipeline");
+  const { DEMO_SOURCE, demoDossier, demoIdeas, demoScript } = await import("@crewcut/pipeline");
 
   // 1. Idea → trend agent's ideas → a person picks one.
   const started = await call<{ videoId: string }>("start-pipeline", { brief: "Why do spring animations feel physical?", ratio: "16:9", platforms: ["youtube"] }, human);
@@ -144,7 +144,73 @@ async function main(): Promise<void> {
     ["trend", "script", "qa"].every((stage) => approvals.some((event) => event.stage === stage && event.decision === "approved" && event.actorKind === "human")),
     "every gate approval is logged with a human actor",
   );
+
+  // 11. Remote file storage (R2/S3/Builder) through a fake provider: one index, any backend.
+  await checkRemoteStorage();
   console.log(`\nAll ${passed} checks passed.`);
+}
+
+async function checkRemoteStorage(): Promise<void> {
+  const { registerFileUploadProvider, unregisterFileUploadProvider } = await import("@agent-native/core/file-upload");
+  const blob = await import("../server/lib/blob-store.ts");
+  const { storagePath, writeStorageFile } = await import("../server/lib/storage.ts");
+  const { existsSync } = await import("node:fs");
+  const bucket = new Map<string, Uint8Array>();
+  registerFileUploadProvider({
+    id: "fake-bucket",
+    name: "Fake bucket",
+    isConfigured: () => true,
+    upload: async (input) => {
+      const id = `obj-${bucket.size + 1}-${input.filename}`;
+      bucket.set(id, new Uint8Array(input.data));
+      return { url: `https://cdn.crewcut.test/${id}`, id, provider: "fake-bucket" };
+    },
+    delete: async (input) => bucket.delete(input.id ?? ""),
+  });
+  const previous = process.env.CREWCUT_STORAGE;
+  try {
+    process.env.CREWCUT_STORAGE = "local";
+    const local = await blob.putFile("assets", "e2e-local.png", new Uint8Array([1, 2, 3]), "image/png");
+    check(local.provider === "local" && bucket.size === 0 && existsSync(storagePath("assets", "e2e-local.png")), "CREWCUT_STORAGE=local keeps files on disk even when a bucket is configured");
+
+    process.env.CREWCUT_STORAGE = "auto";
+    const stored = await blob.putFile("assets", "e2e-remote.png", new Uint8Array([4, 5, 6]), "image/png");
+    check(stored.provider === "fake-bucket" && stored.url?.startsWith("https://cdn.crewcut.test/") && !existsSync(storagePath("assets", "e2e-remote.png")), "auto mode stores uploads in a configured bucket, not on disk");
+    const urls = await blob.resolveFileUrls("assets", ["e2e-remote.png", "e2e-local.png"]);
+    check(urls.get("e2e-remote.png") === stored.url && urls.get("e2e-local.png")?.startsWith("/api/media/"), "file URLs resolve per file: bucket URL or signed local link");
+
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const id = String(input instanceof Request ? input.url : input).split("/").pop() ?? "";
+      const bytes = bucket.get(id);
+      return bytes ? new Response(Buffer.from(bytes)) : new Response("missing", { status: 404 });
+    }) as typeof fetch;
+    try {
+      const copy = await blob.localCopy("assets", "e2e-remote.png");
+      check(existsSync(copy), "a remote file is downloaded when a local copy is needed (YouTube upload, render)");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+
+    await writeStorageFile("renders", "e2e-render.mp4", new Uint8Array([7, 8, 9]));
+    await blob.promoteToRemote("renders", "e2e-render.mp4", "video/mp4");
+    check((await blob.fileUrl("renders", "e2e-render.mp4")).startsWith("https://cdn.crewcut.test/"), "a finished render is promoted to the bucket on first link");
+
+    const library = await call<{ items: Array<{ url: string }> }>("list-audio-library", {}, human);
+    check(library.items.length > 0 && library.items.every((item) => item.url.startsWith("https://cdn.crewcut.test/")), "built-in library sounds are served from the bucket");
+
+    const before = bucket.size;
+    await blob.removeFile("assets", "e2e-remote.png");
+    check(bucket.size === before - 1 && !(await blob.isStoredRemotely("assets", "e2e-remote.png")) && !existsSync(storagePath("assets", "e2e-remote.png")), "deleting a file removes the bucket object, its index row and the local copy");
+
+    unregisterFileUploadProvider("fake-bucket");
+    process.env.CREWCUT_STORAGE = "remote";
+    await expectFailure(blob.putFile("assets", "e2e-nowhere.png", new Uint8Array([1]), "image/png"), /no file storage is configured/, "CREWCUT_STORAGE=remote refuses to fall back to disk silently");
+  } finally {
+    unregisterFileUploadProvider("fake-bucket");
+    if (previous === undefined) delete process.env.CREWCUT_STORAGE;
+    else process.env.CREWCUT_STORAGE = previous;
+  }
 }
 
 main()

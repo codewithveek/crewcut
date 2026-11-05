@@ -1,12 +1,13 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 
-import { type Composition, iterateLayers } from "@proofcut/composition";
+import { type Composition, iterateLayers } from "@crewcut/composition";
 import { runWithRequestContext } from "@agent-native/core/server";
 import { eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "../db/index.js";
 import { toJson } from "./json.js";
+import { resolveFileUrls } from "./blob-store.js";
 import { STORAGE_DIR, WORKSPACE_ROOT, newId, writeStorageFile } from "./storage.js";
 import type { VideoRecord } from "./store.js";
 
@@ -20,7 +21,7 @@ import type { VideoRecord } from "./store.js";
 export type RenderMode = "queue" | "spawn";
 
 export function renderMode(): RenderMode {
-  const configured = process.env.PROOFCUT_RENDER_MODE;
+  const configured = process.env.CREWCUT_RENDER_MODE;
   if (configured === "queue" || configured === "spawn") return configured;
   return /^postgres(ql)?:\/\//.test(process.env.DATABASE_URL ?? "") ? "queue" : "spawn";
 }
@@ -54,7 +55,14 @@ export async function queueRender(input: QueueRenderInput): Promise<{ renderId: 
   const payload = {
     jobId: renderId,
     composition: input.composition,
-    assetFiles: assets.map((asset) => ({ id: asset.id, fileName: asset.fileName })),
+    assetFiles: await (async () => {
+      const urls = await resolveFileUrls("assets", assets.map((asset) => asset.fileName));
+      // Signed local links (/api/media/…) stay local files; remote URLs are fetched by the worker.
+      return assets.map((asset) => {
+        const url = urls.get(asset.fileName);
+        return { id: asset.id, fileName: asset.fileName, ...(url && /^https?:/.test(url) ? { url } : {}) };
+      });
+    })(),
     options: { reducedMotion: input.reducedMotion, burnCaptions: input.burnCaptions },
     outputFileName: `${renderId}.mp4`,
   };
@@ -105,7 +113,7 @@ function spawnWorker(renderId: string, jobFile: string, owner: { userEmail: stri
   const workerMain = path.join(WORKSPACE_ROOT, "apps", "render-worker", "src", "main.ts");
   const child = spawn(process.execPath, ["--import", "tsx", workerMain, "--job-file", jobFile], {
     cwd: path.join(WORKSPACE_ROOT, "apps", "render-worker"),
-    env: { ...process.env, PROOFCUT_STORAGE_DIR: STORAGE_DIR },
+    env: { ...process.env, CREWCUT_STORAGE_DIR: STORAGE_DIR },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });

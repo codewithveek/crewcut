@@ -14,7 +14,7 @@ import { type RenderJobPayload, renderJobPayloadSchema, runRenderJob } from "./j
  * - --job-file <path> (local dev, spawned by the studio): renders one job and
  *   prints JSON progress lines on stdout.
  */
-const STORAGE_DIR = path.resolve(process.env.PROOFCUT_STORAGE_DIR ?? path.join(process.cwd(), "storage"));
+const STORAGE_DIR = path.resolve(process.env.CREWCUT_STORAGE_DIR ?? path.join(process.cwd(), "storage"));
 const WORKER_ID = `${os.hostname()}:${process.pid}`;
 const POLL_MS = 2000;
 const MAX_ATTEMPTS = 2;

@@ -77,6 +77,7 @@ export async function startAssetServer(rootDirectory: string): Promise<AssetServ
 }
 
 /** Maps asset ids to served URLs: `<id>.<ext>` files under the asset root. */
-export function assetUrlMap(baseUrl: string, assets: ReadonlyArray<{ id: string; fileName: string }>): Record<string, string> {
-  return Object.fromEntries(assets.map((asset) => [asset.id, `${baseUrl}/${encodeURIComponent(asset.fileName)}`]));
+/** Local files are served by the loopback server; files in remote storage are fetched from their URL. */
+export function assetUrlMap(baseUrl: string, assets: ReadonlyArray<{ id: string; fileName: string; url?: string | undefined }>): Record<string, string> {
+  return Object.fromEntries(assets.map((asset) => [asset.id, asset.url ?? `${baseUrl}/${encodeURIComponent(asset.fileName)}`]));
 }

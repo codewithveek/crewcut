@@ -13,12 +13,12 @@ const shares = (name: string) => `CREATE TABLE IF NOT EXISTS ${name} (
   notified_at TEXT
 )`;
 
-/** Proofcut's tables. Additive only: never drop or rename a column here. */
+/** Crewcut's tables. Additive only: never drop or rename a column here. */
 export default runMigrations(
   [
     {
       version: 1,
-      name: "proofcut-core-tables",
+      name: "crewcut-core-tables",
       sql: [
         `CREATE TABLE IF NOT EXISTS projects (
           id TEXT PRIMARY KEY, name TEXT NOT NULL, niche TEXT NOT NULL DEFAULT '', brand_kit TEXT NOT NULL DEFAULT '{}',
@@ -79,7 +79,7 @@ export default runMigrations(
     },
     {
       version: 2,
-      name: "proofcut-indexes",
+      name: "crewcut-indexes",
       sql: [
         "CREATE INDEX IF NOT EXISTS videos_project_idx ON videos (project_id)",
         "CREATE INDEX IF NOT EXISTS scripts_video_idx ON scripts (video_id, version)",
@@ -90,6 +90,15 @@ export default runMigrations(
         "CREATE INDEX IF NOT EXISTS project_shares_resource_idx ON project_shares (resource_id)",
       ].join(";\n"),
     },
+    {
+      version: 3,
+      name: "crewcut-stored-files",
+      sql: [
+        `CREATE TABLE IF NOT EXISTS stored_files (
+          key TEXT PRIMARY KEY, area TEXT NOT NULL, file_name TEXT NOT NULL, provider TEXT NOT NULL, url TEXT NOT NULL,
+          remote_id TEXT, mime TEXT NOT NULL, bytes INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT now())`,
+      ].join(";\n"),
+    },
   ],
-  { table: "proofcut_migrations" },
+  { table: "crewcut_migrations" },
 );

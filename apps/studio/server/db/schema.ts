@@ -10,7 +10,7 @@ import {
 } from "@agent-native/core/db/schema";
 
 /**
- * Proofcut's data model (masterplan "Data model and action catalog"). Every
+ * Crewcut's data model (masterplan "Data model and action catalog"). Every
  * table carries owner_email / org_id / visibility via ownableColumns(); JSON
  * documents are stored as text and parsed with Zod whenever they're read.
  * Agents and people change these rows only through actions.
@@ -139,6 +139,23 @@ export const assets = table("assets", {
   provenance: text("provenance").notNull().default("{}"),
   createdAt: text("created_at").notNull().default(now()),
   ...ownableColumns(),
+});
+
+/**
+ * Where a stored file actually lives when it is not on this host's disk:
+ * Agent-Native's file storage (Builder, S3, Cloudflare R2, MinIO…). Keyed by
+ * "<area>/<fileName>", the same names local storage uses.
+ */
+export const storedFiles = table("stored_files", {
+  key: text("key").primaryKey(),
+  area: text("area").notNull(),
+  fileName: text("file_name").notNull(),
+  provider: text("provider").notNull(),
+  url: text("url").notNull(),
+  remoteId: text("remote_id"),
+  mime: text("mime").notNull(),
+  bytes: integer("bytes").notNull().default(0),
+  createdAt: text("created_at").notNull().default(now()),
 });
 
 export const renderJobs = table("render_jobs", {

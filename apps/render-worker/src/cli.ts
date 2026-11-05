@@ -2,9 +2,9 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
 
-import { type AspectRatio, parseComposition } from "@proofcut/composition";
-import { composeFromScript, demoDossier, demoScript } from "@proofcut/pipeline";
-import { RemotionRenderBackend, renderFrame } from "@proofcut/renderer/node";
+import { type AspectRatio, parseComposition } from "@crewcut/composition";
+import { composeFromScript, demoDossier, demoScript } from "@crewcut/pipeline";
+import { RemotionRenderBackend, renderFrame } from "@crewcut/renderer/node";
 
 import { startAssetServer } from "./asset-server";
 
@@ -46,8 +46,8 @@ async function main(): Promise<void> {
     throw new Error("Pass --demo or --input <composition.json>");
   }
 
-  const browserExecutable = values.browser ?? process.env.PROOFCUT_BROWSER_EXECUTABLE ?? null;
-  const storageRoot = path.resolve(values.assets ?? process.env.PROOFCUT_STORAGE_DIR ?? "storage");
+  const browserExecutable = values.browser ?? process.env.CREWCUT_BROWSER_EXECUTABLE ?? null;
+  const storageRoot = path.resolve(values.assets ?? process.env.CREWCUT_STORAGE_DIR ?? "storage");
   const assetRoot = path.join(storageRoot, "assets");
   const bundleDir = path.join(storageRoot, ".remotion-bundle");
   const server = await startAssetServer(assetRoot);
