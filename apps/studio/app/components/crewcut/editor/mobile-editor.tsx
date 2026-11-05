@@ -1,4 +1,4 @@
-import { type Composition } from "@crewcut/composition";
+import { type Composition, type Track } from "@crewcut/composition";
 import {
   IconAdjustments,
   IconArrowBackUp,
@@ -29,6 +29,8 @@ import {
   IconTypography,
   IconUpload,
   IconVolume,
+  IconVolumeOff,
+  IconWaveSine,
   IconWand,
   IconArrowsMove,
 } from "@tabler/icons-react";
@@ -38,14 +40,14 @@ import { Link } from "react-router";
 import { BottomSheet, Button, ColorField } from "@/components/ds";
 import { cn } from "@/lib/utils";
 
-import { type Selection, addCaptionAt, copySelection, deleteSelection, describeSelection, duplicateSelection, generateCaptionsFromNarration, paste, run, setFormat, splitAtPlayhead } from "./commands";
+import { type Selection, addCaptionAt, copySelection, deleteSelection, describeSelection, duplicateSelection, generateCaptionsFromNarration, paste, run, setFormat, splitAtPlayhead, toggleTrack } from "./commands";
 import { type LeftTab, useEditor } from "./editor-store";
 import { EditorAssistant, askEditorAgent } from "./assistant";
 import { EditableTitle } from "./editor-page";
 import { Inspector } from "./inspector";
 import { LeftTabContent, VoiceRecorder } from "./left-panel";
 import { FullscreenControls, PreviewStage, Timecode, useFullscreen } from "./preview";
-import { Timeline } from "./timeline";
+import { type MobileLaneKit, Timeline } from "./timeline";
 
 /**
  * Phone editor (CapCut-style): preview on top, a timeline that scrolls under
@@ -148,7 +150,7 @@ function toolsFor(selection: Selection, open: (sheet: Sheet) => void, compositio
       if (solo && (layer.type === "image" || layer.type === "video")) tools.push({ id: "transition", label: "Transition", icon: IconArrowsExchange, onSelect: left("transitions", "Transition") });
       tools.push({ id: "opacity", label: "Opacity", icon: IconLayersSubtract, onSelect: inspector("basic", "Opacity & blend") });
       tools.push(common.duplicate, common.copy, common.delete);
-      tools.push({ id: "ask", label: "Ask AI", icon: IconWand, onSelect: () => void askEditorAgent("Look at the selected layer and suggest one improvement. Apply it as one undoable step with edit-composition.") });
+      tools.push({ id: "ask", label: "Ask AI", icon: IconWand, onSelect: () => void askEditorAgent("Look at the selected layer and suggest one improvement, then make it as one step I can undo.") });
       void composition;
       return tools;
     }
@@ -207,6 +209,69 @@ function CanvasSheetContent() {
       ) : null}
     </div>
   );
+}
+
+/** What a lane is for, in the person's words, and where adding to it happens. */
+function laneMeta(track: Track, isMain: boolean): { icon: typeof IconPhoto; add: string; sheet: Sheet } {
+  if (isMain) return { icon: IconPhoto, add: "Add photos or videos", sheet: { kind: "left", tab: "media", title: "Media" } };
+  if (track.kind === "caption") return { icon: IconBadgeCc, add: "Add captions", sheet: { kind: "left", tab: "captions", title: "Captions" } };
+  if (track.kind === "audio") {
+    if (track.role === "voice") return { icon: IconMicrophone, add: "Add voiceover", sheet: { kind: "record" } };
+    if (track.role === "music") return { icon: IconMusic, add: "Add music", sheet: { kind: "left", tab: "audio", title: "Audio" } };
+    return { icon: IconWaveSine, add: "Add sound effects", sheet: { kind: "left", tab: "audio", title: "Audio" } };
+  }
+  return { icon: IconTypography, add: "Add text or stickers", sheet: { kind: "left", tab: "text", title: "Text" } };
+}
+
+const LEAD_TILE = "pc-press flex shrink-0 flex-col items-center justify-center gap-1 rounded-ds-sm text-[10px] font-medium leading-none outline-none focus-visible:ring-2 focus-visible:ring-ds-accent";
+
+/**
+ * The phone timeline's lead-in (CapCut style): the half-screen before 0:00
+ * holds each lane's controls instead of empty space. Main track: mute its
+ * sound, ask the assistant, change the format. Other lanes: a chip that adds
+ * to that lane. Empty lanes get a "+ Add …" button; the main track ends in "+".
+ */
+function mobileLaneKit(composition: Composition, open: (sheet: Sheet) => void): MobileLaneKit {
+  return {
+    lead: (track, isMain) => {
+      const meta = laneMeta(track, isMain);
+      if (isMain) {
+        const muted = Boolean((track as { muted?: boolean }).muted);
+        return (
+          <>
+            <button type="button" onClick={() => toggleTrack(track, "muted")} aria-pressed={muted} className={cn(LEAD_TILE, "h-12 w-11", muted ? "text-ds-danger" : "text-ds-text-2")}>
+              {muted ? <IconVolumeOff className="size-5" /> : <IconVolume className="size-5" />}
+              {muted ? "Unmute" : "Mute"}
+            </button>
+            <button type="button" onClick={() => useEditor.getState().setAssistantOpen(true)} className={cn(LEAD_TILE, "h-12 w-[52px] bg-ds-surface-2 text-ds-text shadow-[inset_0_0_0_1px_var(--ds-hairline)]")}>
+              <IconSparkles className="size-5 text-ds-accent" />
+              Ask AI
+            </button>
+            <button type="button" onClick={() => open({ kind: "format" })} aria-label={`Format: ${composition.ratio}`} className={cn(LEAD_TILE, "h-12 w-[52px] bg-ds-surface-2 text-ds-text shadow-[inset_0_0_0_1px_var(--ds-hairline)]")}>
+              <IconAspectRatio className="size-5 text-ds-text-2" />
+              {composition.ratio}
+            </button>
+          </>
+        );
+      }
+      const muted = track.kind === "audio" && Boolean((track as { muted?: boolean }).muted);
+      return (
+        <button type="button" onClick={() => open(meta.sheet)} aria-label={meta.add} className={cn(LEAD_TILE, "size-8 bg-ds-surface-2 shadow-[inset_0_0_0_1px_var(--ds-hairline)]", muted ? "text-ds-danger" : "text-ds-text-2")}>
+          {muted ? <IconVolumeOff className="size-4" /> : <meta.icon className="size-4" />}
+        </button>
+      );
+    },
+    empty: (track, isMain) => {
+      const meta = laneMeta(track, isMain);
+      return { label: meta.add, onSelect: () => open(meta.sheet) };
+    },
+    tail: (track, isMain) =>
+      isMain && track.clips.length > 0 ? (
+        <button type="button" onClick={() => open({ kind: "left", tab: "media", title: "Media" })} aria-label="Add photos or videos at the end" className="pc-press flex size-10 items-center justify-center rounded-ds-sm bg-primary text-primary-foreground shadow-[var(--ds-shadow-sm)]">
+          <IconPlus className="size-5" />
+        </button>
+      ) : null,
+  };
 }
 
 function AddSheetContent({ onPick }: { onPick: (sheet: Sheet) => void }) {
@@ -285,7 +350,7 @@ export function MobileEditor({ onExport }: { onExport: () => void }) {
       </div>
 
       <div className="relative min-h-0 flex-1 border-t border-ds-border">
-        <Timeline variant="mobile" />
+        <Timeline variant="mobile" mobileLanes={mobileLaneKit(composition, open)} />
         <button type="button" aria-label="Add media, text or audio" onClick={() => open({ kind: "add" })} className="pc-press absolute bottom-3 right-3 z-30 flex size-11 items-center justify-center rounded-ds-md bg-primary text-primary-foreground shadow-[var(--ds-shadow-lg)]">
           <IconPlus className="size-5" />
         </button>

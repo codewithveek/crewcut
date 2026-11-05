@@ -48,7 +48,7 @@ import {
   IconZoomIn,
   IconZoomOut,
 } from "@tabler/icons-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -404,13 +404,26 @@ interface DragState {
   ghost: { trackId: string; startMs: number; durationMs: number } | null;
 }
 
+/**
+ * Phone lane extras, CapCut style: controls lined up against the start of
+ * each lane in the half-screen before 0:00, a full-width "+ Add …" button on
+ * empty lanes, and a tile after the end of a lane. They scroll with the tracks.
+ */
+export interface MobileLaneKit {
+  lead?: (track: Track, isMain: boolean) => ReactNode;
+  empty?: (track: Track, isMain: boolean) => { label: string; onSelect: () => void } | null;
+  tail?: (track: Track, isMain: boolean) => ReactNode;
+}
+
 export function Timeline({
   variant = "desktop",
   className,
   density = "regular",
   collapsed = false,
   onToggleCollapse,
+  mobileLanes,
 }: {
+  mobileLanes?: MobileLaneKit;
   variant?: Variant;
   className?: string;
   density?: Density;
@@ -807,10 +820,23 @@ export function Timeline({
                 const height = laneHeight(track, isMain, variant, density);
                 const isDropLane = laneDrop?.trackId === track.id;
                 const ghost = drag?.ghost && drag.ghost.trackId === track.id ? drag.ghost : null;
+                const lead = mobile ? mobileLanes?.lead?.(track, isMain) : null;
+                const tail = mobile ? mobileLanes?.tail?.(track, isMain) : null;
+                const empty = mobile && track.clips.length === 0 ? (mobileLanes?.empty?.(track, isMain) ?? null) : null;
                 return (
                   <div key={track.id}>
-                    <div className="flex" style={{ height }}>
+                    <div className="relative flex" style={{ height }}>
                       {!mobile ? <TrackHeader track={track} isMain={isMain} height={height} /> : null}
+                      {lead ? (
+                        <div className="absolute inset-y-0 left-0 z-10 flex items-center justify-end gap-1.5 overflow-hidden pr-2.5" style={{ width: pad }}>
+                          {lead}
+                        </div>
+                      ) : null}
+                      {tail ? (
+                        <div className="absolute inset-y-0 z-10 flex items-center pl-2" style={{ left: pad + composition.durationMs * pxPerMs }}>
+                          {tail}
+                        </div>
+                      ) : null}
                       <div
                         data-lane-id={track.id}
                         data-drop={isDropLane ? "true" : "false"}
@@ -850,6 +876,16 @@ export function Timeline({
                               />
                             );
                           })}
+                        {empty ? (
+                          <button
+                            type="button"
+                            onClick={empty.onSelect}
+                            className="pc-press absolute inset-y-1 left-0 flex items-center gap-1.5 rounded-ds-sm bg-ds-surface-2 px-3 text-[13px] text-ds-text-2 shadow-[inset_0_0_0_1px_var(--ds-hairline)]"
+                            style={{ width: Math.max(150, Math.min(composition.durationMs * pxPerMs, view.width / 2 - 16)) }}
+                          >
+                            <IconPlus className="size-4 shrink-0" /> <span className="truncate">{empty.label}</span>
+                          </button>
+                        ) : null}
                         {ghost && drag && drag.trackId !== track.id ? <div className="pointer-events-none absolute top-[3px] bottom-[3px] rounded-[7px] border-2 border-dashed border-ds-accent bg-ds-accent-soft" style={{ left: ghost.startMs * pxPerMs, width: ghost.durationMs * pxPerMs }} /> : null}
                         {isDropLane && laneDrop ? <div className="pointer-events-none absolute inset-y-0 w-0.5 bg-ds-accent" style={{ left: laneDrop.atMs * pxPerMs }} /> : null}
                       </div>
@@ -994,7 +1030,7 @@ function TimelineToolbar({ density, collapsed, onToggleCollapse }: { density: De
         <IconBookmark />
       </IconButton>
       <div className="ml-auto flex shrink-0 items-center gap-0.5">
-        <IconButton label={ripple ? "Ripple editing on: deletes and trims close gaps" : "Ripple editing off"} active={ripple} onClick={() => editor().toggleRipple()}>
+        <IconButton label={ripple ? "Close gaps: on. Deleting or trimming a clip pulls the next ones in" : "Close gaps: off"} active={ripple} onClick={() => editor().toggleRipple()}>
           <IconArrowsExchange />
         </IconButton>
         <IconButton label="Snapping (hold Alt to bypass)" active={snapping} onClick={() => editor().toggleSnapping()}>
