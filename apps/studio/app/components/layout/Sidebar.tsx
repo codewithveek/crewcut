@@ -10,40 +10,21 @@ import {
   OwnershipChatHistoryRail,
   useOwnershipChatHistory,
 } from "@agent-native/toolkit/app/chat/ownership-history";
-import { OrgSwitcher } from "@agent-native/toolkit/app/org";
 import { openCommandMenu } from "@agent-native/toolkit/app/shared";
-import {
-  IconEdit,
-  IconApps,
-  IconHome,
-  IconPlugConnected,
-  IconLayoutSidebarLeftCollapse,
-  IconLayoutSidebarLeftExpand,
-  IconLoader2,
-  IconSearch,
-} from "@tabler/icons-react";
+import { IconEdit, IconLoader2, IconMoon, IconSearch, IconSun } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { ProofcutMark } from "@/components/proofcut/primitives";
+import { CrewcutMark } from "@/components/crewcut/primitives";
 import { APP_TITLE } from "@/lib/app-config";
-import { chatThreadPath, HOME_PATH, threadIdFromPath } from "@/lib/chat-paths";
+import { chatThreadPath, threadIdFromPath } from "@/lib/chat-paths";
 import { cn } from "@/lib/utils";
+
+import { PRIMARY_NAV, SECONDARY_NAV, useThemeToggle } from "./nav-items";
 
 const CHAT_STORAGE_KEY = "chat";
 const CHAT_ACTIVE_THREAD_KEY = `agent-chat-active-thread:${CHAT_STORAGE_KEY}`;
-
-interface SidebarProps {
-  collapsed?: boolean;
-  collapsible?: boolean;
-  onCollapsedChange?: (collapsed: boolean) => void;
-}
 
 function ThreadHistoryTitle({
   title,
@@ -119,54 +100,7 @@ function persistActiveThreadId(threadId: string) {
   } catch {}
 }
 
-interface NavItemProps {
-  to: string;
-  label: string;
-  icon: typeof IconHome;
-  collapsed: boolean;
-  match: (pathname: string) => boolean;
-}
-
-function NavItem({ to, label, icon: Icon, collapsed, match }: NavItemProps) {
-  const location = useLocation();
-  const active = match(location.pathname);
-  const link = (
-    <Link
-      to={to}
-      aria-current={active ? "page" : undefined}
-      aria-label={collapsed ? label : undefined}
-      className={cn(
-        "pc-press flex items-center text-sidebar-accent-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-        active && "bg-sidebar-accent",
-        collapsed ? "size-8 justify-center rounded-md" : "h-8 w-full gap-3 rounded-lg px-3 text-sm font-medium",
-      )}
-    >
-      <Icon className="size-4 shrink-0" strokeWidth={1.8} />
-      <span className={collapsed ? "sr-only" : "truncate"}>{label}</span>
-    </Link>
-  );
-  if (collapsed) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>{link}</TooltipTrigger>
-        <TooltipContent side="right">{label}</TooltipContent>
-      </Tooltip>
-    );
-  }
-  return link;
-}
-
-function ProofcutNav({ collapsed }: { collapsed: boolean }) {
-  return (
-    <div className={cn("flex flex-col gap-0.5", collapsed ? "items-center" : "px-2 pb-3")}>
-      <NavItem to={HOME_PATH} label="Studio" icon={IconHome} collapsed={collapsed} match={(path) => path === HOME_PATH || path.startsWith("/videos")} />
-      <NavItem to="/connections" label="Connections" icon={IconPlugConnected} collapsed={collapsed} match={(path) => path === "/connections"} />
-      <NavItem to="/extensions" label="Mini-apps" icon={IconApps} collapsed={collapsed} match={(path) => path.startsWith("/extensions")} />
-    </div>
-  );
-}
-
-function ChatThreadsSection({ collapsed }: { collapsed: boolean }) {
+function ChatThreadsSection() {
   const navigate = useNavigate();
   const location = useLocation();
   const t = useT();
@@ -256,29 +190,12 @@ function ChatThreadsSection({ collapsed }: { collapsed: boolean }) {
     <button
       type="button"
       onClick={() => void handleNewChat()}
-      className={cn(
-        "flex items-center text-sidebar-accent-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-        collapsed
-          ? "size-8 justify-center rounded-md"
-          : "h-8 w-full gap-3 rounded-lg px-3 text-sm font-medium",
-      )}
-      aria-label={collapsed ? t("chat.newChat") : undefined}
+      className="pc-press flex h-9 w-full items-center gap-3 rounded-ds-sm px-3 text-sm font-medium text-ds-text outline-none hover:bg-ds-surface-3 focus-visible:ring-2 focus-visible:ring-ds-accent"
     >
       <IconEdit className="size-4 shrink-0" strokeWidth={1.8} />
-      <span className={collapsed ? "sr-only" : "truncate"}>
-        {t("chat.newChat")}
-      </span>
+      <span className="truncate">{t("chat.newChat")}</span>
     </button>
   );
-
-  if (collapsed) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>{newChatButton}</TooltipTrigger>
-        <TooltipContent side="right">{t("chat.newChat")}</TooltipContent>
-      </Tooltip>
-    );
-  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -317,129 +234,69 @@ function ChatThreadsSection({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-export function Sidebar({
-  collapsed = false,
-  collapsible = true,
-  onCollapsedChange,
-}: SidebarProps) {
+/** Chat history beside the rail on chat routes (desktop/tablet). */
+export function ChatHistoryPanel() {
   const t = useT();
-  const ToggleIcon = collapsed
-    ? IconLayoutSidebarLeftExpand
-    : IconLayoutSidebarLeftCollapse;
-  const collapseButton = collapsible ? (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={() => onCollapsedChange?.(!collapsed)}
-          className="flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-          aria-label={
-            collapsed
-              ? t("navigation.expandSidebar")
-              : t("navigation.collapseSidebar")
-          }
-        >
-          <ToggleIcon className="size-4" strokeWidth={1.8} />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="right">
-        {collapsed
-          ? t("navigation.expandSidebar")
-          : t("navigation.collapseSidebar")}
-      </TooltipContent>
-    </Tooltip>
-  ) : null;
-  const searchButton = (
-    <Tooltip>
-      <TooltipTrigger asChild>
+  return (
+    <aside className="flex h-full w-[264px] shrink-0 flex-col border-e border-ds-border bg-sidebar text-sidebar-foreground" aria-label={t("navigation.navigation")}>
+      <div className="flex h-14 shrink-0 items-center gap-2 px-4">
+        <span className="ds-heading min-w-0 flex-1 truncate text-ds-text">Chats</span>
         <button
           type="button"
           onClick={openCommandMenu}
           aria-label={t("root.commandSearch")}
-          className="flex size-8 items-center justify-center rounded-md text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          title={t("root.commandSearch")}
+          className="pc-press flex size-8 items-center justify-center rounded-ds-sm text-ds-text-2 outline-none hover:bg-ds-surface-3 hover:text-ds-text focus-visible:ring-2 focus-visible:ring-ds-accent"
         >
           <IconSearch className="size-4" strokeWidth={1.8} />
         </button>
-      </TooltipTrigger>
-      <TooltipContent side="right">{t("root.commandSearch")}</TooltipContent>
-    </Tooltip>
-  );
-
-  return (
-    <aside
-      data-collapsed={collapsed ? "true" : "false"}
-      className={cn(
-        "flex h-full min-w-0 shrink-0 flex-col overflow-hidden border-e border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-out",
-        collapsed ? "w-12" : "w-full",
-      )}
-    >
-      <div
-        className={cn(
-          "flex h-14 shrink-0 items-center",
-          collapsed ? "justify-center px-1" : "gap-1 px-3",
-        )}
-      >
-        {collapsed ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Link
-                to="/"
-                aria-label={APP_TITLE}
-                className="flex size-8 items-center justify-center rounded outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-              >
-                <ProofcutMark className="size-5" />
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent side="right">{APP_TITLE}</TooltipContent>
-          </Tooltip>
-        ) : (
-          <>
-            <Link
-              to="/"
-              className="flex min-w-0 flex-1 items-center gap-3 rounded outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-            >
-              <ProofcutMark className="size-5 shrink-0" />
-              <span className="truncate text-sm font-semibold text-sidebar-accent-foreground">
-                {APP_TITLE}
-              </span>
-            </Link>
-          </>
-        )}
       </div>
-
-      <nav
-        aria-label={t("navigation.navigation")}
-        className={cn(
-          "flex min-h-0 flex-1 flex-col",
-          collapsed ? "items-center gap-1 px-1 py-2" : "pt-1",
-        )}
-      >
-        <ProofcutNav collapsed={collapsed} />
-        <ChatThreadsSection collapsed={collapsed} />
-      </nav>
-
-      <div className="mt-auto shrink-0 border-t border-sidebar-border p-2">
-        <div
-          className={cn(
-            collapsed
-              ? "flex flex-col items-center gap-1"
-              : "flex items-center gap-0.5",
-          )}
-        >
-          <OrgSwitcher
-            reserveSpace
-            compact={collapsed}
-            currentAppId="proofcut"
-            className={
-              collapsed
-                ? "size-8 bg-transparent p-0 hover:bg-sidebar-accent"
-                : "min-w-0 flex-1 h-11 rounded-lg bg-transparent px-3 py-2 text-sm text-sidebar-accent-foreground hover:bg-sidebar-accent"
-            }
-          />
-          {searchButton}
-          {collapseButton}
-        </div>
-      </div>
+      <ChatThreadsSection />
     </aside>
+  );
+}
+
+/** The phone navigation sheet (chat and framework routes): destinations + chat history. */
+export function MobileNavigationPanel() {
+  const location = useLocation();
+  const theme = useThemeToggle();
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-sidebar">
+      <div className="flex h-14 shrink-0 items-center gap-3 px-4">
+        <CrewcutMark className="size-7" />
+        <span className="ds-heading text-ds-text">{APP_TITLE}</span>
+      </div>
+      <nav className="grid shrink-0 grid-cols-4 gap-1 px-2 pb-3" aria-label="Main">
+        {[...PRIMARY_NAV, ...SECONDARY_NAV].map((item) => {
+          const active = item.match(location.pathname);
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "pc-press flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-ds-md text-[11px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ds-accent [&_svg]:size-5",
+                active ? "bg-ds-surface-3 text-ds-text" : "text-ds-text-2",
+              )}
+            >
+              <Icon strokeWidth={1.8} />
+              <span className="max-w-full truncate px-1">{item.label}</span>
+            </Link>
+          );
+        })}
+        <button
+          type="button"
+          onClick={theme.toggle}
+          className="pc-press flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-ds-md text-[11px] font-medium text-ds-text-2 outline-none focus-visible:ring-2 focus-visible:ring-ds-accent [&_svg]:size-5"
+        >
+          {theme.dark ? <IconSun strokeWidth={1.8} /> : <IconMoon strokeWidth={1.8} />}
+          <span>{theme.dark ? "Light" : "Dark"}</span>
+        </button>
+      </nav>
+      <div className="flex min-h-0 flex-1 flex-col border-t border-ds-border pt-3">
+        <ChatThreadsSection />
+      </div>
+    </div>
   );
 }

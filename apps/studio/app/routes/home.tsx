@@ -1,4 +1,4 @@
-import { HomePage } from "@/components/proofcut/home-page";
+import { HomePage } from "@/components/crewcut/home-page";
 import { APP_TITLE } from "@/lib/app-config";
 
 export function meta() {

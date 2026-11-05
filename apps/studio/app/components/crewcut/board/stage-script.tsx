@@ -1,11 +1,11 @@
 import { useActionMutation } from "@agent-native/core/client/hooks";
-import { countWords, scriptWordCount, wordBudget } from "@proofcut/contracts";
+import { countWords, scriptWordCount, wordBudget } from "@crewcut/contracts";
 import { IconAlertTriangle, IconPencil, IconScript, IconWand } from "@tabler/icons-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { STAGE_PROMPTS, askAgent, errorMessage } from "@/lib/proofcut";
+import { STAGE_PROMPTS, askAgent, errorMessage } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
 import { EmptyState, VerdictBadge } from "../primitives";

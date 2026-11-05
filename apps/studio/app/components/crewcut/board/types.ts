@@ -1,4 +1,4 @@
-import type { ArtDirectionBrief } from "@proofcut/composition";
+import type { ArtDirectionBrief } from "@crewcut/composition";
 import type {
   ApprovalEvent,
   AuditReport,
@@ -9,7 +9,7 @@ import type {
   Script,
   Stage,
   StageStates,
-} from "@proofcut/contracts";
+} from "@crewcut/contracts";
 
 /** Shape of the `get-video` action's result, as the board reads it. */
 export interface VideoState {

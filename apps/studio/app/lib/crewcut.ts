@@ -1,5 +1,5 @@
 import { sendToAgentChat } from "@agent-native/core/client/agent-chat";
-import { STAGE_LABELS, type Stage, type StageStatus } from "@proofcut/contracts";
+import { STAGE_LABELS, type Stage, type StageStatus } from "@crewcut/contracts";
 
 export { STAGE_LABELS };
 export const STAGE_ORDER: readonly Stage[] = ["trend", "research", "script", "qa", "motion", "voice", "publish", "analytics"];

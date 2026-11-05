@@ -6,7 +6,7 @@ import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { errorMessage, formatAgo } from "@/lib/proofcut";
+import { errorMessage, formatAgo } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
 import { Panel, SkeletonLines } from "./primitives";
@@ -58,7 +58,7 @@ export function ConnectionsPage() {
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-4 py-6 sm:px-6">
       <header>
         <h1 className="pc-display text-2xl text-foreground">Connections</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Accounts Proofcut can publish to and providers it can use. Tokens live in the encrypted vault; revoke any of them here in one click.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Accounts Crewcut can publish to and providers it can use. Tokens live in the encrypted vault; revoke any of them here in one click.</p>
       </header>
 
       <Panel

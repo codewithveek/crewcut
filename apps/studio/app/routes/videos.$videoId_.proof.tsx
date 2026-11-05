@@ -1,9 +1,9 @@
 import { useParams } from "react-router";
 
-import { ProofReportPage } from "@/components/proofcut/proof-report";
+import { ProofReportPage } from "@/components/crewcut/proof-report";
 
 export function meta() {
-  return [{ title: "Proof report — Proofcut" }];
+  return [{ title: "Proof report — Crewcut" }];
 }
 
 export default function ProofReportRoute() {

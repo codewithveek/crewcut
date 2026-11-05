@@ -1,11 +1,11 @@
 import { useActionQuery } from "@agent-native/core/client/hooks";
-import type { Stage } from "@proofcut/contracts";
+import type { Stage } from "@crewcut/contracts";
 import { IconArrowLeft, IconCertificate, IconPlayerPlay, IconSparkles } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
 import { Button } from "@/components/ui/button";
-import { STAGE_LABELS, STAGE_ORDER, STAGE_PROMPTS, askAgent, formatAgo } from "@/lib/proofcut";
+import { STAGE_LABELS, STAGE_ORDER, STAGE_PROMPTS, askAgent, formatAgo } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
 import { Panel, SkeletonLines, StatusPill } from "../primitives";

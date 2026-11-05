@@ -80,6 +80,9 @@ function viewForPath(pathname: string): string {
   if (/^\/videos\/[^/]+\/proof/.test(pathname)) return "proof";
   if (pathname.startsWith("/videos/")) return "video";
   if (pathname.startsWith("/connections")) return "connections";
+  if (pathname.startsWith("/projects")) return "projects";
+  if (pathname.startsWith("/assets")) return "assets";
+  if (pathname.startsWith("/design")) return "design";
   if (isChatPathname(pathname)) return "chat";
   if (pathname === HOME_PATH) return "home";
   if (pathname.startsWith("/database")) return "database";
@@ -100,6 +103,12 @@ function pathForView(view?: string, videoId?: string): string {
   switch (view) {
     case "connections":
       return "/connections";
+    case "projects":
+      return "/projects";
+    case "assets":
+      return "/assets";
+    case "design":
+      return "/design";
     case "chat":
     case "ask":
       return NEW_CHAT_PATH;

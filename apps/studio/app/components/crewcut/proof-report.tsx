@@ -1,13 +1,13 @@
 import { useActionQuery } from "@agent-native/core/client/hooks";
-import type { ClaimVerdict } from "@proofcut/contracts";
+import type { ClaimVerdict } from "@crewcut/contracts";
 import { IconArrowLeft, IconExternalLink, IconPrinter, IconRobot, IconUser } from "@tabler/icons-react";
 import { Link } from "react-router";
 
 import { Button } from "@/components/ui/button";
-import { STAGE_LABELS, formatAgo } from "@/lib/proofcut";
+import { STAGE_LABELS, formatAgo } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
-import { ProofcutMark, SkeletonLines, VerdictBadge } from "./primitives";
+import { CrewcutMark, SkeletonLines, VerdictBadge } from "./primitives";
 
 interface ProofReport {
   video: { id: string; title: string; ratio: string; status: string; isDemo: boolean; createdAt: string };
@@ -68,7 +68,7 @@ export function ProofReportPage({ videoId }: { videoId: string }) {
             <IconArrowLeft className="size-3.5" /> Pipeline
           </Link>
           <p className="mt-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            <ProofcutMark className="size-4" /> Proof report
+            <CrewcutMark className="size-4" /> Proof report
           </p>
           <h1 className="pc-display mt-1 text-2xl text-foreground sm:text-3xl">{report.video.title}</h1>
           <p className="mt-1 text-xs text-muted-foreground">

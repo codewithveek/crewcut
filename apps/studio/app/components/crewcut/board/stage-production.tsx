@@ -1,12 +1,12 @@
 import { useActionMutation } from "@agent-native/core/client/hooks";
-import { formatTimecode } from "@proofcut/composition";
+import { formatTimecode } from "@crewcut/composition";
 import { IconChartLine, IconDownload, IconExternalLink, IconMicrophone, IconMovie, IconPlayerPlay, IconSparkles, IconUpload } from "@tabler/icons-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { STAGE_PROMPTS, askAgent, errorMessage, formatAgo, formatBytes } from "@/lib/proofcut";
+import { STAGE_PROMPTS, askAgent, errorMessage, formatAgo, formatBytes } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
 import { EmptyState } from "../primitives";

@@ -1,8 +1,8 @@
-import type { ClaimVerdict, StageStatus } from "@proofcut/contracts";
+import type { ClaimVerdict, StageStatus } from "@crewcut/contracts";
 import { IconCheck, IconCircleDashed, IconLoader2, IconAlertTriangle, IconHandStop, IconX } from "@tabler/icons-react";
 import type { ReactNode } from "react";
 
-import { STATUS_META } from "@/lib/proofcut";
+import { STATUS_META } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
 const TONE_CLASS = {
@@ -91,12 +91,15 @@ export function SkeletonLines({ count = 3 }: { count?: number }) {
   );
 }
 
-export function ProofcutMark({ className }: { className?: string }) {
+/** The Crewcut logo mark (kept under its original name so imports stay stable). */
+export function CrewcutMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={cn("size-5", className)} aria-hidden>
-      <rect x="2" y="2" width="20" height="20" rx="6" fill="var(--pc-accent)" />
-      <path d="M8 16.5V7.5h4.2a3 3 0 0 1 0 6H8" fill="none" stroke="var(--pc-on-accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M13.5 15.5l1.8 1.8 3.2-3.6" fill="none" stroke="var(--pc-on-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Crewcut: a "C" with a cut stroke through its tail and a crew dot in the gap. */}
+      <rect x="1" y="1" width="22" height="22" rx="6.5" fill="var(--pc-accent)" />
+      <path d="M16.7 8.3A5.7 5.7 0 1 0 16.7 15.7" fill="none" stroke="var(--pc-on-accent)" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M5.6 18.4L10.1 13.9" fill="none" stroke="var(--pc-on-accent)" strokeWidth="1.7" strokeLinecap="round" />
+      <circle cx="18.2" cy="12" r="1.25" fill="var(--pc-on-accent)" />
     </svg>
   );
 }

@@ -1,0 +1,389 @@
+/*
+ * Crewcut design system (layer 2: utilities). Tokens live in global.css.
+ * Rules: hairlines with alpha instead of heavy borders, tabular numbers for
+ * every timecode, ink-black/white primary actions with one violet brand
+ * accent, press feedback at scale(0.97), short ease-out UI motion, and every
+ * motion / transparency / contrast preference respected.
+ */
+@theme inline {
+  --color-ds-bg: var(--ds-bg);
+  --color-ds-surface: var(--ds-surface);
+  --color-ds-surface-2: var(--ds-surface-2);
+  --color-ds-surface-3: var(--ds-surface-3);
+  --color-ds-sunken: var(--ds-sunken);
+  --color-ds-stage: var(--ds-stage);
+  --color-ds-text: var(--ds-text);
+  --color-ds-text-2: var(--ds-text-2);
+  --color-ds-text-3: var(--ds-text-3);
+  --color-ds-border: var(--ds-border);
+  --color-ds-accent: var(--ds-accent);
+  --color-ds-accent-soft: var(--ds-accent-soft);
+  --color-ds-on-accent: var(--ds-on-accent);
+  --color-ds-success: var(--ds-success);
+  --color-ds-warning: var(--ds-warning);
+  --color-ds-danger: var(--ds-danger);
+  --color-ds-info: var(--ds-info);
+  --color-kind-media: var(--clip-media);
+  --color-kind-graphic: var(--clip-graphic);
+  --color-kind-text: var(--clip-text);
+  --color-kind-caption: var(--clip-caption);
+  --color-kind-voice: var(--clip-voice);
+  --color-kind-music: var(--clip-music);
+  --color-kind-sfx: var(--clip-sfx);
+  --color-kind-effect: var(--clip-effect);
+  --color-pc-accent: var(--pc-accent);
+  --color-pc-accent-soft: var(--pc-accent-soft);
+  --color-pc-on-accent: var(--pc-on-accent);
+  --color-supported: var(--pc-supported);
+  --color-weak: var(--pc-weak);
+  --color-unsupported: var(--pc-unsupported);
+  --color-pc-canvas: var(--pc-canvas);
+  --color-pc-track: var(--pc-track);
+  --color-pc-clip: var(--pc-clip);
+  --color-pc-playhead: var(--pc-playhead);
+  --radius-ds-xs: var(--ds-radius-xs);
+  --radius-ds-sm: var(--ds-radius-sm);
+  --radius-ds-md: var(--ds-radius-md);
+  --radius-ds-lg: var(--ds-radius-lg);
+  --radius-ds-xl: var(--ds-radius-xl);
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+}
+
+html,
+body {
+  font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* No input zoom on iOS: inputs stay at 16px on touch devices. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* ── Type scale ───────────────────────────────────────────────────────────── */
+.ds-display {
+  font-size: clamp(1.75rem, 1.2rem + 2vw, 2.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  font-weight: 600;
+}
+.ds-title {
+  font-size: 1.25rem;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+}
+.ds-heading {
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+}
+.ds-body {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.ds-label {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  font-weight: 500;
+}
+.ds-caption {
+  font-size: 0.6875rem;
+  line-height: 1.3;
+}
+.ds-overline {
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.pc-display {
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ── Surfaces ─────────────────────────────────────────────────────────────── */
+.pc-hairline {
+  box-shadow: 0 0 0 1px var(--ds-hairline);
+}
+
+.ds-panel,
+.pc-panel {
+  background: var(--ds-surface);
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-md), 0 0 0 1px var(--ds-hairline);
+}
+
+.ds-card {
+  background: var(--ds-surface);
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-sm), 0 0 0 1px var(--ds-hairline);
+}
+
+.ds-popover {
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  border-radius: var(--ds-radius-md);
+  box-shadow: var(--ds-shadow-lg), 0 0 0 1px var(--ds-hairline);
+}
+
+/* Floating chrome over the preview and timeline. */
+.pc-glass {
+  background: color-mix(in oklab, var(--ds-surface) 74%, transparent);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow: 0 0 0 1px var(--ds-hairline), 0 10px 30px -14px rgb(0 0 0 / 0.45);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .pc-glass {
+    background: var(--ds-surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --ds-hairline: rgb(0 0 0 / 0.35);
+    --ds-text-2: #3d434e;
+  }
+  .dark {
+    --ds-hairline: rgb(255 255 255 / 0.35);
+    --ds-text-2: #d0d0d6;
+  }
+}
+
+/* ── Interaction ──────────────────────────────────────────────────────────── */
+/* Press feedback on pointer-down (never on keyboard-driven actions). */
+.pc-press {
+  transition: transform var(--ds-dur-fast) var(--ds-ease-out), background-color var(--ds-dur-fast) ease, color var(--ds-dur-fast) ease, box-shadow var(--ds-dur-fast) ease, opacity var(--ds-dur-fast) ease;
+}
+.pc-press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.pc-focus:focus-visible,
+.pc-press:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 2px;
+}
+
+/* Skeletons while loading. */
+.pc-skeleton {
+  background: linear-gradient(90deg, var(--ds-surface-2) 0%, var(--ds-surface-3) 50%, var(--ds-surface-2) 100%);
+  background-size: 200% 100%;
+  animation: pc-shimmer 1.4s linear infinite;
+  border-radius: 8px;
+}
+@keyframes pc-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* "Agent is working" on whatever it is changing. */
+.pc-agent-working {
+  position: relative;
+}
+.pc-agent-working::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--ds-accent-soft), transparent);
+  background-size: 200% 100%;
+  animation: pc-shimmer 1.6s linear infinite;
+  box-shadow: 0 0 0 1px var(--ds-accent);
+}
+
+/* Entrances for UI panels: ease-out, from 0.985, short. */
+.pc-enter {
+  animation: pc-enter 220ms var(--ds-ease-out) both;
+}
+@keyframes pc-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Menus and popovers grow from their trigger. */
+.ds-menu-enter[data-state="open"] {
+  animation: ds-menu-in 140ms var(--ds-ease-out) both;
+}
+/* Individual `scale` so centring transforms (dialogs) are never overridden. */
+@keyframes ds-menu-in {
+  from {
+    opacity: 0;
+    scale: 0.97;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+.ds-fade-enter[data-state="open"] {
+  animation: ds-fade-in 160ms ease-out both;
+}
+@keyframes ds-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Editor ───────────────────────────────────────────────────────────────── */
+.pc-timeline-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ds-border) transparent;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+}
+.ds-no-scrollbar {
+  scrollbar-width: none;
+}
+.ds-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.pc-clip {
+  background: var(--ds-surface-2);
+  box-shadow: 0 0 0 1px var(--ds-hairline);
+}
+.ds-clip {
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+}
+.ds-clip[data-selected="true"],
+.pc-clip[data-selected="true"] {
+  box-shadow: 0 0 0 2px var(--ds-selection), inset 0 0 0 1px rgb(0 0 0 / 0.2);
+  z-index: 2;
+}
+.ds-clip[data-drop="true"] {
+  box-shadow: 0 0 0 2px var(--ds-accent);
+}
+.pc-trim-handle {
+  cursor: ew-resize;
+  touch-action: none;
+}
+.ds-lane[data-drop="true"] {
+  background: color-mix(in oklab, var(--ds-accent) 10%, var(--ds-sunken));
+  box-shadow: inset 0 0 0 1px var(--ds-accent);
+}
+
+/* Transition thumbnails: B plays into A on a loop (paused under reduced motion). */
+.ds-transition-b {
+  animation: ds-tr-crossfade 2.2s var(--ds-ease-in-out) infinite;
+}
+.ds-transition-demo[data-type="push"] .ds-transition-b,
+.ds-transition-demo[data-type="slide"] .ds-transition-b {
+  animation-name: ds-tr-slide;
+}
+.ds-transition-demo[data-type="wipe"] .ds-transition-b {
+  animation-name: ds-tr-wipe;
+}
+.ds-transition-demo[data-type="zoom-through"] .ds-transition-b,
+.ds-transition-demo[data-type="scale-fade"] .ds-transition-b {
+  animation-name: ds-tr-zoom;
+}
+.ds-transition-demo[data-type="blur-crossfade"] .ds-transition-b {
+  animation-name: ds-tr-blur;
+}
+.ds-transition-demo[data-type="cut"] .ds-transition-b {
+  animation-name: ds-tr-cut;
+}
+@keyframes ds-tr-crossfade {
+  0%, 30% { opacity: 0; }
+  60%, 100% { opacity: 1; }
+}
+@keyframes ds-tr-slide {
+  0%, 30% { transform: translateX(100%); }
+  60%, 100% { transform: translateX(0); }
+}
+@keyframes ds-tr-wipe {
+  0%, 30% { clip-path: inset(0 0 0 100%); }
+  60%, 100% { clip-path: inset(0 0 0 0); }
+}
+@keyframes ds-tr-zoom {
+  0%, 30% { opacity: 0; transform: scale(0.8); }
+  60%, 100% { opacity: 1; transform: scale(1); }
+}
+@keyframes ds-tr-blur {
+  0%, 30% { opacity: 0; filter: blur(6px); }
+  60%, 100% { opacity: 1; filter: blur(0); }
+}
+@keyframes ds-tr-cut {
+  0%, 49% { opacity: 0; }
+  50%, 100% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds-transition-b {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* Checkerboard behind transparent media and the preview stage. */
+.ds-checker {
+  background-color: var(--ds-surface-2);
+  background-image: linear-gradient(45deg, var(--ds-surface-3) 25%, transparent 25%), linear-gradient(-45deg, var(--ds-surface-3) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--ds-surface-3) 75%), linear-gradient(-45deg, transparent 75%, var(--ds-surface-3) 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+}
+
+@media (pointer: coarse) {
+  .pc-trim-handle {
+    width: 22px !important;
+  }
+  .pc-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+.pc-safe-bottom {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+.ds-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pc-press,
+  .pc-enter,
+  .pc-skeleton,
+  .ds-menu-enter[data-state="open"],
+  .ds-fade-enter[data-state="open"],
+  .pc-agent-working::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .pc-press:active:not(:disabled) {
+    transform: none;
+  }
+}

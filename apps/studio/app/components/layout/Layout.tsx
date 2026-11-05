@@ -26,13 +26,17 @@ import {
 import { APP_TITLE } from "@/lib/app-config";
 import { HOME_PATH, isChatPathname } from "@/lib/chat-paths";
 import { TAB_ID } from "@/lib/tab-id";
+import { cn } from "@/lib/utils";
 
 // Not lazy() like Header: the inspector wraps the page, so a Suspense fallback
 // would mount the page once before its chunk loads and again after.
 // AgentSidebar already lazy-loads its own panel.
 import { AgentInspector } from "./AgentInspector";
+import { AppRail } from "./AppRail";
 import { MobileAppBar } from "./MobileAppBar";
-import { Sidebar } from "./Sidebar";
+import { MobileNav } from "./MobileNav";
+import { isEditorPath, isCrewcutPage } from "./nav-items";
+import { ChatHistoryPanel, MobileNavigationPanel } from "./Sidebar";
 
 const Header = lazy(() =>
   import("./Header").then((module) => ({ default: module.Header })),
@@ -42,17 +46,15 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-const SIDEBAR_COLLAPSE_KEY = "chat.sidebar.collapsed";
-
 function routeOwnsToolbar(pathname: string): boolean {
   return (
     pathname === HOME_PATH ||
     isChatPathname(pathname) ||
     pathname === "/database" ||
     pathname.startsWith("/extensions") ||
-    // Proofcut pages draw their own headers (the editor owns the whole canvas).
-    pathname.startsWith("/videos/") ||
-    pathname === "/connections"
+    // Crewcut pages draw their own headers (the editor owns the whole canvas).
+    isCrewcutPage(pathname) ||
+    isEditorPath(pathname)
   );
 }
 
@@ -90,7 +92,6 @@ function LayoutShell({ children }: LayoutProps) {
   const location = useLocation();
   const t = useT();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const isChatRoute = isChatPathname(location.pathname);
   // Settings brings its own navigation, header, and agent toggle, so it
   // renders full width.
@@ -119,26 +120,6 @@ function LayoutShell({ children }: LayoutProps) {
     };
   }, []);
 
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(SIDEBAR_COLLAPSE_KEY);
-      if (stored !== null) setSidebarCollapsed(stored === "1");
-    } catch {
-      // Ignore storage access errors; the default collapsed state still works.
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        SIDEBAR_COLLAPSE_KEY,
-        sidebarCollapsed ? "1" : "0",
-      );
-    } catch {
-      // Ignore storage access errors.
-    }
-  }, [sidebarCollapsed]);
-
   const pageTitle = useHeaderTitle();
   const pageActions = useHeaderActions();
   // Until the chat route publishes its title and toolbar here, the AgentKit
@@ -147,6 +128,10 @@ function LayoutShell({ children }: LayoutProps) {
     isChatRoute && (pageTitle != null || pageActions != null);
   const openMobileSidebar = () => setMobileSidebarOpen(true);
   const ownsToolbar = routeOwnsToolbar(location.pathname);
+  const editorRoute = isEditorPath(location.pathname);
+  // Phones: Crewcut pages get the bottom nav; the editor gets neither bar.
+  const showMobileNav = isCrewcutPage(location.pathname);
+  const showMobileAppBar = isChatRoute || (ownsToolbar && !showMobileNav && !editorRoute);
   const contentFrame = (
     <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
       {isChatRoute ? (
@@ -157,18 +142,27 @@ function LayoutShell({ children }: LayoutProps) {
           actions={pageActions}
         />
       ) : ownsToolbar ? (
-        <MobileAppBar
-          className="md:hidden"
-          onOpenNavigation={openMobileSidebar}
-        />
+        showMobileAppBar ? (
+          <MobileAppBar
+            className="md:hidden"
+            onOpenNavigation={openMobileSidebar}
+          />
+        ) : null
       ) : settingsOwnsChrome ? null : (
         <Suspense fallback={<div className="h-12 shrink-0" />}>
           <Header onOpenMobileSidebar={openMobileSidebar} />
         </Suspense>
       )}
-      <main className="agent-native-app-main min-w-0 flex-1 overflow-y-auto overscroll-contain">
+      <main
+        className={cn(
+          "agent-native-app-main min-w-0 flex-1 overflow-y-auto overscroll-contain",
+          showMobileNav &&
+            "max-md:pb-[calc(84px+env(safe-area-inset-bottom))]",
+        )}
+      >
         {children}
       </main>
+      {showMobileNav ? <MobileNav /> : null}
     </div>
   );
 
@@ -176,14 +170,15 @@ function LayoutShell({ children }: LayoutProps) {
     <HeaderActionsProvider>
       <div className="agent-layout-shell chat-layout-shell flex h-screen w-full overflow-hidden bg-background text-foreground">
         {settingsOwnsChrome ? null : (
+          // The editor owns the canvas below 1280px (it has its own back button).
           <div
-            data-collapsed={sidebarCollapsed ? "true" : "false"}
-            className="agent-layout-left-drawer hidden md:block"
+            className={cn(
+              "hidden h-full shrink-0 md:flex",
+              editorRoute && "md:hidden xl:flex",
+            )}
           >
-            <Sidebar
-              collapsed={sidebarCollapsed}
-              onCollapsedChange={setSidebarCollapsed}
-            />
+            <AppRail />
+            {isChatRoute ? <ChatHistoryPanel /> : null}
           </div>
         )}
         <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
@@ -197,7 +192,7 @@ function LayoutShell({ children }: LayoutProps) {
             <SheetDescription className="sr-only">
               {t("navigation.navigationDescription")}
             </SheetDescription>
-            <Sidebar collapsed={false} collapsible={false} />
+            <MobileNavigationPanel />
           </SheetContent>
         </Sheet>
         {isChatRoute ? (
@@ -214,6 +209,7 @@ function LayoutShell({ children }: LayoutProps) {
           <AgentInspector
             chatHomeHandoffActive={chatHomeHandoffActive}
             chatHomeHandoffPending={chatHomeHandoffPending}
+            enabled={!editorRoute}
           >
             {contentFrame}
           </AgentInspector>

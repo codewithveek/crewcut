@@ -1,9 +1,9 @@
 import { useParams } from "react-router";
 
-import { EditorPage } from "@/components/proofcut/editor/editor-page";
+import { EditorPage } from "@/components/crewcut/editor/editor-page";
 
 export function meta() {
-  return [{ title: "Editor — Proofcut" }];
+  return [{ title: "Editor — Crewcut" }];
 }
 
 export default function VideoEditorRoute() {

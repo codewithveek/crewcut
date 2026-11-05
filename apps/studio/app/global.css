@@ -3,52 +3,110 @@
 
 @import "tailwindcss";
 @import "@agent-native/toolkit/styles.css";
-@import "./proofcut.css";
+@import "./crewcut.css";
 
 @source "./**/*.{ts,tsx}";
 
+/*
+ * Crewcut design tokens. One source of truth for both themes; the shadcn
+ * HSL variables (used by toolkit components) and the --ds-* tokens (used by
+ * Crewcut components) are defined side by side so everything matches.
+ * Reference page: /design.
+ */
 :root {
-  /* Proofcut light: warm paper canvas, ink, one violet accent (masterplan: own accent). */
-  --background: 60 6% 93%;
-  --foreground: 240 6% 9.5%;
+  /* Neutral cool canvas, white panels, ink-black primary actions, one violet brand accent. */
+  --background: 220 14% 95%;
+  --foreground: 224 15% 10%;
   --card: 0 0% 100%;
-  --card-foreground: 240 6% 9.5%;
+  --card-foreground: 224 15% 10%;
   --popover: 0 0% 100%;
-  --popover-foreground: 240 6% 9.5%;
-  --primary: 246 84% 61%;
+  --popover-foreground: 224 15% 10%;
+  --primary: 224 15% 10%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 60 5% 96%;
-  --secondary-foreground: 240 6% 12%;
-  --muted: 60 5% 95%;
-  --muted-foreground: 240 4% 37%;
-  --accent: 60 5% 91%;
-  --accent-foreground: 240 6% 12%;
-  --destructive: 0 75% 55%;
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 224 15% 10%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 40%;
+  --accent: 220 14% 93%;
+  --accent-foreground: 224 15% 10%;
+  --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
-  --border: 60 5% 87%;
-  --input: 60 5% 84%;
-  --ring: 246 84% 61%;
-  --radius: 0.625rem;
-  --sidebar-background: 60 6% 95.5%;
-  --sidebar-foreground: 240 4% 37%;
-  --sidebar-primary: 246 84% 61%;
+  --border: 220 13% 89%;
+  --input: 220 13% 86%;
+  --ring: 248 84% 61%;
+  --radius: 0.75rem;
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 220 9% 40%;
+  --sidebar-primary: 224 15% 10%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 60 5% 90%;
-  --sidebar-accent-foreground: 240 6% 12%;
-  --sidebar-border: 60 5% 87%;
-  --sidebar-ring: 246 84% 61%;
-  --pc-accent: #5b4bef;
-  --pc-accent-soft: #5b4bef1f;
-  --pc-on-accent: #ffffff;
-  --pc-supported: #1e9e5a;
-  --pc-weak: #b97a07;
-  --pc-unsupported: #d83a3a;
-  --pc-canvas: #e9e9e5;
-  --pc-hairline: rgb(0 0 0 / 0.08);
-  --pc-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -16px rgb(0 0 0 / 0.18);
-  --pc-track: #f6f6f3;
-  --pc-clip: #ffffff;
-  --pc-playhead: #5b4bef;
+  --sidebar-accent: 220 14% 94%;
+  --sidebar-accent-foreground: 224 15% 10%;
+  --sidebar-border: 220 13% 90%;
+  --sidebar-ring: 248 84% 61%;
+
+  /* Surfaces */
+  --ds-bg: #eff1f4;
+  --ds-surface: #ffffff;
+  --ds-surface-2: #f6f7f9;
+  --ds-surface-3: #eceef2;
+  --ds-sunken: #f3f4f7;
+  --ds-stage: #e4e6eb;
+  --ds-scrim: rgb(9 10 14 / 0.45);
+  /* Text */
+  --ds-text: #15171d;
+  --ds-text-2: #5d6573;
+  --ds-text-3: #8a919d;
+  /* Lines */
+  --ds-border: #dfe3e8;
+  --ds-hairline: rgb(17 20 28 / 0.08);
+  /* Brand + semantic */
+  --ds-accent: #5b4bef;
+  --ds-accent-soft: rgb(91 75 239 / 0.12);
+  --ds-on-accent: #ffffff;
+  --ds-success: #1e9e5a;
+  --ds-warning: #b97a07;
+  --ds-danger: #d83a3a;
+  --ds-info: #2b7de9;
+  /* Timeline clip colours (white text sits on every one, both themes) */
+  --clip-media: #3a4150;
+  --clip-graphic: #6a55e8;
+  --clip-text: #0f97ad;
+  --clip-caption: #2b7de9;
+  --clip-voice: #e0534f;
+  --clip-music: #1f9a66;
+  --clip-sfx: #c98a12;
+  --clip-effect: #b546c9;
+  --ds-selection: #15171d;
+  /* Elevation */
+  --ds-shadow-sm: 0 1px 2px rgb(17 20 28 / 0.05);
+  --ds-shadow-md: 0 1px 2px rgb(17 20 28 / 0.04), 0 8px 24px -12px rgb(17 20 28 / 0.18);
+  --ds-shadow-lg: 0 2px 6px rgb(17 20 28 / 0.06), 0 24px 48px -16px rgb(17 20 28 / 0.28);
+  /* Radius */
+  --ds-radius-xs: 6px;
+  --ds-radius-sm: 8px;
+  --ds-radius-md: 10px;
+  --ds-radius-lg: 14px;
+  --ds-radius-xl: 20px;
+  /* Motion: ease-out for UI entrances, short durations (UI is faster than video). */
+  --ds-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ds-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ds-dur-fast: 120ms;
+  --ds-dur: 200ms;
+  --ds-dur-slow: 320ms;
+
+  /* Legacy aliases (pipeline board, proof report, connections). */
+  --pc-accent: var(--ds-accent);
+  --pc-accent-soft: var(--ds-accent-soft);
+  --pc-on-accent: var(--ds-on-accent);
+  --pc-supported: var(--ds-success);
+  --pc-weak: var(--ds-warning);
+  --pc-unsupported: var(--ds-danger);
+  --pc-canvas: var(--ds-bg);
+  --pc-hairline: var(--ds-hairline);
+  --pc-shadow: var(--ds-shadow-md);
+  --pc-track: var(--ds-sunken);
+  --pc-clip: var(--ds-surface-2);
+  --pc-playhead: var(--ds-text);
   --chat-sidebar-width: 17.5rem;
   --chat-sidebar-content-inset: 0.5rem;
   --chat-sidebar-row-padding: 0.75rem;
@@ -244,54 +302,71 @@
 }
 
 .dark {
-  /* Proofcut dark (default for the editor): Cutroom's warm near-black, raised panels. */
-  --background: 240 4% 4.7%;
-  --foreground: 240 5% 95.5%;
-  --card: 240 5% 8.6%;
-  --card-foreground: 240 5% 95.5%;
+  /* Near-black canvas, raised panels, white primary actions. */
+  --background: 240 6% 4%;
+  --foreground: 240 5% 96%;
+  --card: 240 5% 8%;
+  --card-foreground: 240 5% 96%;
   --popover: 240 5% 10%;
-  --popover-foreground: 240 5% 95.5%;
-  --primary: 247 100% 71%;
-  --primary-foreground: 250 40% 8%;
+  --popover-foreground: 240 5% 96%;
+  --primary: 240 5% 96%;
+  --primary-foreground: 240 6% 8%;
   --secondary: 240 5% 12%;
-  --secondary-foreground: 240 5% 95.5%;
-  --muted: 240 5% 11%;
-  --muted-foreground: 240 4% 65.5%;
-  --accent: 240 5% 14.5%;
-  --accent-foreground: 240 5% 95.5%;
-  --destructive: 0 100% 68%;
+  --secondary-foreground: 240 5% 96%;
+  --muted: 240 5% 12%;
+  --muted-foreground: 240 5% 65%;
+  --accent: 240 5% 15%;
+  --accent-foreground: 240 5% 96%;
+  --destructive: 0 90% 66%;
   --destructive-foreground: 0 0% 98%;
   --border: 240 5% 16%;
-  --input: 240 5% 19%;
-  --ring: 247 100% 71%;
-  --radius: 0.625rem;
-  --sidebar-background: 240 5% 6.5%;
-  --sidebar-foreground: 240 4% 62%;
-  --sidebar-primary: 247 100% 71%;
-  --sidebar-primary-foreground: 250 40% 8%;
-  --sidebar-accent: 240 5% 12%;
-  --sidebar-accent-foreground: 240 5% 95.5%;
+  --input: 240 5% 20%;
+  --ring: 248 100% 72%;
+  --sidebar-background: 240 6% 6%;
+  --sidebar-foreground: 240 5% 62%;
+  --sidebar-primary: 240 5% 96%;
+  --sidebar-primary-foreground: 240 6% 8%;
+  --sidebar-accent: 240 5% 13%;
+  --sidebar-accent-foreground: 240 5% 96%;
   --sidebar-border: 240 5% 13%;
-  --sidebar-ring: 247 100% 71%;
-  --pc-accent: #8b7bff;
-  --pc-accent-soft: #8b7bff26;
-  --pc-on-accent: #0d0a1f;
-  --pc-supported: #3ccf7f;
-  --pc-weak: #f2b13c;
-  --pc-unsupported: #ff5d5d;
-  --pc-canvas: #0b0b0c;
-  --pc-hairline: rgb(255 255 255 / 0.07);
-  --pc-shadow: 0 1px 0 0 rgb(255 255 255 / 0.03) inset, 0 12px 32px -16px rgb(0 0 0 / 0.6);
-  --pc-track: #111113;
-  --pc-clip: #1d1d20;
-  --pc-playhead: #8b7bff;
+  --sidebar-ring: 248 100% 72%;
+
+  --ds-bg: #09090b;
+  --ds-surface: #131316;
+  --ds-surface-2: #1a1a1e;
+  --ds-surface-3: #232328;
+  --ds-sunken: #0e0e10;
+  --ds-stage: #050506;
+  --ds-scrim: rgb(0 0 0 / 0.6);
+  --ds-text: #f3f3f6;
+  --ds-text-2: #a1a1aa;
+  --ds-text-3: #71717a;
+  --ds-border: #26262b;
+  --ds-hairline: rgb(255 255 255 / 0.07);
+  --ds-accent: #8b7bff;
+  --ds-accent-soft: rgb(139 123 255 / 0.16);
+  --ds-on-accent: #0d0a1f;
+  --ds-success: #3ccf7f;
+  --ds-warning: #f2b13c;
+  --ds-danger: #ff5d5d;
+  --ds-info: #5ea2ff;
+  --clip-media: #2c3140;
+  --clip-graphic: #5b48d6;
+  --clip-text: #0d8597;
+  --clip-caption: #2a6fd0;
+  --clip-voice: #c9433f;
+  --clip-music: #1a8659;
+  --clip-sfx: #b07812;
+  --clip-effect: #9c3bb0;
+  --ds-selection: #ffffff;
+  --ds-shadow-sm: 0 1px 0 rgb(255 255 255 / 0.03) inset;
+  --ds-shadow-md: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 12px 32px -16px rgb(0 0 0 / 0.7);
+  --ds-shadow-lg: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 24px 56px -16px rgb(0 0 0 / 0.8);
 }
 
 @layer base {
   body {
     @apply bg-background text-foreground;
-    font-family: "Inter Variable", "Inter", sans-serif;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
 

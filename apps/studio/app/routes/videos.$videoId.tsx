@@ -1,9 +1,9 @@
 import { useParams } from "react-router";
 
-import { BoardPage } from "@/components/proofcut/board/board-page";
+import { BoardPage } from "@/components/crewcut/board/board-page";
 
 export function meta() {
-  return [{ title: "Pipeline — Proofcut" }];
+  return [{ title: "Pipeline — Crewcut" }];
 }
 
 export default function VideoBoardRoute() {

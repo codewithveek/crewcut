@@ -3,7 +3,7 @@ import { IconCheck, IconExternalLink, IconFileText, IconTrendingUp, IconX } from
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { STAGE_PROMPTS, askAgent, errorMessage } from "@/lib/proofcut";
+import { STAGE_PROMPTS, askAgent, errorMessage } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
 import { EmptyState } from "../primitives";

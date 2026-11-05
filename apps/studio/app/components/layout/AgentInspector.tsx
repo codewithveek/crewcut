@@ -12,6 +12,8 @@ interface AgentInspectorProps {
   children: ReactNode;
   chatHomeHandoffActive: boolean;
   chatHomeHandoffPending: boolean;
+  /** Off on the editor, whose Assistant tab hosts the chat instead (one chat per page). */
+  enabled?: boolean;
 }
 
 /** Contextual inspector shell used on secondary chat routes. */
@@ -19,6 +21,7 @@ export function AgentInspector({
   children,
   chatHomeHandoffActive,
   chatHomeHandoffPending,
+  enabled = true,
 }: AgentInspectorProps) {
   const navigate = useNavigate();
   const t = useT();
@@ -30,6 +33,7 @@ export function AgentInspector({
 
   return (
     <AgentSidebar
+      enabled={enabled}
       position="right"
       chatViewTransition
       chatViewTransitionHandoff={chatHomeHandoffPending}
