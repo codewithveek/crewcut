@@ -107,8 +107,6 @@ function pathForView(view?: string, videoId?: string): string {
       return "/projects";
     case "assets":
       return "/assets";
-    case "design":
-      return "/design";
     case "chat":
     case "ask":
       return NEW_CHAT_PATH;

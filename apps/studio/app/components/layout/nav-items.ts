@@ -3,7 +3,6 @@ import {
   IconFolder,
   IconHome,
   IconMessageCircle,
-  IconPalette,
   IconPhoto,
   IconPlugConnected,
   IconSettings,
@@ -32,7 +31,6 @@ export const PRIMARY_NAV: readonly NavItem[] = [
 ];
 
 export const SECONDARY_NAV: readonly NavItem[] = [
-  { to: "/design", label: "Design", title: "Design system", icon: IconPalette, match: (path) => path.startsWith("/design") },
   { to: "/settings", label: "Settings", title: "Settings", icon: IconSettings, match: (path) => path.startsWith("/settings") || path.startsWith("/team") },
 ];
 

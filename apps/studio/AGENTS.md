@@ -1,6 +1,6 @@
 # Crewcut — Agent Guide
 
-Crewcut is an agent-native video studio. Agents research, script, fact-check, animate, voice, publish and learn from analytics; a person sees and approves every stage. Home is `/home` (create a project, the agents prompt, recent work); `/projects` lists every video (search, filters, rename, delete); `/assets` is the person's media library (uploads usable in any project); `/design` is the design-system reference. Each video has a pipeline board at `/videos/<id>`, an editor at `/videos/<id>/edit` and a Proof report at `/videos/<id>/proof`. Accounts live at `/connections`.
+Crewcut is an agent-native video studio. Agents research, script, fact-check, animate, voice, publish and learn from analytics; a person sees and approves every stage. Home is `/home` (create a project, the agents prompt, recent work); `/projects` lists every video (search, filters, rename, delete); `/assets` is the person's media library (uploads usable in any project); `/design` is a development-only design-system reference (not in the navigation; redirects home in production). Each video has a pipeline board at `/videos/<id>`, an editor at `/videos/<id>/edit` and a Proof report at `/videos/<id>/proof`. Accounts live at `/connections`.
 
 ## Core rules
 
@@ -35,7 +35,7 @@ trend (approve: person picks an idea) → research (notify) → script (approve)
 
 ## Application state
 
-- `navigation` — the current view (`home`, `projects`, `assets`, `design`, `video`, `editor`, `proof`, `connections`) and ids.
+- `navigation` — the current view (`home`, `projects`, `assets`, `video`, `editor`, `proof`, `connections`) and ids.
 - `editor-selection` — in the editor: `videoId`, `selectedClipIds`, `selectedLayer`, `playheadMs`, `inMs`, `outMs`, `compositionVersion`. Read it via `view-screen` when the person says "this", "here" or "tighten that".
 
 ## Developing (coding agents)

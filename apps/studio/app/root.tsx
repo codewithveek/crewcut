@@ -22,6 +22,7 @@ import {
 import type { LinksFunction } from "react-router";
 
 import { Layout as AppLayout } from "@/components/layout/Layout";
+import { pageSkeletonForPath } from "@/components/layout/PageSkeleton";
 import { AppToolkitProvider } from "@/components/ui/toolkit-provider";
 import { useNavigationState } from "@/hooks/use-navigation-state";
 import { APP_TITLE } from "@/lib/app-config";
@@ -184,6 +185,9 @@ export default function Root() {
       <AppProviders
         queryClient={queryClient}
         skeletonLayout={skeletonLayoutForPath(pathname)}
+        // Crewcut pages get loading shells shaped like the page; chat and
+        // framework pages keep the framework's matching ones.
+        clientOnlyFallback={pageSkeletonForPath(pathname) ?? undefined}
         i18n={{ catalog: i18nCatalog }}
       >
         <DbSyncSetup />

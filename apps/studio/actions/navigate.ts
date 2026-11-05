@@ -6,7 +6,7 @@ export default defineAction({
   description:
     "Navigate the UI to a specific view or path. Writes a navigate command to application state which the UI reads and auto-deletes.",
   schema: z.object({
-    view: z.string().optional().describe("home, projects, assets, design, video, editor, proof, connections, chat, settings"),
+    view: z.string().optional().describe("home, projects, assets, video, editor, proof, connections, chat, settings"),
     videoId: z.string().optional().describe("Video to open (for video, editor and proof views)"),
     path: z.string().optional().describe("URL path to navigate to"),
     threadId: z.string().optional().describe("Chat thread ID to open"),

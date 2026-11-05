@@ -183,11 +183,14 @@ body {
 }
 
 /* Skeletons while loading. */
-.pc-skeleton {
-  background: linear-gradient(90deg, var(--ds-surface-2) 0%, var(--ds-surface-3) 50%, var(--ds-surface-2) 100%);
-  background-size: 200% 100%;
-  animation: pc-shimmer 1.4s linear infinite;
-  border-radius: 8px;
+/* In the components layer so rounded-* utilities on a skeleton win over the default radius. */
+@layer components {
+  .pc-skeleton {
+    background: linear-gradient(90deg, var(--ds-surface-2) 0%, var(--ds-surface-3) 50%, var(--ds-surface-2) 100%);
+    background-size: 200% 100%;
+    animation: pc-shimmer 1.4s linear infinite;
+    border-radius: 8px;
+  }
 }
 @keyframes pc-shimmer {
   from {
@@ -386,4 +389,20 @@ body {
   .pc-press:active:not(:disabled) {
     transform: none;
   }
+}
+
+/* Editor Assistant tab: the chat kit reserves a row for suggestion chips even
+   after the conversation starts and the chips are gone, which left a blank
+   band between the transcript and the composer. Collapse it once there are
+   messages, and keep the footer tight in this narrow panel. */
+.pc-assistant .agentkit-chat:not([data-empty="true"]) .agentkit-host-suggestions-slot {
+  display: none;
+}
+.pc-assistant .agentkit-chat-footer {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+.pc-assistant .agentkit-transcript-content {
+  padding-bottom: 1.5rem; /* just clears the footer's fade */
 }
