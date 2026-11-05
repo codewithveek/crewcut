@@ -21,7 +21,7 @@ export default defineAction({
   run: async ({ videoId, voiceId, speed }, ctx) => {
     const video = await loadVideo(videoId, ctx, "editor");
     const [scriptEntry, compositionEntry] = await Promise.all([latestScript(videoId), latestComposition(videoId)]);
-    if (!scriptEntry || !compositionEntry) throw new Error("Write the script and compose the video first.");
+    if (!scriptEntry || !compositionEntry) throw new Error("Write the script and create the draft video first.");
     await beginStage(video, "voice");
     const credentialCtx = accessContext(video.who);
     const apiKey = await resolveCredential("ELEVENLABS_API_KEY", credentialCtx);

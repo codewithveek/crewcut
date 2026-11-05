@@ -404,7 +404,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       open={open}
       onOpenChange={onOpenChange}
       title="Export video"
-      description="Renders the exact preview on a render worker as an H.264 MP4."
+      description="Saves your video as an MP4 that looks exactly like the preview."
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -431,16 +431,16 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           ))}
         </div>
         <FieldRow label="Captions">
-          <Switch label="Burn captions into the video" checked={burnCaptions} onCheckedChange={setBurnCaptions} />
-          <span className="text-xs text-ds-text-2">Burn into the picture</span>
+          <Switch label="Include captions in the video" checked={burnCaptions} onCheckedChange={setBurnCaptions} />
+          <span className="text-xs text-ds-text-2">Include in the video</span>
         </FieldRow>
         <FieldRow label="Motion">
-          <Switch label="Reduced motion export" checked={reducedMotion} onCheckedChange={setReducedMotion} />
-          <span className="text-xs text-ds-text-2">Calmer version (crossfades only)</span>
+          <Switch label="Reduce motion" checked={reducedMotion} onCheckedChange={setReducedMotion} />
+          <span className="text-xs text-ds-text-2">Reduce motion: simple fades, nothing slides or zooms</span>
         </FieldRow>
         {renders.length ? (
           <div className="flex flex-col gap-1.5">
-            <p className="ds-overline text-ds-text-3">Renders</p>
+            <p className="ds-overline text-ds-text-3">Previous exports</p>
             {renders.map((render) => (
               <div key={render.id} className="flex items-center gap-2 rounded-ds-sm bg-ds-surface-2 px-2.5 py-2">
                 <div className="min-w-0 flex-1">
@@ -587,7 +587,7 @@ export function EditorPage({ videoId }: { videoId: string }) {
   if (!payload?.composition) {
     return (
       <div className="mx-auto max-w-lg p-8 text-center">
-        <p className="text-sm text-ds-text-2">This video has no composition yet.</p>
+        <p className="text-sm text-ds-text-2">This video has nothing to edit yet.</p>
         <Button asChild variant="outline" className="mt-4">
           <Link to={`/videos/${videoId}`}>Back to the pipeline</Link>
         </Button>

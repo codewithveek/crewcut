@@ -157,7 +157,7 @@ export default defineAction({
     await recordApproval(video, { stage: "qa", decision: "approved", reason: DEMO_REASON, actor: who });
     const composition = composeFromScript({ videoId, script, dossier, ratio: "16:9", seed: 7 });
     const version = await saveComposition(video, composition, "Compose video", { ...video.who, kind: "agent", actorId: "agent" });
-    video.stages = completeStage(startStage(video.stages, "motion", { now, actor: agent }), "motion", { policy: DEFAULT_GATE_POLICY, now, actor: agent, note: `Composition v${version}` });
+    video.stages = completeStage(startStage(video.stages, "motion", { now, actor: agent }), "motion", { policy: DEFAULT_GATE_POLICY, now, actor: agent, note: "Draft video ready" });
     await saveStages(videoId, video.stages);
     return { projectId, sampleVideoId: sampleId, videoId, path: `/videos/${videoId}/edit` };
   },

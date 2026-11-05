@@ -29,7 +29,7 @@ export default defineAction({
     const [post] = await db.select().from(schema.publishJobs).where(eq(schema.publishJobs.videoId, videoId)).orderBy(desc(schema.publishJobs.createdAt)).limit(1);
     const [render] = post ? await db.select().from(schema.renderJobs).where(eq(schema.renderJobs.id, post.renderJobId)).limit(1) : [];
     const composition = (render ? await compositionAt(videoId, render.compositionVersion) : null) ?? (await latestComposition(videoId))?.composition;
-    if (!composition) throw new Error("No composition to map the results onto.");
+    if (!composition) throw new Error("This video has nothing to map the results onto yet.");
 
     const insights = explainPerformance({ videoId, composition, metrics, window });
     await db.delete(schema.insights).where(and(eq(schema.insights.videoId, videoId), eq(schema.insights.window, window)));

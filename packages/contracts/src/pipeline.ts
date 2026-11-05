@@ -11,12 +11,12 @@ export type Stage = (typeof STAGES)[number];
 
 export const STAGE_LABELS: Record<Stage, { agent: string; job: string; output: string }> = {
   trend: { agent: "Trend", job: "Find topics with evidence", output: "Ranked ideas" },
-  research: { agent: "Research", job: "Build a cited dossier", output: "Dossier" },
+  research: { agent: "Research", job: "Gather sources and quote the facts", output: "Fact sheet" },
   script: { agent: "Script", job: "Write hook, beats and narration", output: "Script" },
-  qa: { agent: "QA", job: "Check claims, pacing, rules and sameness", output: "Flags with fixes" },
-  motion: { agent: "Motion director", job: "Compose a freeform video", output: "Composition" },
+  qa: { agent: "Fact-check", job: "Check claims, pacing, platform rules and originality", output: "Issues with fixes" },
+  motion: { agent: "Motion director", job: "Design and animate the video", output: "Draft video" },
   voice: { agent: "Voice & sound", job: "Voiceover, music, captions", output: "Audio tracks" },
-  publish: { agent: "Publish", job: "Render, write copy, upload", output: "Publish jobs" },
+  publish: { agent: "Publish", job: "Export, write the post, upload", output: "Posts" },
   analytics: { agent: "Analytics", job: "Explain results, feed the next idea", output: "Insights" },
 };
 

@@ -16,7 +16,7 @@ export default defineAction({
   run: async ({ videoId, claimId, fixIndex }, ctx) => {
     const video = await loadVideo(videoId, ctx, "editor");
     const [scriptEntry, dossier, audit] = await Promise.all([latestScript(videoId), loadDossier(videoId), latestAudit(videoId)]);
-    if (!scriptEntry || !dossier || !audit) throw new Error("Audit the script first.");
+    if (!scriptEntry || !dossier || !audit) throw new Error("Fact-check the script first.");
     const result = audit.results.find((candidate) => candidate.claimId === claimId);
     if (!result) throw new Error(`No claim ${claimId} in the latest audit`);
     const fixes = suggestFixes(result, scriptEntry.script, dossier);

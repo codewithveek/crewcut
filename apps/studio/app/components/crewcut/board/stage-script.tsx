@@ -17,7 +17,7 @@ export function ScriptStage({ state }: { state: VideoState }) {
   if (!state.script) {
     return (
       <EmptyState icon={<IconScript className="size-6" />} title="No script yet" action={<Button size="sm" onClick={() => askAgent(STAGE_PROMPTS.script(videoId), { videoId })}>Ask the script agent</Button>}>
-        The script agent writes a hook, beats and narration within the word budget, citing a dossier fact on every claim.
+        The script agent writes the hook, the main points and the narration at the right length, backing every claim with a researched fact.
       </EmptyState>
     );
   }
@@ -90,7 +90,7 @@ export function ScriptStage({ state }: { state: VideoState }) {
             onClick={async () => {
               try {
                 await approve.mutateAsync({ videoId, stage: "script" } as never);
-                toast.success("Script approved — QA is checking it now");
+                toast.success("Script approved — fact-checking it now");
               } catch (error) {
                 toast.error(errorMessage(error));
               }
@@ -204,10 +204,10 @@ export function QaStage({ state }: { state: VideoState }) {
         {state.qa ? (
           <div className="flex items-baseline gap-1.5">
             <span className={cn("tabular text-2xl font-semibold", state.qa.pass ? "text-supported" : "text-unsupported")}>{state.qa.score}</span>
-            <span className="text-xs text-muted-foreground">QA score · {state.qa.pass ? "no blockers" : "blocked"}</span>
+            <span className="text-xs text-muted-foreground">Fact-check score · {state.qa.pass ? "no blockers" : "blocked"}</span>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">QA runs when you approve the script.</p>
+          <p className="text-sm text-muted-foreground">The fact-check runs when you approve the script.</p>
         )}
         <div className="ml-auto flex flex-wrap gap-2">
           <Button
@@ -240,7 +240,7 @@ export function QaStage({ state }: { state: VideoState }) {
                 }
               }}
             >
-              Approve QA
+              Approve fact-check
             </Button>
           ) : null}
         </div>
@@ -286,7 +286,7 @@ export function QaStage({ state }: { state: VideoState }) {
           ))}
         </ul>
       ) : state.qa ? (
-        <p className="text-sm text-muted-foreground">No other findings: hook, pacing, reading speed, licences, platform rules, motion and sameness all check out.</p>
+        <p className="text-sm text-muted-foreground">No other findings: hook, pacing, reading speed, licences, platform rules, motion and originality all check out.</p>
       ) : null}
     </div>
   );

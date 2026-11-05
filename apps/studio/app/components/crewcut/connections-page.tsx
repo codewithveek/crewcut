@@ -45,7 +45,7 @@ export function ConnectionsPage() {
     try {
       const result = (await connect.mutateAsync({ provider: "youtube", origin: window.location.origin, returnTo: "/connections" } as never)) as { configured: boolean; url?: string; message?: string };
       if (!result.configured || !result.url) {
-        toast.message(result.message ?? "YouTube isn't configured on this deployment.");
+        toast.message(result.message ?? "YouTube isn't set up yet.");
         return;
       }
       window.location.assign(result.url);
@@ -58,7 +58,7 @@ export function ConnectionsPage() {
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5 px-4 py-6 sm:px-6">
       <header>
         <h1 className="pc-display text-2xl text-foreground">Connections</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Accounts Crewcut can publish to and providers it can use. Tokens live in the encrypted vault; revoke any of them here in one click.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Accounts Crewcut can publish to and providers it can use. Sign-ins and keys are stored encrypted; disconnect any of them here in one click.</p>
       </header>
 
       <Panel
@@ -76,7 +76,7 @@ export function ConnectionsPage() {
         ) : data.accounts.length === 0 ? (
           <p className="text-[13px] text-muted-foreground">
             No accounts yet.{" "}
-            {data.youtubeConfigured ? "Connect YouTube to publish privately and read analytics." : "This deployment needs YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET before YouTube can connect."}
+            {data.youtubeConfigured ? "Connect YouTube to publish privately and read analytics." : import.meta.env.DEV ? "Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in apps/studio/.env to connect YouTube." : "Whoever runs this Crewcut server needs to turn on YouTube first."}
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
@@ -89,7 +89,7 @@ export function ConnectionsPage() {
                     <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", STATUS_TONE[account.status] ?? STATUS_TONE.revoked)}>{account.status}</span>
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {account.scopes.length} scopes ({account.scopes.map((scope) => scope.split("/").pop()).join(", ") || "none"}) · last used {account.lastUsedAt ? formatAgo(account.lastUsedAt) : "never"} · quota: 100 uploads/day per project
+                    Last used {account.lastUsedAt ? formatAgo(account.lastUsedAt) : "never"}
                   </p>
                   {account.statusDetail ? <p className="mt-0.5 text-xs text-muted-foreground">{account.statusDetail}</p> : null}
                 </div>
@@ -142,7 +142,7 @@ export function ConnectionsPage() {
       <Panel title="AI providers" description="Bring your own keys; they're stored encrypted per person.">
         <ul className="grid gap-3 sm:grid-cols-2">
           {[
-            { name: "ElevenLabs voice", key: "ELEVENLABS_API_KEY", connected: data?.providers.voice.elevenlabs ?? false, note: "Narration with word timestamps. Without it, timing is estimated and the voice track stays silent." },
+            { name: "ElevenLabs voice", key: "ELEVENLABS_API_KEY", connected: data?.providers.voice.elevenlabs ?? false, note: "Realistic AI voice-overs. Without it, videos have no narration and caption timing is estimated." },
             { name: "Anthropic (Claude)", key: "ANTHROPIC_API_KEY", connected: data?.providers.model.anthropic ?? false, note: "Powers the agents. Configure models in agent settings." },
           ].map((provider) => (
             <li key={provider.key} className="flex flex-col gap-2 rounded-xl border border-border p-4">
@@ -164,7 +164,7 @@ export function ConnectionsPage() {
         </ul>
       </Panel>
 
-      <Panel title="Platforms" description="What each platform requires before public posting works, and the limits the publish agent checks before rendering a cut.">
+      <Panel title="Platforms" description="What each platform requires before public posting works, and the limits the publish agent checks before exporting.">
         <ul className="flex flex-col divide-y divide-border">
           {(data?.platforms ?? []).map((platform) => (
             <li key={platform.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:gap-4">

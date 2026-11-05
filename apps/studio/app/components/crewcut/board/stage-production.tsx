@@ -30,7 +30,7 @@ function useRun<T extends string>(name: T, label: string) {
 }
 
 export function MotionStage({ state }: { state: VideoState }) {
-  const compose = useRun("compose-video", "Draft composed");
+  const compose = useRun("compose-video", "Draft video ready");
   const approve = useActionMutation("approve-stage", { uiOnly: true });
   const videoId = state.video.id;
   const composition = state.composition;
@@ -38,7 +38,7 @@ export function MotionStage({ state }: { state: VideoState }) {
     return (
       <EmptyState
         icon={<IconMovie className="size-6" />}
-        title="Not composed yet"
+        title="No draft video yet"
         action={
           <div className="flex flex-wrap justify-center gap-2">
             <Button size="sm" onClick={() => askAgent(STAGE_PROMPTS.motion(videoId), { videoId })}>
@@ -51,7 +51,7 @@ export function MotionStage({ state }: { state: VideoState }) {
           </div>
         }
       >
-        The motion director writes an art direction brief, then composes every scene from primitive layers — no templates unless you ask for one.
+        The motion director picks a look for this video and designs every scene from scratch — no templates unless you ask for one.
       </EmptyState>
     );
   }
@@ -97,16 +97,16 @@ export function MotionStage({ state }: { state: VideoState }) {
             onClick={async () => {
               try {
                 await approve.mutateAsync({ videoId, stage: "motion" } as never);
-                toast.success("Composition approved");
+                toast.success("Video approved");
               } catch (error) {
                 toast.error(errorMessage(error));
               }
             }}
           >
-            Approve composition
+            Approve video
           </Button>
         ) : null}
-        <Button variant="outline" className="pc-press" onClick={() => askAgent(`Give video ${videoId} a different art direction — fresh palette, type and motion — and recompose.`, { videoId })}>
+        <Button variant="outline" className="pc-press" onClick={() => askAgent(`Give video ${videoId} a fresh look: new colours, type and motion.`, { videoId })}>
           Try a different look
         </Button>
       </div>
@@ -115,7 +115,7 @@ export function MotionStage({ state }: { state: VideoState }) {
 }
 
 export function VoiceStage({ state }: { state: VideoState }) {
-  const synth = useRun("synthesize-voice", "Narration re-timed");
+  const synth = useRun("synthesize-voice", "Timing matched to the narration");
   const videoId = state.video.id;
   const voice = state.composition?.summary.tracks.find((track) => track.kind === "audio" && track.name === "Voice");
   const narrationClips = voice?.clips.length ?? 0;
@@ -127,7 +127,7 @@ export function VoiceStage({ state }: { state: VideoState }) {
       <div className="flex flex-wrap items-center gap-2">
         <Button className="pc-press" disabled={synth.pending || !state.composition} onClick={() => void synth.run({ videoId })}>
           <IconMicrophone className="size-4" />
-          {synth.pending ? "Synthesizing…" : "Synthesize voice"}
+          {synth.pending ? "Synthesizing…" : "Generate voice-over"}
         </Button>
         <span className="text-xs text-muted-foreground">{narrationClips} narration clips on the timeline</span>
       </div>
@@ -136,7 +136,7 @@ export function VoiceStage({ state }: { state: VideoState }) {
 }
 
 export function PublishStage({ state }: { state: VideoState }) {
-  const render = useRun("render-video", "Render started");
+  const render = useRun("render-video", "Export started");
   const publish = useActionMutation("publish-post", { uiOnly: true });
   const [privacy, setPrivacy] = useState<"private" | "unlisted" | "public">("private");
   const videoId = state.video.id;
@@ -146,7 +146,7 @@ export function PublishStage({ state }: { state: VideoState }) {
       <div className="flex flex-wrap items-center gap-2">
         <Button className="pc-press" disabled={render.pending || !state.composition} onClick={() => void render.run({ videoId })}>
           <IconMovie className="size-4" />
-          Render v{state.video.compositionVersion || "–"}
+          Export video
         </Button>
         <Button variant="outline" className="pc-press" disabled={!latest || latest.status !== "done"} onClick={() => askAgent(STAGE_PROMPTS.publish(videoId), { videoId })}>
           <IconSparkles className="size-4" />
@@ -228,7 +228,7 @@ export function PublishStage({ state }: { state: VideoState }) {
                 <IconUpload className="size-4" />
                 Publish ({privacy})
               </Button>
-              <span className="text-xs text-muted-foreground">Unaudited API projects stay private until Google's audit.</span>
+              <span className="text-xs text-muted-foreground">YouTube keeps uploads private until Google has verified this app.</span>
             </div>
           ) : null}
         </div>
@@ -260,7 +260,7 @@ function RenderDownload({ videoId, renderId }: { videoId: string; renderId: stri
 }
 
 export function AnalyticsStage({ state }: { state: VideoState }) {
-  const pull = useRun("pull-metrics", "Metrics pulled");
+  const pull = useRun("pull-metrics", "Results updated");
   const explain = useRun("explain-performance", "Insights updated");
   const videoId = state.video.id;
   const insights = state.insights;

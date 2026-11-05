@@ -204,7 +204,7 @@ export function ProofReportPage({ videoId }: { videoId: string }) {
               )}
               <span className="text-xs text-muted-foreground">
                 {source.publisher ? ` · ${source.publisher}` : ""} · retrieved {new Date(source.retrievedAt).toLocaleDateString()}
-                {source.redactions ? ` · ${source.redactions} secrets redacted` : ""}
+                {source.redactions ? ` · ${source.redactions} private keys left out` : ""}
               </span>
             </li>
           ))}

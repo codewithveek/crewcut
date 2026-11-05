@@ -17,14 +17,14 @@ export const STATUS_META: Record<StageStatus, { label: string; tone: "idle" | "r
 
 /** Which stages ask the agent (AI work) vs. run a deterministic action directly. */
 export const STAGE_PROMPTS: Record<Stage, (videoId: string) => string> = {
-  trend: (id) => `Run the trend stage for video ${id}: research the idea and save 3–5 ranked ideas with evidence using find-trends.`,
-  research: (id) => `Run the research stage for video ${id}: gather sources for the picked idea with add-source, then build a dossier where every fact quotes its source verbatim.`,
-  script: (id) => `Write the script for video ${id}. Read the learnings first; cite dossier facts on every factual line.`,
-  qa: (id) => `Run QA on video ${id} with audit-claims and fix what you can with apply-fix. Tell me what needs my decision.`,
-  motion: (id) => `Be the motion director for video ${id}: write a fresh art direction brief and compose a freeform video.`,
-  voice: (id) => `Do the voice and sound stage for video ${id} with synthesize-voice, then check pacing.`,
-  publish: (id) => `Prepare the YouTube post for video ${id}: render if needed, then write the title, description and hashtags with prepare-post (private).`,
-  analytics: (id) => `Pull 7-day metrics for video ${id}, explain the performance, and save the learnings.`,
+  trend: (id) => `Find 3–5 strong ideas for video ${id}, ranked, with the evidence for each.`,
+  research: (id) => `Research the picked idea for video ${id}: gather sources and collect facts that quote them word for word.`,
+  script: (id) => `Write the script for video ${id}, using what we've learned from past videos. Back every factual line with a researched fact.`,
+  qa: (id) => `Fact-check video ${id} and fix what you can. Tell me what needs my decision.`,
+  motion: (id) => `Design and animate video ${id} with a fresh look of its own.`,
+  voice: (id) => `Record the voice-over for video ${id}, then check the pacing.`,
+  publish: (id) => `Prepare the YouTube post for video ${id}: export it if needed, then write the title, description and hashtags. Keep it private.`,
+  analytics: (id) => `Get the first week's results for video ${id}, explain how it did, and note what to repeat next time.`,
 };
 
 export function askAgent(message: string, context?: Record<string, unknown>): void {

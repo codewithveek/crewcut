@@ -15,7 +15,7 @@ export default defineAction({
     runCompositionEdit(ctx, videoId, assetId ? `Music: ${label}` : "Remove music", (composition) => {
       const draft = structuredClone(composition);
       const track = draft.tracks.find((candidate) => candidate.kind === "audio" && candidate.role === "music");
-      if (!track || track.kind !== "audio") throw new Error("This composition has no music track.");
+      if (!track || track.kind !== "audio") throw new Error("This video has no music track.");
       track.clips = assetId
         ? [
             {

@@ -64,7 +64,7 @@ export default defineAction({
 
     const version = await saveComposition(video, composition, args.label);
     const findings = lintMotion(composition);
-    const status = await finishStage(video, "motion", { note: `Composition v${version}: ${composition.brief.mood}` });
+    const status = await finishStage(video, "motion", { note: `Draft video ready: ${composition.brief.mood}` });
     return {
       version,
       status,

@@ -68,7 +68,7 @@ export async function runAuditAndQa(video: VideoRecord, options: { completeQaSta
   const scriptEntry = await latestScript(video.row.id);
   if (!scriptEntry) throw new Error("There's no script to audit yet. Write the script first.");
   const dossier = await loadDossier(video.row.id);
-  if (!dossier) throw new Error("There's no research dossier yet. Build the dossier before auditing claims.");
+  if (!dossier) throw new Error("There's no research yet. Research the idea before fact-checking.");
   const previous = await latestAudit(video.row.id);
   const report = auditClaims({ script: scriptEntry.script, dossier, scriptVersion: scriptEntry.version, previous: previous?.results ?? [] });
   await saveAudit(video, report);
@@ -93,7 +93,7 @@ export async function runAuditAndQa(video: VideoRecord, options: { completeQaSta
       ...(blockers.length > 0
         ? { blockedReason: `${blockers.length} unsupported claim${blockers.length === 1 ? "" : "s"}: fix, cut, or override with a reason.` }
         : {}),
-      note: `QA score ${qa.score}; ${report.counts.supported} supported, ${report.counts.weak} weak.`,
+      note: `Fact-check score ${qa.score}; ${report.counts.supported} claims backed, ${report.counts.weak} weak.`,
     });
   }
   return {
@@ -122,7 +122,7 @@ export async function editComposition(
   edit: (composition: Composition) => Composition,
 ): Promise<{ version: number; composition: Composition }> {
   const current = await latestComposition(video.row.id);
-  if (!current) throw new Error("This video has no composition yet. Run compose-video first.");
+  if (!current) throw new Error("This video has nothing to edit yet. Ask the motion director to create the draft video first.");
   const next = edit(current.composition);
   const version = await saveComposition(video, next, label);
   return { version, composition: next };

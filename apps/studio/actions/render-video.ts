@@ -15,7 +15,7 @@ export default defineAction({
   run: async ({ videoId, reducedMotion, burnCaptions }, ctx) => {
     const video = await loadVideo(videoId, ctx, "editor");
     const current = await latestComposition(videoId);
-    if (!current) throw new Error("Compose the video before rendering.");
+    if (!current) throw new Error("Create the draft video before exporting.");
     const { renderId, mode } = await queueRender({
       video,
       composition: current.composition,

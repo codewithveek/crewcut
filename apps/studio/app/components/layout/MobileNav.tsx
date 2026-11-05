@@ -126,7 +126,7 @@ export function MobileNav() {
             <SheetRow
               icon={<IconFlask2 />}
               title={demo.pending ? "Loading demo…" : "Load demo workspace"}
-              hint="A sourced script, a QA flag and a finished video"
+              hint="A fact-checked script and a finished video"
               onClick={async () => {
                 await demo.load();
                 setCreateOpen(false);

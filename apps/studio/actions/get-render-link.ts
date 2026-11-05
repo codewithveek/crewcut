@@ -17,7 +17,7 @@ export default defineAction({
       .from(schema.renderJobs)
       .where(and(eq(schema.renderJobs.id, renderId), eq(schema.renderJobs.videoId, videoId)))
       .limit(1);
-    if (!render?.outputFile || render.status !== "done") throw new Error("That render isn't finished.");
+    if (!render?.outputFile || render.status !== "done") throw new Error("That export isn't finished yet.");
     await promoteToRemote("renders", render.outputFile, "video/mp4", render.ownerEmail).catch(() => undefined);
     const url = await fileUrl("renders", render.outputFile);
     const local = url.startsWith("/api/media/");

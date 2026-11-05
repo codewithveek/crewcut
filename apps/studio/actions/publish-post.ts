@@ -33,7 +33,7 @@ export default defineAction({
     const connection = await youtubeConnectionFor(video.row.ownerEmail);
     if (!connection) throw new Error("Connect YouTube in Settings → Connections first.");
     const [render] = await db.select().from(schema.renderJobs).where(eq(schema.renderJobs.id, job.renderJobId)).limit(1);
-    if (!render?.outputFile) throw new Error("The render for this post is missing.");
+    if (!render?.outputFile) throw new Error("The exported file for this post is missing. Export the video again.");
 
     const finalPrivacy = privacy ?? (job.privacy as "private" | "unlisted" | "public");
     await db.update(schema.publishJobs).set({ status: "uploading", privacy: finalPrivacy, approvedBy: who.email, approvedAt: nowIso(), error: null }).where(eq(schema.publishJobs.id, job.id));

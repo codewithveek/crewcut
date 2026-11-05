@@ -33,7 +33,7 @@ export default defineAction({
       .where(and(eq(schema.renderJobs.videoId, args.videoId), args.renderId ? eq(schema.renderJobs.id, args.renderId) : eq(schema.renderJobs.status, "done")))
       .orderBy(desc(schema.renderJobs.createdAt))
       .limit(1);
-    if (!render || render.status !== "done") throw new Error("Render the video first; publishing uses a finished render.");
+    if (!render || render.status !== "done") throw new Error("Export the video first; publishing uploads the exported file.");
     await beginStage(video, "publish");
     const dossier = await loadDossier(args.videoId);
     const sources = dossier?.sources.filter((source) => source.url).map((source) => ({ title: source.title, url: source.url as string })) ?? [];

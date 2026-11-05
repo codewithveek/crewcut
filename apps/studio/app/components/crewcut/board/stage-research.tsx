@@ -87,8 +87,8 @@ export function ResearchStage({ state }: { state: VideoState }) {
   const { dossier, sources } = state;
   if (!dossier) {
     return (
-      <EmptyState icon={<IconFileText className="size-6" />} title="No dossier yet" action={<Button size="sm" onClick={() => askAgent(STAGE_PROMPTS.research(state.video.id), { videoId: state.video.id })}>Ask the research agent</Button>}>
-        Research reads pages, docs or a repo (secrets redacted) and records facts that quote their source word for word.
+      <EmptyState icon={<IconFileText className="size-6" />} title="No research yet" action={<Button size="sm" onClick={() => askAgent(STAGE_PROMPTS.research(state.video.id), { videoId: state.video.id })}>Ask the research agent</Button>}>
+        Research reads pages, docs or a code repo (passwords and keys are left out) and records facts that quote their source word for word.
       </EmptyState>
     );
   }

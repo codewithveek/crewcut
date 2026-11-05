@@ -89,7 +89,7 @@ export function runQa(input: RunQaInput): QaReport {
 
 function claimFindings(audit: AuditReport | null): QaFinding[] {
   if (!audit) {
-    return [{ severity: "blocker", code: "claims_unaudited", area: "claims", message: "The script's claims haven't been audited.", fix: "Run audit-claims." }];
+    return [{ severity: "blocker", code: "claims_unaudited", area: "claims", message: "The script's claims haven't been fact-checked.", fix: "Run the fact-check." }];
   }
   return audit.results.flatMap((result): QaFinding[] => {
     if (result.verdict === "unsupported" && !result.overrideReason) {
@@ -153,7 +153,7 @@ function compositionFindings(input: RunQaInput): QaFinding[] {
   if (voicedMs > 0) {
     const wpm = (words / voicedMs) * 60_000;
     if (wpm > QA_LIMITS.maxWordsPerMinute) {
-      findings.push({ severity: "major", code: "narration_fast", area: "reading", message: `Narration runs at ${Math.round(wpm)} wpm.`, fix: `Slow the voice or cut words (≤ ${QA_LIMITS.maxWordsPerMinute} wpm).` });
+      findings.push({ severity: "major", code: "narration_fast", area: "reading", message: `Narration runs at ${Math.round(wpm)} words a minute.`, fix: `Slow the voice or cut words (≤ ${QA_LIMITS.maxWordsPerMinute} wpm).` });
     }
   }
   const firstVoice = [...voiceClips].sort((a, b) => a.startMs - b.startMs)[0];
@@ -216,7 +216,7 @@ function compositionFindings(input: RunQaInput): QaFinding[] {
       findings.push({ severity: "blocker", code: "platform_duration", area: "platform", where: platform, message: `${spec.label} accepts ${spec.minSec}–${spec.maxSec} s; this is ${seconds.toFixed(1)} s.`, fix: "Cut a version for this platform or drop it from the targets." });
     }
     if (!spec.aspects.includes(composition.ratio)) {
-      findings.push({ severity: "major", code: "platform_aspect", area: "platform", where: platform, message: `${spec.label} expects ${spec.aspects.join(" or ")}, the master is ${composition.ratio}.`, fix: "Render a reframed cut for this platform." });
+      findings.push({ severity: "major", code: "platform_aspect", area: "platform", where: platform, message: `${spec.label} expects ${spec.aspects.join(" or ")}, this video is ${composition.ratio}.`, fix: "Export a version in this shape for this platform." });
     }
   }
 

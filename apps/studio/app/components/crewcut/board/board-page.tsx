@@ -30,7 +30,7 @@ const DECISION_LABEL: Record<string, string> = {
   sent_back: "sent back",
   override: "overrode a claim",
   rejected: "rejected",
-  notified: "finished (notify gate)",
+  notified: "finished",
   published: "published",
 };
 

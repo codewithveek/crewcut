@@ -21,7 +21,7 @@ export const EDITOR_SUGGESTIONS = [
   "Tighten the selected clip",
   "Make the hook punchier",
   "Add captions from the narration",
-  "Pick music that fits and duck it under the voice",
+  "Pick music that fits and lower it under the voice",
   "Try a different transition at the playhead",
   "Give this a warmer colour grade",
 ];
@@ -59,7 +59,7 @@ export async function askEditorAgent(message: string, context: Record<string, un
 export function EditorAssistant({ className }: { className?: string }) {
   const navigate = useNavigate();
   return (
-    <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", className)}>
+    <div className={cn("pc-assistant flex min-h-0 flex-1 flex-col overflow-hidden", className)}>
       <AgentPanel
         storageKey="chat"
         browserTabId={TAB_ID}

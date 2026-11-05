@@ -116,7 +116,7 @@ function useProjectDialogs(video: VideoSummary) {
         open={deleting}
         onOpenChange={setDeleting}
         title={`Delete “${video.title}”?`}
-        description="This removes every version, script, report, upload and render of this project. It can't be undone."
+        description="This removes every edit, script, report, upload and export of this project. It can't be undone."
         footer={
           <>
             <Button variant="ghost" onClick={() => setDeleting(false)}>

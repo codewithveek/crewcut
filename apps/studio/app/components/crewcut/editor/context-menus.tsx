@@ -213,7 +213,7 @@ export function ClipMenu({ clip, track }: { clip: AnyClip; track: Track }) {
       ) : null}
       <ContextMenuSeparator />
       <TrackStateItems track={track} />
-      <ContextMenuItem icon={<IconSparkles />} onSelect={() => void askEditorAgent("Look at the selected clip and suggest one improvement. Apply it as one undoable step with edit-composition.", selectionContext())}>
+      <ContextMenuItem icon={<IconSparkles />} onSelect={() => void askEditorAgent("Look at the selected clip and suggest one improvement, then make it as one step I can undo.", selectionContext())}>
         Ask the agent about this
       </ContextMenuItem>
       <ContextMenuSeparator />
@@ -221,7 +221,7 @@ export function ClipMenu({ clip, track }: { clip: AnyClip; track: Track }) {
         Delete
       </ContextMenuItem>
       <ContextMenuItem icon={<IconLayersSubtract />} shortcut="⇧Del" danger onSelect={() => deleteSelection(true)}>
-        Ripple delete
+        Delete and close gap
       </ContextMenuItem>
     </ContextMenuContent>
   );
@@ -284,7 +284,7 @@ export function LayerMenu({ clip, layer }: { clip: VisualClip; layer: Layer | Le
       <ContextMenuItem icon={layer.hidden ? <IconEye /> : <IconEyeOff />} onSelect={() => void run(layer.hidden ? "Show layer" : "Hide layer", [{ op: "update-layer", clipId: clip.id, layerId: layer.id, patch: { hidden: !layer.hidden } }])}>
         {layer.hidden ? "Show layer" : "Hide layer"}
       </ContextMenuItem>
-      <ContextMenuItem icon={<IconSparkles />} onSelect={() => void askEditorAgent("Look at the selected layer and suggest one improvement. Apply it as one undoable step with edit-composition.", selectionContext())}>
+      <ContextMenuItem icon={<IconSparkles />} onSelect={() => void askEditorAgent("Look at the selected layer and suggest one improvement, then make it as one step I can undo.", selectionContext())}>
         Ask the agent about this
       </ContextMenuItem>
       <ContextMenuSeparator />

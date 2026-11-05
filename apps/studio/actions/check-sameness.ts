@@ -13,7 +13,7 @@ export default defineAction({
   run: async ({ videoId }, ctx) => {
     const video = await loadVideo(videoId, ctx);
     const current = await latestComposition(videoId);
-    if (!current) throw new Error("Compose the video first.");
+    if (!current) throw new Error("Create the draft video first.");
     const [recent, project] = await Promise.all([recentFingerprints(video.row.projectId, videoId), getProject(video.row.projectId)]);
     const fingerprint = styleFingerprint(current.composition);
     const report = checkVariety(fingerprint, recent, { threshold: project?.varietyThreshold ?? 0.72, consistencyRequested: video.row.consistencyRequested });

@@ -74,7 +74,7 @@ export function CreateProjectForm({ onDone, autoFocus = true }: { onDone?: () =>
             <RatioTile key={option} ratio={option} selected={ratio === option} onSelect={() => setRatio(option)} />
           ))}
         </div>
-        <p className="ds-caption mt-1 text-ds-text-3">You can change the format later in the editor; layouts reflow because positions are stored in percent.</p>
+        <p className="ds-caption mt-1 text-ds-text-3">You can change the format later in the editor; layouts adjust to the new shape automatically.</p>
       </fieldset>
       <Button type="submit" disabled={pending} className="pc-press h-10">
         {pending ? <IconLoader2 className="size-4 motion-safe:animate-spin" /> : null}

@@ -137,7 +137,7 @@ export function deleteSelection(rippleOverride?: boolean): void {
   }
   const ids = state().selectedClipIds;
   if (ids.length === 0) return;
-  void run(ids.length === 1 ? (ripple ? "Ripple delete" : "Delete clip") : `Delete ${ids.length} clips`, [{ op: "delete-clips", clipIds: ids, ripple }]);
+  void run(ids.length === 1 ? (ripple ? "Delete and close gap" : "Delete clip") : `Delete ${ids.length} clips`, [{ op: "delete-clips", clipIds: ids, ripple }]);
   state().selectClip(null);
 }
 
