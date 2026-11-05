@@ -1,4 +1,4 @@
-import { createSeededRandom } from "@proofcut/motion";
+import { createSeededRandom } from "@crewcut/motion";
 
 import { type RecipeContext, type SceneSpec, expandRecipe } from "./recipes";
 import {

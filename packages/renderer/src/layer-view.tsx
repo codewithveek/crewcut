@@ -4,9 +4,13 @@ import {
   type Layer,
   type LeafLayer,
   type ResolvedTransform,
+  colorBalanceMatrix,
+  colorFilterCss,
+  hasColorEffects,
   isLayerActive,
   resolveLayerTransform,
-} from "@proofcut/composition";
+  vignetteCss,
+} from "@crewcut/composition";
 import { useVideoConfig } from "remotion";
 
 import { type FrameContextValue, useFrameContext } from "./context";
@@ -62,12 +66,15 @@ export function LayerView({ layer, parentLocalMs, parentDurationMs, parentStartF
           position: "absolute",
           inset: 0,
           transformOrigin: `${transform.x}% ${transform.y}%`,
-          transform: `translate(${panX.toFixed(2)}px, ${panY.toFixed(2)}px) rotate(${transform.rotation}deg) scale(${scaleX.toFixed(4)}, ${scaleY.toFixed(4)})`,
+          transform: `translate(${panX.toFixed(2)}px, ${panY.toFixed(2)}px) rotate(${transform.rotation}deg) scale(${(scaleX * (layer.flipX ? -1 : 1)).toFixed(4)}, ${(scaleY * (layer.flipY ? -1 : 1)).toFixed(4)})`,
           opacity: transform.opacity,
-          ...(transform.blur > 0.05 ? { filter: `blur(${(transform.blur * context.scale).toFixed(2)}px)` } : {}),
+          ...(hasColorEffects(layer) || transform.blur > 0.05
+            ? { filter: colorFilterCss(layer, { matrixFilterId: matrixId(layer.id), blurPx: transform.blur * context.scale }) }
+            : {}),
           mixBlendMode: layer.blendMode === "normal" ? undefined : layer.blendMode,
         }}
       >
+        <ColorMatrix id={matrixId(layer.id)} matrix={colorBalanceMatrix(layer.adjust)} />
         {layer.children.map((child) => (
           <LayerView
             key={child.id}
@@ -97,9 +104,13 @@ export function LayerView({ layer, parentLocalMs, parentDurationMs, parentStartF
     style.height = context.width * 0.1;
   }
   if (layer.blendMode !== "normal") style.mixBlendMode = layer.blendMode;
+  if (layer.flipX || layer.flipY) style.transform = `${style.transform ?? ""} scale(${layer.flipX ? -1 : 1}, ${layer.flipY ? -1 : 1})`;
+  if (hasColorEffects(layer)) style.filter = colorFilterCss(layer, { matrixFilterId: matrixId(layer.id), blurPx: transform.blur * context.scale });
+  const vignette = layer.type === "image" || layer.type === "video" ? vignetteCss(layer.adjust) : undefined;
 
   return (
     <div data-layer-id={layer.id} style={style}>
+      <ColorMatrix id={matrixId(layer.id)} matrix={colorBalanceMatrix(layer.adjust)} />
       {layer.type === "text" ? <TextLayerView layer={layer} localMs={localMs} /> : null}
       {layer.type === "shape" ? <ShapeLayerView layer={layer} /> : null}
       {layer.type === "image" ? <ImageLayerView layer={layer} /> : null}
@@ -107,6 +118,23 @@ export function LayerView({ layer, parentLocalMs, parentDurationMs, parentStartF
       {layer.type === "code" ? <CodeLayerView layer={layer} progress={transform.progress} /> : null}
       {layer.type === "chart" ? <ChartLayerView layer={layer} progress={transform.progress} boxWidth={boxWidth || context.width * 0.1} boxHeight={boxHeight || context.width * 0.1} /> : null}
       {layer.type === "icon" ? <IconLayerView layer={layer} /> : null}
+      {vignette ? <div style={{ position: "absolute", inset: 0, background: vignette, borderRadius: "radius" in layer ? layer.radius * context.scale : 0, pointerEvents: "none" }} /> : null}
     </div>
+  );
+}
+
+export function matrixId(id: string): string {
+  return `pc-cb-${id.replace(/[^A-Za-z0-9_-]/g, "_")}`;
+}
+
+/** White balance (temperature/tint) as an inline SVG colour matrix referenced by the CSS filter. */
+export function ColorMatrix({ id, matrix }: { id: string; matrix: string | null }) {
+  if (!matrix) return null;
+  return (
+    <svg aria-hidden width="0" height="0" style={{ position: "absolute", width: 0, height: 0 }}>
+      <filter id={id} colorInterpolationFilters="sRGB">
+        <feColorMatrix type="matrix" values={matrix} />
+      </filter>
+    </svg>
   );
 }

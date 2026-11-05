@@ -1,4 +1,4 @@
-import { normalizeKeyframes } from "@proofcut/motion";
+import { normalizeKeyframes } from "@crewcut/motion";
 
 import { clipEndMs, computeDurationMs } from "./query";
 import { type Composition, type CompositionInput, compositionSchema, type Layer, type LeafLayer } from "./schema";

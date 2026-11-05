@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { type Composition, designScale } from "@proofcut/composition";
+import { type Composition, designScale } from "@crewcut/composition";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 
 import { AudioTracksView } from "./audio-view";
@@ -7,9 +7,9 @@ import { CaptionsView } from "./captions-view";
 import { VisualTrackView } from "./clip-view";
 import { DEFAULT_RENDER_OPTIONS, FrameContext, type FrameContextValue, type RenderOptions, createSrcResolver } from "./context";
 
-export const VIDEO_COMPOSITION_ID = "proofcut-video";
+export const VIDEO_COMPOSITION_ID = "crewcut-video";
 
-export interface ProofcutVideoProps extends Record<string, unknown> {
+export interface CrewcutVideoProps extends Record<string, unknown> {
   composition: Composition;
   /** asset id → URL (signed URLs in the studio, file URLs on the render worker). */
   assetUrls?: Record<string, string>;
@@ -20,7 +20,7 @@ export interface ProofcutVideoProps extends Record<string, unknown> {
  * The single renderer for every composition: the editor's Remotion Player and
  * the render worker both draw this component, so preview equals export.
  */
-export function ProofcutVideo({ composition, assetUrls, options }: ProofcutVideoProps) {
+export function CrewcutVideo({ composition, assetUrls, options }: CrewcutVideoProps) {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
   const timeMs = (frame * 1000) / fps;

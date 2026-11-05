@@ -1,4 +1,4 @@
-import { MOTION_RULES, isEntranceSafeEasing } from "@proofcut/motion";
+import { MOTION_RULES, isEntranceSafeEasing } from "@crewcut/motion";
 
 import { contrastRatio } from "./fingerprint";
 import { iterateLayers } from "./query";

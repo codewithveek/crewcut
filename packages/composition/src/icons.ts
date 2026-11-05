@@ -1,4 +1,4 @@
-/** Curated icon vocabulary (rendered with Lucide shapes in @proofcut/renderer). */
+/** Curated icon vocabulary (rendered with Lucide shapes in @crewcut/renderer). */
 export const ICON_NAMES = [
   "arrow-right",
   "arrow-up-right",

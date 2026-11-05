@@ -1,4 +1,4 @@
-import { type Fill, type ResolvedTransform, cssFontStack, resolveFontFamily, type FontFamily, type FontRole, type TypePairing, STATIC_WEIGHT_FAMILIES } from "@proofcut/composition";
+import { type Fill, type ResolvedTransform, cssFontStack, resolveFontFamily, type FontFamily, type FontRole, type TypePairing, STATIC_WEIGHT_FAMILIES } from "@crewcut/composition";
 import type { CSSProperties } from "react";
 
 export function fillToCss(fill: Fill | undefined): string | undefined {

@@ -1,4 +1,4 @@
-import { ambientOffset, evaluateKeyframes } from "@proofcut/motion";
+import { ambientOffset, evaluateKeyframes } from "@crewcut/motion";
 
 import type { AnimatableProperty, Keyframe, KeyframeMap, Layer, LeafLayer, Transform } from "./schema";
 

@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { Composition } from "@proofcut/composition";
+import type { Composition } from "@crewcut/composition";
 
 import type { RenderOptions } from "../context";
 import { VIDEO_COMPOSITION_ID } from "../video";

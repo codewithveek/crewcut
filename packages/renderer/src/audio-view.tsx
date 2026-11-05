@@ -1,5 +1,5 @@
 import React from "react";
-import { type AudioClip, type AudioTrack, type Composition, clipEndMs } from "@proofcut/composition";
+import { type AudioClip, type AudioTrack, type Composition, clipEndMs } from "@crewcut/composition";
 import { Html5Audio, Sequence, useVideoConfig } from "remotion";
 
 import { useFrameContext } from "./context";
@@ -61,6 +61,7 @@ export function AudioTracksView() {
               <Html5Audio
                 src={src}
                 trimBefore={Math.round((clip.trimStartMs / 1000) * fps)}
+                playbackRate={clip.playbackRate}
                 volume={(frame) => {
                   const localMs = (frame / fps) * 1000;
                   const duck = clip.duckUnderVoice ? duckFactor(intervals, clip.startMs + localMs) : 1;

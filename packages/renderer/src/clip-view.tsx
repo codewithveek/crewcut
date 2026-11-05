@@ -1,11 +1,11 @@
 import React from "react";
 import type { CSSProperties } from "react";
-import { type Transition, type VisualClip, type VisualTrack, clipEndMs, resolveLayerTransform } from "@proofcut/composition";
-import { MOTION_RULES, easedSegmentProgress } from "@proofcut/motion";
+import { type Transition, type VisualClip, type VisualTrack, clipEndMs, colorBalanceMatrix, colorFilterCss, hasColorEffects, resolveLayerTransform, vignetteCss } from "@crewcut/composition";
+import { MOTION_RULES, easedSegmentProgress } from "@crewcut/motion";
 import { AbsoluteFill, useVideoConfig } from "remotion";
 
-import { useFrameContext } from "./context";
-import { LayerView } from "./layer-view";
+import { TrackMutedContext, useFrameContext } from "./context";
+import { ColorMatrix, LayerView, matrixId } from "./layer-view";
 import { fillToCss } from "./styles";
 
 /** Styles for the clip entering (`enter`) and leaving (`exit`) at transition progress p. */
@@ -62,8 +62,13 @@ function ClipView({ clip, localMs, style, isBase }: { clip: VisualClip; localMs:
         transformOrigin: "50% 50%",
       }
     : undefined;
+  const colored = hasColorEffects(clip);
+  const clipMatrixId = matrixId(`clip-${clip.id}`);
+  const vignette = vignetteCss(clip.adjust);
+  const colorFilter = colored ? colorFilterCss(clip, { matrixFilterId: clipMatrixId }) : undefined;
   return (
-    <AbsoluteFill data-clip-id={clip.id} style={{ background, overflow: "hidden", ...style }}>
+    <AbsoluteFill data-clip-id={clip.id} style={{ background, overflow: "hidden", ...style, ...(colorFilter ? { filter: [style?.filter, colorFilter].filter(Boolean).join(" ") } : {}) }}>
+      <ColorMatrix id={clipMatrixId} matrix={colorBalanceMatrix(clip.adjust)} />
       <AbsoluteFill style={cameraStyle}>
         {clip.layers.map((layer) => (
           <LayerView
@@ -76,6 +81,7 @@ function ClipView({ clip, localMs, style, isBase }: { clip: VisualClip; localMs:
           />
         ))}
       </AbsoluteFill>
+      {vignette ? <AbsoluteFill style={{ background: vignette, pointerEvents: "none" }} /> : null}
     </AbsoluteFill>
   );
 }
@@ -86,6 +92,14 @@ function ClipView({ clip, localMs, style, isBase }: { clip: VisualClip; localMs:
  * hold their end state) while the incoming one enters.
  */
 export function VisualTrackView({ track, timeMs, isBase }: { track: VisualTrack; timeMs: number; isBase: boolean }) {
+  return (
+    <TrackMutedContext.Provider value={track.muted}>
+      <VisualTrackClips track={track} timeMs={timeMs} isBase={isBase} />
+    </TrackMutedContext.Provider>
+  );
+}
+
+function VisualTrackClips({ track, timeMs, isBase }: { track: VisualTrack; timeMs: number; isBase: boolean }) {
   const { options } = useFrameContext();
   const { fps } = useVideoConfig();
   const clips = [...track.clips].sort((a, b) => a.startMs - b.startMs);

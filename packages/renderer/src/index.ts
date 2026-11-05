@@ -2,7 +2,8 @@ export { DUCK_LEVEL, duckFactor, envelopeGain, voiceIntervals } from "./audio-vi
 export { CODE_THEMES, tokenizeLine } from "./code-highlight";
 export { transitionStyles } from "./clip-view";
 export { DEFAULT_RENDER_OPTIONS, type RenderOptions, createSrcResolver } from "./context";
-export { loadProofcutFonts } from "./fonts";
-export { calculateProofcutMetadata } from "./remotion-root";
+export { loadCrewcutFonts } from "./fonts";
+export { calculateCrewcutMetadata } from "./remotion-root";
 export { fillToCss, parseStarred } from "./styles";
-export { ProofcutVideo, type ProofcutVideoProps, VIDEO_COMPOSITION_ID } from "./video";
+export { captionAnchor, captionWords } from "./captions-view";
+export { CrewcutVideo, type CrewcutVideoProps, VIDEO_COMPOSITION_ID } from "./video";

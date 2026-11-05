@@ -1,7 +1,7 @@
 import React from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { easedSegmentProgress } from "@proofcut/motion";
-import type { TextAnimation, TextLayer } from "@proofcut/composition";
+import { easedSegmentProgress } from "@crewcut/motion";
+import type { TextAnimation, TextLayer } from "@crewcut/composition";
 
 import { useFrameContext } from "../context";
 import { fontCss, parseStarred } from "../styles";
@@ -149,6 +149,8 @@ export function TextLayerView({ layer, localMs }: { layer: TextLayer; localMs: n
         whiteSpace: "pre-wrap",
         ...(style.background ? { background: style.background, borderRadius: style.radius * scale } : {}),
         ...(style.padding ? { padding: style.padding * scale } : {}),
+        ...(style.strokeWidth > 0 && style.strokeColor ? { WebkitTextStroke: `${(style.strokeWidth * scale).toFixed(2)}px ${style.strokeColor}`, paintOrder: "stroke fill" } : {}),
+        ...(layer.shadow ? { textShadow: `${layer.shadow.x * scale}px ${layer.shadow.y * scale}px ${layer.shadow.blur * scale}px ${layer.shadow.color}` } : {}),
       }}
     >
       {lines.map((line, lineIndex) => {

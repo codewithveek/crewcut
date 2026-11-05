@@ -1,5 +1,5 @@
-import React from "react";
-import type { IconLayer, ImageLayer, ShapeLayer, VideoLayer } from "@proofcut/composition";
+import React, { useContext } from "react";
+import type { IconLayer, ImageLayer, ShapeLayer, VideoLayer } from "@crewcut/composition";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -44,7 +44,7 @@ import {
 } from "lucide-react";
 import { Img, OffthreadVideo, Sequence, useVideoConfig } from "remotion";
 
-import { useFrameContext } from "../context";
+import { TrackMutedContext, useFrameContext } from "../context";
 import { fillToCss } from "../styles";
 
 export function ShapeLayerView({ layer }: { layer: ShapeLayer }) {
@@ -106,6 +106,7 @@ export function ImageLayerView({ layer }: { layer: ImageLayer }) {
 
 export function VideoLayerView({ layer, layerStartFrame }: { layer: VideoLayer; layerStartFrame: number }) {
   const { resolveSrc, scale } = useFrameContext();
+  const trackMuted = useContext(TrackMutedContext);
   const { fps } = useVideoConfig();
   const src = resolveSrc(layer.src);
   if (!src) return <MissingMedia label="Video" />;
@@ -115,8 +116,8 @@ export function VideoLayerView({ layer, layerStartFrame }: { layer: VideoLayer; 
         src={src}
         trimBefore={Math.round((layer.trimStartMs / 1000) * fps)}
         playbackRate={layer.playbackRate}
-        volume={layer.volume}
-        muted={layer.volume === 0}
+        volume={trackMuted ? 0 : layer.volume}
+        muted={trackMuted || layer.volume === 0}
         style={{ width: "100%", height: "100%", objectFit: layer.fit, borderRadius: layer.radius * scale }}
       />
     </Sequence>

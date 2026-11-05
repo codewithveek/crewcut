@@ -41,9 +41,22 @@ export const namedEasingSchema = z.enum([
   "spring-bouncy",
 ]);
 
+/**
+ * A plain 4-number array, not z.tuple: tuples become JSON Schema `prefixItems`
+ * without `items`, which OpenAI-style tool validators reject as invalid_request
+ * (this broke every agent run on gpt models). The type stays a 4-tuple.
+ */
+const bezierSchema = z
+  .array(z.number())
+  .length(4)
+  .describe("[x1, y1, x2, y2] as in CSS cubic-bezier(); x1 and x2 within 0..1")
+  .refine((points) => (points[0] ?? -1) >= 0 && (points[0] ?? 2) <= 1 && (points[2] ?? -1) >= 0 && (points[2] ?? 2) <= 1, "x1 and x2 must be within [0, 1]") as unknown as z.ZodType<
+  [number, number, number, number]
+>;
+
 export const easingSchema = z.union([
   namedEasingSchema,
-  z.object({ bezier: z.tuple([z.number().min(0).max(1), z.number(), z.number().min(0).max(1), z.number()]) }),
+  z.object({ bezier: bezierSchema }),
   z.object({
     spring: z.object({
       dampingRatio: z.number().min(0.1).max(3),
@@ -156,6 +169,38 @@ export const ambientSchema = z.object({
   periodMs: z.number().min(500).max(30_000),
 });
 
+export const BLEND_MODES = ["normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "soft-light", "hard-light", "difference", "exclusion", "luminosity"] as const;
+export type BlendMode = (typeof BLEND_MODES)[number];
+
+// ── Colour: adjustments and filter presets ──────────────────────────────────
+
+/** Colour adjustments (CapCut's "Adjust"): bipolar sliders, 0 = unchanged. */
+export const adjustSchema = z.object({
+  brightness: z.number().min(-100).max(100).default(0),
+  contrast: z.number().min(-100).max(100).default(0),
+  saturation: z.number().min(-100).max(100).default(0),
+  /** Degrees. */
+  hue: z.number().min(-180).max(180).default(0),
+  /** Warm (+) / cool (−) white balance. */
+  temperature: z.number().min(-100).max(100).default(0),
+  /** Magenta (+) / green (−). */
+  tint: z.number().min(-100).max(100).default(0),
+  /** Darkened edges, 0..100 (media and whole clips). */
+  vignette: z.number().min(0).max(100).default(0),
+});
+export type Adjust = z.infer<typeof adjustSchema>;
+
+export const FILTER_PRESETS = ["mono", "noir", "sepia", "warm", "cool", "vivid", "fade", "dramatic", "vintage", "dreamy"] as const;
+export const filterPresetSchema = z.enum(FILTER_PRESETS);
+export type FilterPreset = (typeof FILTER_PRESETS)[number];
+
+export const filterSchema = z.object({
+  preset: filterPresetSchema,
+  /** 0..1 blend toward the preset. */
+  intensity: z.number().min(0).max(1).default(1),
+});
+export type Filter = z.infer<typeof filterSchema>;
+
 // ── Layers ──────────────────────────────────────────────────────────────────
 
 const layerBaseShape = {
@@ -170,8 +215,13 @@ const layerBaseShape = {
   ambient: ambientSchema.optional(),
   /** Parallax depth for camera moves: 0 = locked to frame, 1 = full camera motion. */
   depth: z.number().min(0).max(2).default(1),
-  blendMode: z.enum(["normal", "multiply", "screen", "overlay", "lighten", "difference"]).default("normal"),
+  blendMode: z.enum(BLEND_MODES).default("normal"),
   shadow: shadowSchema.optional(),
+  /** Mirror horizontally / vertically. */
+  flipX: z.boolean().default(false),
+  flipY: z.boolean().default(false),
+  adjust: adjustSchema.optional(),
+  filter: filterSchema.optional(),
   hidden: z.boolean().default(false),
   locked: z.boolean().default(false),
   /** Claim ids (from the script) that this layer shows on screen. */
@@ -210,6 +260,9 @@ export const textStyleSchema = z.object({
   background: hexColorSchema.optional(),
   padding: z.number().min(0).max(200).default(0),
   radius: z.number().min(0).max(200).default(0),
+  /** Outline around the glyphs (design px). */
+  strokeColor: hexColorSchema.optional(),
+  strokeWidth: z.number().min(0).max(40).default(0),
 });
 export type TextStyle = z.infer<typeof textStyleSchema>;
 
@@ -327,6 +380,8 @@ export const layerSchema = z.discriminatedUnion("type", [...leafLayerSchemas, gr
 
 export type Layer = z.infer<typeof layerSchema>;
 export type LayerInput = z.input<typeof layerSchema>;
+/** A layer before it has an id (element presets, clipboard); ops assign a unique one. */
+export type LayerDraft = LayerInput extends infer L ? (L extends unknown ? Omit<L, "id"> & { id?: string } : never) : never;
 export type LeafLayer = z.infer<typeof leafLayerSchema>;
 export type TextLayer = z.infer<typeof textLayerSchema>;
 export type ShapeLayer = z.infer<typeof shapeLayerSchema>;
@@ -372,6 +427,9 @@ const clipTimingShape = {
 export const visualClipSchema = z.object({
   ...clipTimingShape,
   background: fillSchema.optional(),
+  /** Whole-clip colour (an adjustment layer over every layer in the clip). */
+  adjust: adjustSchema.optional(),
+  filter: filterSchema.optional(),
   layers: z.array(layerSchema).max(120).default([]),
   transitionIn: transitionSchema.optional(),
   /** Script beat and narration lines this clip covers. */
@@ -398,6 +456,8 @@ export const audioClipSchema = z.object({
   /** Offset into the source file. */
   trimStartMs: z.number().min(0).default(0),
   volume: z.number().min(0).max(2).default(1),
+  /** Speed: 0.5 = half speed (the clip covers half as much source per second). */
+  playbackRate: z.number().min(0.25).max(4).default(1),
   fadeInMs: z.number().min(0).max(10_000).default(0),
   fadeOutMs: z.number().min(0).max(10_000).default(0),
   /** Clip-relative gain automation, multiplied with `volume`. */
@@ -431,15 +491,33 @@ export const captionClipSchema = z.object({
 });
 export type CaptionClip = z.infer<typeof captionClipSchema>;
 
+export const CAPTION_PRESETS = ["karaoke", "clean", "pop", "boxed", "outline"] as const;
+
+export const CAPTION_HIGHLIGHT_STYLES = ["color", "box", "underline", "bounce"] as const;
+
 export const captionStyleSchema = z.object({
-  preset: z.enum(["karaoke", "clean", "pop", "boxed"]).default("karaoke"),
+  preset: z.enum(CAPTION_PRESETS).default("karaoke"),
   position: z.enum(["bottom", "middle", "top"]).default("bottom"),
+  /** Custom vertical centre in % of the frame; overrides `position`. */
+  positionY: z.number().min(4).max(96).optional(),
+  /** Custom horizontal centre in % of the frame (default 50 = centred). */
+  positionX: z.number().min(5).max(95).optional(),
+  /** Wrap width in % of the frame width (default 84 portrait / 72 landscape). */
+  maxWidth: z.number().min(20).max(100).optional(),
+  align: z.enum(["left", "center", "right"]).default("center"),
   font: fontRefSchema.default("body"),
   size: z.number().min(16).max(160).default(54),
   weight: z.number().int().min(100).max(900).default(800),
+  italic: z.boolean().default(false),
   color: hexColorSchema.default("#ffffff"),
   highlightColor: hexColorSchema.default("#ffd400"),
+  /** How the spoken (or emphasised) word stands out. */
+  highlightStyle: z.enum(CAPTION_HIGHLIGHT_STYLES).default("color"),
   background: hexColorSchema.optional(),
+  strokeColor: hexColorSchema.optional(),
+  /** Outline width in design px (outline preset defaults to 5). */
+  strokeWidth: z.number().min(0).max(20).default(0),
+  shadow: z.boolean().default(true),
   uppercase: z.boolean().default(false),
 });
 export type CaptionStyle = z.infer<typeof captionStyleSchema>;
@@ -454,6 +532,8 @@ const trackBaseShape = {
 export const visualTrackSchema = z.object({
   ...trackBaseShape,
   kind: z.literal("visual"),
+  /** Silences video layers on this track. */
+  muted: z.boolean().default(false),
   clips: z.array(visualClipSchema).default([]),
 });
 

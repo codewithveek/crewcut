@@ -1,5 +1,5 @@
 import React from "react";
-import type { ChartLayer, CodeLayer } from "@proofcut/composition";
+import type { ChartLayer, CodeLayer } from "@crewcut/composition";
 
 import { CODE_THEMES, tokenizeLine } from "../code-highlight";
 import { useFrameContext } from "../context";

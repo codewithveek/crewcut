@@ -1,4 +1,4 @@
-import type { ArtDirectionBrief, Composition } from "@proofcut/composition";
+import type { ArtDirectionBrief, Composition } from "@crewcut/composition";
 import { createContext, useContext } from "react";
 
 export interface RenderOptions {
@@ -26,9 +26,12 @@ export interface FrameContextValue {
 
 export const FrameContext = createContext<FrameContextValue | null>(null);
 
+/** True inside a visual track whose sound is muted (video layers go silent). */
+export const TrackMutedContext = createContext(false);
+
 export function useFrameContext(): FrameContextValue {
   const value = useContext(FrameContext);
-  if (!value) throw new Error("Proofcut layers must render inside <ProofcutVideo>");
+  if (!value) throw new Error("Crewcut layers must render inside <CrewcutVideo>");
   return value;
 }
 

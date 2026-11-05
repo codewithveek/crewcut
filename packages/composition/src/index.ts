@@ -14,3 +14,6 @@ export * from "./snap";
 export * from "./units";
 export * from "./validate";
 export * from "./scene-spec";
+export * from "./composition-ops";
+export * from "./effects";
+export * from "./elements";

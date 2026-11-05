@@ -1,8 +1,8 @@
-import { createSeededRandom } from "@proofcut/motion";
+import { createSeededRandom } from "@crewcut/motion";
 
 import type { IconName } from "./icons";
 import type { ArtDirectionBrief, EasingSpec, Fill, Keyframe, KeyframeMap, LayerInput, TextAnimation } from "./schema";
-import type { AspectRatio } from "./units";
+import { type AspectRatio, FRAME_SIZE } from "./units";
 
 /**
  * Recipes: Cutroom's ten blocks re-expressed as functions that expand into
@@ -54,7 +54,7 @@ interface Layout {
 }
 
 function layoutFor(context: RecipeContext): Layout {
-  const portrait = context.ratio === "9:16" || context.ratio === "4:5";
+  const portrait = FRAME_SIZE[context.ratio].height > FRAME_SIZE[context.ratio].width;
   const grid = context.brief.layoutGrid;
   const leftAligned = grid === "left-rail" || grid === "editorial-columns" || grid === "asymmetric" || (grid === "split" && !portrait);
   const alternate = grid === "asymmetric" && context.index % 2 === 1;

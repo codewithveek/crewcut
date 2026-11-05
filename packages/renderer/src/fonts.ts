@@ -8,7 +8,7 @@ import jetbrainsMono from "@fontsource-variable/jetbrains-mono/files/jetbrains-m
 import plusJakartaSans from "@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2";
 import spaceGrotesk from "@fontsource-variable/space-grotesk/files/space-grotesk-latin-wght-normal.woff2";
 import instrumentSerif from "@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2";
-import type { FontFamily } from "@proofcut/composition";
+import type { FontFamily } from "@crewcut/composition";
 import { loadFont } from "@remotion/fonts";
 
 /**
@@ -31,7 +31,7 @@ const FONT_FILES: Record<FontFamily, { url: string; weight: string }> = {
 let fontsPromise: Promise<void> | null = null;
 
 /** Loads every family once (each loadFont holds the render until it's ready). */
-export function loadProofcutFonts(): Promise<void> {
+export function loadCrewcutFonts(): Promise<void> {
   if (!fontsPromise) {
     fontsPromise = Promise.all(
       Object.entries(FONT_FILES).map(([family, file]) =>

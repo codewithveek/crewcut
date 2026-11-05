@@ -26,7 +26,7 @@ import { parseComposition, safeParseComposition } from "./validate";
 
 const ALL_SPECS: SceneSpec[] = [
   { kind: "headline", lines: ["Your build is *slow*", "for one reason"], eyebrow: "The problem" },
-  { kind: "title", name: "Proofcut", tagline: "Videos with receipts", eyebrow: "Introducing" },
+  { kind: "title", name: "Crewcut", tagline: "Videos with receipts", eyebrow: "Introducing" },
   { kind: "big-number", value: 42, suffix: "%", label: "Faster builds", line: "Measured on *1,200* CI runs" },
   { kind: "cards", heading: "What you get", cards: [
     { icon: "bolt", title: "Fast", line: "Cold start in 80 ms" },
@@ -39,7 +39,7 @@ const ALL_SPECS: SceneSpec[] = [
   { kind: "quote", quote: "Proof over claims.", attribution: "Product principle 2" },
   { kind: "chart", heading: "Throughput", chart: "bar", data: [{ label: "Before", value: 3 }, { label: "After", value: 9 }] },
   { kind: "image", src: "https://example.com/a.png", caption: "The editor" },
-  { kind: "end", name: "Proofcut", cta: "Try it", url: "proofcut.dev" },
+  { kind: "end", name: "Crewcut", cta: "Try it", url: "crewcut.dev" },
 ];
 
 function sample(ratio: (typeof ASPECT_RATIOS)[number] = "16:9", seed = 7): Composition {

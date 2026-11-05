@@ -1,4 +1,4 @@
-import { DEFAULT_ENTER_SCALE, DEFAULT_ENTRANCE_MS, upsertKeyframe } from "@proofcut/motion";
+import { DEFAULT_ENTER_SCALE, DEFAULT_ENTRANCE_MS, upsertKeyframe } from "@crewcut/motion";
 
 import { CompositionEditError, findLayer, requireVisualClip } from "./query";
 import type {

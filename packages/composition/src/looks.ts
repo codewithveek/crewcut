@@ -1,4 +1,4 @@
-import { createSeededRandom } from "@proofcut/motion";
+import { createSeededRandom } from "@crewcut/motion";
 
 import { type StyleFingerprint, fingerprintFromBrief, styleSimilarity } from "./fingerprint";
 import type { FontFamily } from "./fonts";
