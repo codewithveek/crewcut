@@ -35,9 +35,10 @@ function hotWordStyle(style: CaptionStyle, scale: number, karaokeActive: boolean
     case "underline":
       return { textDecorationLine: "underline", textDecorationColor: style.highlightColor, textDecorationThickness: `${Math.max(2, 0.1 * style.size * scale)}px`, textUnderlineOffset: `${0.14 * style.size * scale}px` };
     case "bounce":
-      return { color: style.highlightColor, display: "inline-block", transform: karaokeActive ? "translateY(-0.08em) scale(1.12)" : undefined };
+      // A lift, not a scale: scaling a word makes it overlap the spaces around it.
+      return { color: style.highlightColor, display: "inline-block", transform: karaokeActive ? "translateY(-0.12em)" : undefined };
     default:
-      return { color: style.highlightColor, display: "inline-block", transform: karaokeActive ? "scale(1.06)" : undefined };
+      return { color: style.highlightColor };
   }
 }
 
@@ -83,17 +84,19 @@ export function CaptionsView({ track, timeMs }: { track: CaptionTrack; timeMs: n
         {words.map((word, index) => {
           const active = timeMs >= word.startMs && timeMs < word.endMs;
           const spoken = timeMs >= word.startMs;
-          const emphasized = cue.emphasis.includes(index);
+          // Key words light up once they're said and stay lit; before that they look like
+          // every other upcoming word. Lit early, they read as the highlight skipping words.
+          const emphasized = cue.emphasis.includes(index) && spoken;
           let wordStyle: React.CSSProperties = {};
           if (style.preset === "karaoke" || style.preset === "outline") {
-            wordStyle = active || emphasized ? hotWordStyle(style, scale, active) : { display: "inline-block" };
+            wordStyle = active || emphasized ? hotWordStyle(style, scale, active) : {};
           } else if (style.preset === "boxed") {
             wordStyle = active || emphasized ? hotWordStyle(style, scale, active) : { opacity: spoken ? 1 : 0.62 };
           } else if (style.preset === "pop") {
             const p = spoken ? springProgress(SPRINGS.snappy, (timeMs - word.startMs) / 1000) : 0;
             wordStyle = { display: "inline-block", opacity: Math.min(1, p * 1.4), transform: `scale(${(0.9 + 0.1 * p).toFixed(3)})`, ...(emphasized ? hotWordStyle(style, scale, false) : {}) };
             if (emphasized && wordStyle.transform === undefined) wordStyle.transform = `scale(${(0.9 + 0.1 * p).toFixed(3)})`;
-          } else if (emphasized) {
+          } else if (cue.emphasis.includes(index)) {
             wordStyle = hotWordStyle(style, scale, false);
           }
           return (
