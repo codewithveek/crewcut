@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { applyFix, suggestFixes } from "@proofcut/claim-audit";
+import { applyFix, suggestFixes } from "@crewcut/claim-audit";
 import { z } from "zod";
 
 import { runAuditAndQa } from "../server/lib/pipeline-ops.js";

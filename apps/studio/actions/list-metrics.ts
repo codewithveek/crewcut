@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { metricsSchema } from "@proofcut/contracts";
+import { metricsSchema } from "@crewcut/contracts";
 import { desc, inArray } from "drizzle-orm";
 import { z } from "zod";
 

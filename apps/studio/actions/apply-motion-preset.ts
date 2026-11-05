@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { MOTION_PRESETS, TRANSITION_PRESETS, applyMotionPreset, setTransition } from "@proofcut/composition";
+import { MOTION_PRESETS, TRANSITION_PRESETS, applyMotionPreset, setTransition } from "@crewcut/composition";
 import { z } from "zod";
 
 import { runCompositionEdit } from "../server/lib/composition-action.js";

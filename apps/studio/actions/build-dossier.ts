@@ -1,6 +1,6 @@
 import { defineAction } from "@agent-native/core/action";
-import { locateQuote, verifyQuote } from "@proofcut/claim-audit";
-import { dossierSchema, factSchema } from "@proofcut/contracts";
+import { locateQuote, verifyQuote } from "@crewcut/claim-audit";
+import { dossierSchema, factSchema } from "@crewcut/contracts";
 import { z } from "zod";
 
 import { finishStage } from "../server/lib/pipeline-ops.js";

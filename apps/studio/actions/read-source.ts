@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { keywords } from "@proofcut/claim-audit";
+import { keywords } from "@crewcut/claim-audit";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 

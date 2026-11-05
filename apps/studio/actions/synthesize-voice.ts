@@ -1,8 +1,8 @@
 import { defineAction } from "@agent-native/core/action";
 import { resolveCredential } from "@agent-native/core/credentials";
-import { scriptLines } from "@proofcut/contracts";
-import { type LineAudio, applyNarration } from "@proofcut/pipeline";
-import { ElevenLabsVoiceProvider } from "@proofcut/voice";
+import { scriptLines } from "@crewcut/contracts";
+import { type LineAudio, applyNarration } from "@crewcut/pipeline";
+import { ElevenLabsVoiceProvider } from "@crewcut/voice";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
@@ -10,7 +10,8 @@ import { accessContext } from "../server/lib/identity.js";
 import { toJson } from "../server/lib/json.js";
 import { beginStage, finishStage } from "../server/lib/pipeline-ops.js";
 import { latestComposition, latestScript, loadVideo, saveComposition } from "../server/lib/store.js";
-import { newId, writeStorageFile } from "../server/lib/storage.js";
+import { putFile } from "../server/lib/blob-store.js";
+import { newId } from "../server/lib/storage.js";
 import { lineAudioFor } from "../server/lib/voice-ops.js";
 
 export default defineAction({
@@ -40,7 +41,7 @@ export default defineAction({
         });
         const assetId = newId("ast");
         const fileName = `${assetId}.wav`;
-        await writeStorageFile("assets", fileName, result.bytes);
+        await putFile("assets", fileName, result.bytes, "audio/wav", { keepLocal: true });
         await getDb().insert(schema.assets).values({
           id: assetId,
           videoId,

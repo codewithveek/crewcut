@@ -1,6 +1,6 @@
 import { defineAction } from "@agent-native/core/action";
-import { stageSchema } from "@proofcut/contracts";
-import { approveStage, startStage } from "@proofcut/pipeline";
+import { stageSchema } from "@crewcut/contracts";
+import { approveStage, startStage } from "@crewcut/pipeline";
 import { z } from "zod";
 
 import { requireHuman } from "../server/lib/identity.js";

@@ -29,7 +29,7 @@ export default defineAction({
     let kind: "url" | "document" = "document";
     if (args.url) {
       kind = "url";
-      const response = await ssrfSafeFetch(args.url, { headers: { "user-agent": "Proofcut research (+https://github.com/codewithveek)", accept: "text/html,text/plain,application/json" }, signal: AbortSignal.timeout(15_000) });
+      const response = await ssrfSafeFetch(args.url, { headers: { "user-agent": "Crewcut research (+https://github.com/codewithveek)", accept: "text/html,text/plain,application/json" }, signal: AbortSignal.timeout(15_000) });
       if (!response.ok) throw new Error(`Couldn't fetch ${args.url}: HTTP ${response.status}`);
       const length = Number(response.headers.get("content-length") ?? 0);
       if (length > MAX_BYTES) throw new Error("That page is too large to use as a source (2 MB limit).");

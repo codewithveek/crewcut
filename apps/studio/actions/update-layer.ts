@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { type LayerPatch, updateLayer } from "@proofcut/composition";
+import { type LayerPatch, updateLayer } from "@crewcut/composition";
 import { z } from "zod";
 
 import { runCompositionEdit } from "../server/lib/composition-action.js";

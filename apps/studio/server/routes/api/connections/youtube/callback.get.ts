@@ -1,6 +1,6 @@
 import { deleteCredential, resolveCredential } from "@agent-native/core/credentials";
 import { getSession, runWithRequestContext } from "@agent-native/core/server";
-import { YouTubeClient, exchangeCode, verifyState } from "@proofcut/distribute";
+import { YouTubeClient, exchangeCode, verifyState } from "@crewcut/distribute";
 import { defineEventHandler, getQuery } from "h3";
 
 import { getDb, schema } from "../../../../db/index.js";
@@ -22,15 +22,15 @@ export default defineEventHandler(async (event) => {
     const sessionEmail = session?.email ?? (process.env.NODE_ENV === "production" ? null : "local@localhost");
     if (!sessionEmail || sessionEmail !== payload.ownerEmail) throw new Error("This connection was started by a different account.");
     const ctx = { userEmail: payload.ownerEmail, ...(payload.orgId ? { orgId: payload.orgId } : {}) };
-    const verifier = await resolveCredential(`proofcut_pkce_${payload.nonce}`, ctx);
-    await deleteCredential(`proofcut_pkce_${payload.nonce}`, { ...ctx, scope: "user" }).catch(() => undefined);
+    const verifier = await resolveCredential(`crewcut_pkce_${payload.nonce}`, ctx);
+    await deleteCredential(`crewcut_pkce_${payload.nonce}`, { ...ctx, scope: "user" }).catch(() => undefined);
     if (!verifier) throw new Error("The connection attempt expired. Start again.");
     const client = youtubeOAuthClient(appOrigin());
     if (!client) throw new Error("YouTube isn't configured.");
 
     const tokens = await exchangeCode("youtube", client, { code: query.code, codeVerifier: verifier });
     const connectionId = newId("con");
-    const vaultKey = `proofcut_youtube_${connectionId}`;
+    const vaultKey = `crewcut_youtube_${connectionId}`;
     await credentialVault({ userEmail: payload.ownerEmail, orgId: payload.orgId }).set(vaultKey, tokens);
     const channel = await new YouTubeClient({ getToken: async () => tokens.accessToken }).channel().catch(() => null);
     await runWithRequestContext(ctx, () =>

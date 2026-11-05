@@ -27,6 +27,7 @@ export default defineAction({
               text: label,
               trimStartMs: 0,
               volume,
+              playbackRate: 1,
               fadeInMs: 800,
               fadeOutMs: 1500,
               envelope: [],

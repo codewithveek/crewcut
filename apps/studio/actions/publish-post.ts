@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { publishCopySchema, privacySchema } from "@proofcut/contracts";
+import { publishCopySchema, privacySchema } from "@crewcut/contracts";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -7,9 +7,9 @@ import { getDb, schema } from "../server/db/index.js";
 import { requireHuman } from "../server/lib/identity.js";
 import { nowIso, toJson } from "../server/lib/json.js";
 import { loadVideo, recordApproval, saveStages, updateVideo } from "../server/lib/store.js";
-import { storagePath } from "../server/lib/storage.js";
+import { localCopy } from "../server/lib/blob-store.js";
 import { fileVideoSource, youtubeClientFor, youtubeConnectionFor } from "../server/lib/youtube.js";
-import { approveStage } from "@proofcut/pipeline";
+import { approveStage } from "@crewcut/pipeline";
 import { runWithRequestContext } from "@agent-native/core/server";
 
 /**
@@ -49,7 +49,7 @@ export default defineAction({
     void runWithRequestContext(owner, async () => {
       try {
         const youtube = youtubeClientFor(connection);
-        const source = await fileVideoSource(storagePath("renders", render.outputFile as string));
+        const source = await fileVideoSource(await localCopy("renders", render.outputFile as string));
         const result = await youtube.upload({
           video: source,
           copy,

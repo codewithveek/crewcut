@@ -1,6 +1,6 @@
 import { open, stat } from "node:fs/promises";
 
-import { type VideoSource, YouTubeClient, getAccessToken } from "@proofcut/distribute";
+import { type VideoSource, YouTubeClient, getAccessToken } from "@crewcut/distribute";
 import { and, eq } from "drizzle-orm";
 
 import { getDb, schema } from "../db/index.js";

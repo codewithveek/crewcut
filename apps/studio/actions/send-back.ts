@@ -1,6 +1,6 @@
 import { defineAction } from "@agent-native/core/action";
-import { stageSchema } from "@proofcut/contracts";
-import { sendBack } from "@proofcut/pipeline";
+import { stageSchema } from "@crewcut/contracts";
+import { sendBack } from "@crewcut/pipeline";
 import { z } from "zod";
 
 import { nowIso } from "../server/lib/json.js";

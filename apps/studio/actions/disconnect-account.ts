@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { revokeTokens } from "@proofcut/distribute";
+import { revokeTokens } from "@crewcut/distribute";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 

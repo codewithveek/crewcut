@@ -1,6 +1,6 @@
 import { defineAction } from "@agent-native/core/action";
-import { VIDEO_PRESETS, type ArtDirectionBrief, type Composition, artDirectionBriefSchema, setArtDirection } from "@proofcut/composition";
-import { composeFromScript } from "@proofcut/pipeline";
+import { VIDEO_PRESETS, type ArtDirectionBrief, type Composition, artDirectionBriefSchema, setArtDirection } from "@crewcut/composition";
+import { composeFromScript } from "@crewcut/pipeline";
 import { z } from "zod";
 
 import { runCompositionEdit } from "../server/lib/composition-action.js";

@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { checkVariety, styleFingerprint } from "@proofcut/composition";
+import { checkVariety, styleFingerprint } from "@crewcut/composition";
 import { z } from "zod";
 
 import { getProject, latestComposition, loadVideo, recentFingerprints } from "../server/lib/store.js";

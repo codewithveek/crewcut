@@ -1,6 +1,6 @@
 import { defineAction } from "@agent-native/core/action";
-import { metricWindowSchema } from "@proofcut/contracts";
-import { demoMetrics } from "@proofcut/pipeline";
+import { metricWindowSchema } from "@crewcut/contracts";
+import { demoMetrics } from "@crewcut/pipeline";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 

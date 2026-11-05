@@ -1,6 +1,6 @@
 import { defineAction } from "@agent-native/core/action";
-import { STAGE_LABELS } from "@proofcut/contracts";
-import { pipelineProgress } from "@proofcut/pipeline";
+import { STAGE_LABELS } from "@crewcut/contracts";
+import { pipelineProgress } from "@crewcut/pipeline";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 

@@ -24,3 +24,14 @@ export function parseJsonStrict<T extends z.ZodType>(schema: T, text: string, wh
 export const toJson = (value: unknown): string => JSON.stringify(value);
 
 export const nowIso = (): string => new Date().toISOString();
+
+/** Untyped JSON read for display-only metadata; never throws. */
+export function parseJsonLoose<T>(text: string | null | undefined, fallback: T): T {
+  if (!text) return fallback;
+  try {
+    const value = JSON.parse(text) as unknown;
+    return value && typeof value === "object" ? (value as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}

@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { learningSchema } from "@proofcut/contracts";
+import { learningSchema } from "@crewcut/contracts";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 

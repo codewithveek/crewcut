@@ -1,7 +1,7 @@
 import { defineAction } from "@agent-native/core/action";
-import { auditClaims } from "@proofcut/claim-audit";
-import { scriptSchema, scriptWordCount, wordBudget } from "@proofcut/contracts";
-import { invalidateFrom } from "@proofcut/pipeline";
+import { auditClaims } from "@crewcut/claim-audit";
+import { scriptSchema, scriptWordCount, wordBudget } from "@crewcut/contracts";
+import { invalidateFrom } from "@crewcut/pipeline";
 import { z } from "zod";
 
 import { nowIso } from "../server/lib/json.js";

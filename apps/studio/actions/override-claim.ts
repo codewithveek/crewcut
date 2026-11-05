@@ -1,11 +1,11 @@
 import { defineAction } from "@agent-native/core/action";
-import { overrideClaim } from "@proofcut/claim-audit";
+import { overrideClaim } from "@crewcut/claim-audit";
 import { z } from "zod";
 
 import { requireHuman } from "../server/lib/identity.js";
 import { finishStage } from "../server/lib/pipeline-ops.js";
 import { latestAudit, loadVideo, recordApproval, saveAudit } from "../server/lib/store.js";
-import { findApprovalBlockers } from "@proofcut/claim-audit";
+import { findApprovalBlockers } from "@crewcut/claim-audit";
 
 export default defineAction({
   description: "Override an unsupported claim with a written reason (people only). The reason is logged in the Proof report.",

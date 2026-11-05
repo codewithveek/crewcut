@@ -1,6 +1,6 @@
 import type { ActionRunContext } from "@agent-native/core/action";
 import { accessFilter, assertAccess } from "@agent-native/core/sharing";
-import { type Composition, type StyleFingerprint, parseComposition, styleFingerprint } from "@proofcut/composition";
+import { type Composition, type StyleFingerprint, parseComposition, styleFingerprint } from "@crewcut/composition";
 import {
   type ApprovalEvent,
   type AuditReport,
@@ -21,7 +21,7 @@ import {
   qaReportSchema,
   scriptSchema,
   stageStatesSchema,
-} from "@proofcut/contracts";
+} from "@crewcut/contracts";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 

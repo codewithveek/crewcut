@@ -8,8 +8,8 @@ import {
   composeVideo,
   generateArtDirectionBrief,
   lintMotion,
-} from "@proofcut/composition";
-import { applyNarration, composeFromScript } from "@proofcut/pipeline";
+} from "@crewcut/composition";
+import { applyNarration, composeFromScript } from "@crewcut/pipeline";
 import { z } from "zod";
 
 import { beginStage, finishStage, summarizeComposition } from "../server/lib/pipeline-ops.js";

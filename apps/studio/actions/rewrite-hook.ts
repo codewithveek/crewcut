@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { countWords } from "@proofcut/contracts";
+import { countWords } from "@crewcut/contracts";
 import { z } from "zod";
 
 import { latestScript, loadVideo, saveScript } from "../server/lib/store.js";

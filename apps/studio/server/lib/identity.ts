@@ -22,7 +22,7 @@ export class ForbiddenError extends Error {
 
 export function identity(ctx: ActionRunContext | undefined): Identity {
   const email = ctx?.userEmail ?? (process.env.NODE_ENV === "production" ? undefined : "local@localhost");
-  if (!email) throw new ForbiddenError("Sign in to use Proofcut.");
+  if (!email) throw new ForbiddenError("Sign in to use Crewcut.");
   const caller = ctx?.caller ?? "unknown";
   const kind = HUMAN_CALLERS.has(caller) ? "human" : "agent";
   return { email, orgId: ctx?.orgId ?? null, kind, caller, actorId: kind === "human" ? email : "agent" };
@@ -32,7 +32,7 @@ export function identity(ctx: ActionRunContext | undefined): Identity {
 export function requireHuman(ctx: ActionRunContext | undefined, what: string): Identity {
   const who = identity(ctx);
   if (who.kind !== "human") {
-    throw new ForbiddenError(`${what} needs a person. Ask the user to click it in Proofcut.`);
+    throw new ForbiddenError(`${what} needs a person. Ask the user to click it in Crewcut.`);
   }
   return who;
 }

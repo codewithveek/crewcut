@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { ideaSchema } from "@proofcut/contracts";
+import { ideaSchema } from "@crewcut/contracts";
 import { z } from "zod";
 
 import { toJson } from "../server/lib/json.js";

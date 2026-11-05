@@ -1,6 +1,6 @@
 import { defineAction } from "@agent-native/core/action";
-import { auditClaims } from "@proofcut/claim-audit";
-import { scriptSchema } from "@proofcut/contracts";
+import { auditClaims } from "@crewcut/claim-audit";
+import { scriptSchema } from "@crewcut/contracts";
 import { z } from "zod";
 
 import { latestAudit, latestScript, loadDossier, loadVideo, saveAudit, saveScript } from "../server/lib/store.js";

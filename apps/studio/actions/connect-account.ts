@@ -1,6 +1,6 @@
 import { defineAction } from "@agent-native/core/action";
 import { saveCredential } from "@agent-native/core/credentials";
-import { buildAuthorizeUrl, pkcePair, randomToken, signState } from "@proofcut/distribute";
+import { buildAuthorizeUrl, pkcePair, randomToken, signState } from "@crewcut/distribute";
 import { z } from "zod";
 
 import { requireHuman } from "../server/lib/identity.js";
@@ -35,7 +35,7 @@ export default defineAction({
     const { verifier, challenge } = await pkcePair();
     const nonce = randomToken(16);
     // The PKCE verifier never leaves the server: it waits in the encrypted vault for the callback.
-    await saveCredential(`proofcut_pkce_${nonce}`, verifier, { userEmail: who.email, ...(who.orgId ? { orgId: who.orgId } : {}), scope: "user" });
+    await saveCredential(`crewcut_pkce_${nonce}`, verifier, { userEmail: who.email, ...(who.orgId ? { orgId: who.orgId } : {}), scope: "user" });
     const state = await signState(
       { provider: "youtube", ownerEmail: who.email, orgId: who.orgId, returnTo, nonce, expiresAt: Date.now() + 10 * 60 * 1000 },
       oauthStateSecret(),

@@ -1,6 +1,6 @@
 import { defineAction } from "@agent-native/core/action";
 import { hasCredential } from "@agent-native/core/credentials";
-import { PLATFORM_SPECS } from "@proofcut/contracts";
+import { PLATFORM_SPECS } from "@crewcut/contracts";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 

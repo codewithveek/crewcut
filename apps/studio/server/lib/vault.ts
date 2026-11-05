@@ -1,5 +1,5 @@
 import { deleteCredential, resolveCredential, saveCredential } from "@agent-native/core/credentials";
-import type { OAuthClient, TokenSet, TokenVault } from "@proofcut/distribute";
+import type { OAuthClient, TokenSet, TokenVault } from "@crewcut/distribute";
 
 /**
  * OAuth tokens live in Agent-Native's encrypted credential vault (AES-256-GCM),
@@ -41,7 +41,7 @@ export function oauthStateSecret(): string {
   const secret = process.env.OAUTH_STATE_SECRET ?? process.env.BETTER_AUTH_SECRET;
   if (secret) return secret;
   if (process.env.NODE_ENV === "production") throw new Error("Set OAUTH_STATE_SECRET to connect accounts.");
-  return "proofcut-dev-oauth-state-secret-change-me";
+  return "crewcut-dev-oauth-state-secret-change-me";
 }
 
 export function appOrigin(): string {

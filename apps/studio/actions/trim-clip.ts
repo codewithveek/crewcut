@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { trimClip } from "@proofcut/composition";
+import { trimClip } from "@crewcut/composition";
 import { z } from "zod";
 
 import { runCompositionEdit } from "../server/lib/composition-action.js";

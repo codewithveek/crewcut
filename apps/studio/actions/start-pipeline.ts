@@ -1,7 +1,7 @@
 import { defineAction } from "@agent-native/core/action";
-import { aspectRatioSchema } from "@proofcut/composition";
-import { platformSchema } from "@proofcut/contracts";
-import { initialStageStates, startStage } from "@proofcut/pipeline";
+import { aspectRatioSchema } from "@crewcut/composition";
+import { platformSchema } from "@crewcut/contracts";
+import { initialStageStates, startStage } from "@crewcut/pipeline";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";

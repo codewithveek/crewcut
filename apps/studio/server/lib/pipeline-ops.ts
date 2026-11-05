@@ -1,7 +1,7 @@
-import { auditClaims, findApprovalBlockers } from "@proofcut/claim-audit";
-import { type Composition, clipEndMs, visualTracks } from "@proofcut/composition";
-import type { Stage } from "@proofcut/contracts";
-import { completeStage, runQa, startStage } from "@proofcut/pipeline";
+import { auditClaims, findApprovalBlockers } from "@crewcut/claim-audit";
+import { type Composition, clipEndMs, visualTracks } from "@crewcut/composition";
+import type { Stage } from "@crewcut/contracts";
+import { completeStage, runQa, startStage } from "@crewcut/pipeline";
 
 import type { Identity } from "./identity.js";
 import { nowIso } from "./json.js";
@@ -113,7 +113,7 @@ export async function runAuditAndQa(video: VideoRecord, options: { completeQaSta
 }
 
 /**
- * Applies a pure edit from @proofcut/composition to the latest version and
+ * Applies a pure edit from @crewcut/composition to the latest version and
  * saves the result as the next version — one undoable step, attributed.
  */
 export async function editComposition(

@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
 import { loadVideo } from "../server/lib/store.js";
-import { signMediaUrl } from "../server/lib/storage.js";
+import { fileUrl, promoteToRemote } from "../server/lib/blob-store.js";
 
 export default defineAction({
   description: "A short-lived signed link (15 minutes) to a finished render, for preview or download.",
@@ -18,7 +18,9 @@ export default defineAction({
       .where(and(eq(schema.renderJobs.id, renderId), eq(schema.renderJobs.videoId, videoId)))
       .limit(1);
     if (!render?.outputFile || render.status !== "done") throw new Error("That render isn't finished.");
-    const url = signMediaUrl("renders", render.outputFile);
-    return { url: download ? `${url}&download=1` : url, expiresInSeconds: 900 };
+    await promoteToRemote("renders", render.outputFile, "video/mp4", render.ownerEmail).catch(() => undefined);
+    const url = await fileUrl("renders", render.outputFile);
+    const local = url.startsWith("/api/media/");
+    return { url: download && local ? `${url}&download=1` : url, expiresInSeconds: local ? 900 : null };
   },
 });

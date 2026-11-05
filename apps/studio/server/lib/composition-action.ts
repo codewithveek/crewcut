@@ -1,12 +1,12 @@
 import type { ActionRunContext } from "@agent-native/core/action";
-import { type Composition, lintMotion } from "@proofcut/composition";
+import { type Composition, lintMotion } from "@crewcut/composition";
 
 import { editComposition, summarizeComposition } from "./pipeline-ops.js";
 import { loadVideo } from "./store.js";
 
 /**
  * Shared body of every composition-editing action: load with editor access,
- * apply one pure edit from @proofcut/composition, save it as the next
+ * apply one pure edit from @crewcut/composition, save it as the next
  * version (one undoable step), and report back compactly.
  */
 export async function runCompositionEdit(

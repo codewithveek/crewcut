@@ -1,6 +1,6 @@
-import type { Composition } from "@proofcut/composition";
-import type { Script } from "@proofcut/contracts";
-import { type LineAudio, estimateLineAudio } from "@proofcut/pipeline";
+import type { Composition } from "@crewcut/composition";
+import type { Script } from "@crewcut/contracts";
+import { type LineAudio, estimateLineAudio } from "@crewcut/pipeline";
 
 /**
  * Line audio for re-timing: real synthesized voice where a voice clip exists

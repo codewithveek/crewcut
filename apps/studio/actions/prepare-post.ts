@@ -1,6 +1,6 @@
 import { defineAction } from "@agent-native/core/action";
-import { PLATFORM_SPECS, platformSchema, privacySchema, publishCopySchema } from "@proofcut/contracts";
-import { adaptCopy, validateForYouTube } from "@proofcut/distribute";
+import { PLATFORM_SPECS, platformSchema, privacySchema, publishCopySchema } from "@crewcut/contracts";
+import { adaptCopy, validateForYouTube } from "@crewcut/distribute";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
