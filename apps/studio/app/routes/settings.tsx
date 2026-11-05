@@ -17,7 +17,7 @@ export function meta() {
 // Chat has no app rows here: core Preferences owns the interface language.
 export default function SettingsRoute() {
   const t = useT();
-  const agentSettingsTabs = useAgentSettingsTabs();
+  const agentSettingsTabs = useAgentSettingsTabs({ appName: APP_TITLE, extensionTools: true });
   useSetPageTitle(t("settings.title"));
 
   return (

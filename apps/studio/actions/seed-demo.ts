@@ -1,7 +1,7 @@
 import { defineAction } from "@agent-native/core/action";
-import { explainPerformance } from "@proofcut/analytics";
-import { applyFix, auditClaims } from "@proofcut/claim-audit";
-import { DEFAULT_GATE_POLICY, STAGES, type StageStates } from "@proofcut/contracts";
+import { explainPerformance } from "@crewcut/analytics";
+import { applyFix, auditClaims } from "@crewcut/claim-audit";
+import { DEFAULT_GATE_POLICY, STAGES, type StageStates } from "@crewcut/contracts";
 import {
   DEMO_SOURCE,
   approveStage,
@@ -15,7 +15,7 @@ import {
   demoScript,
   initialStageStates,
   startStage,
-} from "@proofcut/pipeline";
+} from "@crewcut/pipeline";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
@@ -40,7 +40,11 @@ const DEMO_REASON = "Demo seed";
 export default defineAction({
   description: "Load the demo workspace: a sample published video with analytics, and 'Why good motion feels physical' advanced to the chosen stage. Everything is labelled as sample data.",
   schema: z.object({ through: z.enum(["ideas", "script", "composed"]).default("script") }),
+  // People-only like approvals: it records human approvals on the demo video.
+  // toolCallable: false also keeps agent-written mini-apps (extensions) from calling it.
   agentTool: false,
+  uiOnly: true,
+  toolCallable: false,
   run: async ({ through }, ctx) => {
     const who = requireHuman(ctx, "Loading the demo");
     const db = getDb();
