@@ -37,7 +37,6 @@ import {
   IconPlayerStopFilled,
   IconPlus,
   IconRocket,
-  IconSearch,
   IconShape,
   IconShield,
   IconSparkles,
@@ -54,7 +53,7 @@ import { fillToCss } from "@crewcut/renderer";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { Button, ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger, EmptyState, Segmented, Slider } from "@/components/ds";
+import { Button, ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger, EmptyState, SearchField, Segmented, Slider, useDebouncedValue } from "@/components/ds";
 import { errorMessage } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
@@ -185,16 +184,16 @@ function MediaTile({ asset, onDeleted }: { asset: AssetDto; onDeleted: () => voi
 
 export function MediaTab() {
   const videoId = useEditor((state) => state.videoId);
-  const { assets, loading, refetch } = useAssets(videoId);
   const [filter, setFilter] = useState<"all" | "image" | "video">("all");
   const [search, setSearch] = useState("");
+  const settledSearch = useDebouncedValue(search, 250);
+  const { assets: visible, total, loading, refetch, hasMore, loadMore, loadingMore } = useAssets(videoId, { mediaType: filter === "all" ? "visual" : filter, query: settledSearch });
   const [dropping, setDropping] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const { busy, upload } = useUploader(videoId, (done) => {
     void refetch();
     useEditor.getState().mergeAssetUrls(Object.fromEntries(done.map((asset) => [asset.id, asset.url])));
   });
-  const visible = assets.filter((asset) => asset.mediaType !== "audio" && (filter === "all" || asset.mediaType === filter) && asset.label.toLowerCase().includes(search.toLowerCase()));
   return (
     <div
       className={cn("flex min-h-0 flex-1 flex-col", dropping && "bg-ds-accent-soft")}
@@ -215,10 +214,7 @@ export function MediaTab() {
         <Segmented size="sm" ariaLabel="Media type" value={filter} onChange={setFilter} options={[{ value: "all", label: "All" }, { value: "image", label: "Images" }, { value: "video", label: "Videos" }]} />
       </PanelHeader>
       <div className="px-3 pb-2">
-        <label className="flex h-8 items-center gap-2 rounded-ds-sm bg-ds-surface-2 px-2 shadow-[inset_0_0_0_1px_var(--ds-hairline)] focus-within:shadow-[inset_0_0_0_1.5px_var(--ds-accent)]">
-          <IconSearch className="size-4 text-ds-text-3" />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.stopPropagation()} placeholder="Search media" aria-label="Search media" className="min-w-0 flex-1 bg-transparent text-[13px] text-ds-text outline-none placeholder:text-ds-text-3" />
-        </label>
+        <SearchField size="sm" value={search} onChange={setSearch} label="Search media" placeholder="Search media" />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         <div className="grid grid-cols-2 gap-x-2 gap-y-3">
@@ -235,7 +231,14 @@ export function MediaTab() {
             <MediaTile key={asset.id} asset={asset} onDeleted={() => void refetch()} />
           ))}
         </div>
-        {!loading && visible.length === 0 ? <p className="mt-4 text-center text-xs text-ds-text-3">Drop photos or videos here, or press Import. Then drag them onto the timeline.</p> : null}
+        {hasMore ? (
+          <Button size="sm" variant="ghost" className="mt-3 w-full" disabled={loadingMore} onClick={loadMore}>
+            {loadingMore ? "Loading…" : `Show more (${total - visible.length} left)`}
+          </Button>
+        ) : null}
+        {!loading && visible.length === 0 ? (
+          <p className="mt-4 text-center text-xs text-ds-text-3">{settledSearch.trim() ? `Nothing matches “${settledSearch.trim()}”.` : "Drop photos or videos here, or press Import. Then drag them onto the timeline."}</p>
+        ) : null}
         <input
           ref={input}
           type="file"
@@ -389,7 +392,7 @@ export function VoiceRecorder({ onAdded }: { onAdded?: () => void }) {
           <IconMicrophone className="size-4" /> Record voiceover
         </Button>
       )}
-      <p className="text-[11px] text-ds-text-3">Lands on the voice track at the playhead. Music ducks under it automatically.</p>
+      <p className="text-[11px] text-ds-text-3">Lands on the voice track at the playhead. Music gets quieter under it automatically.</p>
     </div>
   );
 }
@@ -398,11 +401,10 @@ export function AudioTab() {
   const videoId = useEditor((state) => state.videoId);
   const [section, setSection] = useState<"music" | "sfx" | "uploads" | "record">("music");
   const { items, loading } = useAudioLibrary();
-  const { assets, refetch } = useAssets(videoId);
+  const { assets: uploads, refetch, hasMore: moreUploads, loadMore: loadMoreUploads } = useAssets(videoId, { mediaType: "audio" });
   const { playing, toggle } = usePreviewPlayer();
   const input = useRef<HTMLInputElement>(null);
   const { busy, upload } = useUploader(videoId, () => void refetch());
-  const uploads = assets.filter((asset) => asset.mediaType === "audio");
   const library = items.filter((item) => item.kind === section);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -443,6 +445,11 @@ export function AudioTab() {
                 }}
               />
             ))}
+            {moreUploads ? (
+              <Button size="sm" variant="ghost" className="mx-1 mt-1 w-[calc(100%-8px)]" onClick={loadMoreUploads}>
+                Show more
+              </Button>
+            ) : null}
           </>
         ) : (
           <>
@@ -592,12 +599,13 @@ export function CaptionsTab() {
         </button>
       </PanelHeader>
       <div className="flex flex-col gap-2 px-3 pb-3">
-        <div className="grid grid-cols-2 gap-2">
-          <Button size="sm" variant="outline" className="pc-press" onClick={() => void addCaptionAt()}>
-            <IconPlus className="size-4" /> Add at playhead
+        {/* Side by side when the panel is wide enough, stacked otherwise; never clipped. */}
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-2">
+          <Button size="sm" variant="outline" className="pc-press min-w-0 justify-start" onClick={() => void addCaptionAt()}>
+            <IconPlus className="size-4 shrink-0" /> <span className="truncate">Add at playhead</span>
           </Button>
-          <Button size="sm" variant="outline" className="pc-press" onClick={() => void generateCaptionsFromNarration()}>
-            <IconWand className="size-4" /> From narration
+          <Button size="sm" variant="outline" className="pc-press min-w-0 justify-start" onClick={() => void generateCaptionsFromNarration()}>
+            <IconWand className="size-4 shrink-0" /> <span className="truncate">From narration</span>
           </Button>
         </div>
         {style ? (

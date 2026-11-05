@@ -1,5 +1,6 @@
 import { appPath } from "@agent-native/core/client/api-path";
 import { useActionQuery } from "@agent-native/core/client/hooks";
+import { keepPreviousData } from "@tanstack/react-query";
 import type { LayerDraft, Transition } from "@crewcut/composition";
 import { useEffect, useState } from "react";
 
@@ -20,13 +21,33 @@ export interface AssetDto extends AssetLike {
   createdAt: string;
 }
 
-export function useAssets(videoId: string) {
-  const query = useActionQuery("list-assets", { videoId, scope: "all" } as never);
-  const all = ((query.data as { assets?: AssetDto[] } | undefined)?.assets ?? []).filter(
-    // This video's uploads, the person's library, and nothing from other videos.
-    (asset) => asset.videoId === videoId || asset.videoId === null,
+/**
+ * This video's uploads plus the person's library, newest first, searched on
+ * the server. The panel shows a page and grows by a page per "Show more".
+ */
+export function useAssets(videoId: string, options: { mediaType?: "visual" | "image" | "video" | "audio"; query?: string; pageSize?: number } = {}) {
+  const pageSize = options.pageSize ?? 60;
+  const [pages, setPages] = useState(1);
+  const search = options.query?.trim() ?? "";
+  // A new search or type starts again from the first page.
+  useEffect(() => setPages(1), [search, options.mediaType, videoId]);
+  const query = useActionQuery(
+    "list-assets",
+    { videoId, scope: "video_and_library", ...(options.mediaType ? { mediaType: options.mediaType } : {}), ...(search ? { query: search } : {}), limit: pageSize * pages } as never,
+    { placeholderData: keepPreviousData } as never,
   );
-  return { assets: all, loading: query.isLoading, refetch: query.refetch };
+  const data = query.data as { assets?: AssetDto[]; total?: number } | undefined;
+  const assets = data?.assets ?? [];
+  const total = data?.total ?? 0;
+  return {
+    assets,
+    total,
+    loading: query.isLoading,
+    refetch: query.refetch,
+    hasMore: assets.length < total,
+    loadingMore: query.isFetching && query.isPlaceholderData,
+    loadMore: () => setPages((count) => count + 1),
+  };
 }
 
 export interface LibraryItemDto extends LibraryAudio {

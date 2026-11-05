@@ -225,7 +225,7 @@ function TransformSections({ composition, clip, layer }: { composition: Composit
           </IconButton>
         </FieldRow>
       </Section>
-      <Section title="Compositing">
+      <Section title="Blending">
         <FieldRow label="Blend">
           <Select label="Blend mode" className="w-full" value={layer.blendMode} onChange={(blendMode) => commit(`Blend: ${blendMode}`, [{ op: "update-layer", clipId: clip.id, layerId: layer.id, patch: { blendMode } }])} options={BLEND_MODES.map((mode) => ({ value: mode, label: mode.replace("-", " ").replace(/^\w/, (c) => c.toUpperCase()) }))} />
         </FieldRow>
@@ -270,9 +270,9 @@ function MediaSection({ clip, layer }: { clip: VisualClip; layer: Extract<Layer,
 // ── Text ────────────────────────────────────────────────────────────────────
 
 const FONT_OPTIONS = [
-  { value: "display", label: "Display (art direction)", group: "Pairing" },
-  { value: "body", label: "Body (art direction)", group: "Pairing" },
-  { value: "mono", label: "Mono (art direction)", group: "Pairing" },
+  { value: "display", label: "Headline (this video's style)", group: "Pairing" },
+  { value: "body", label: "Body (this video's style)", group: "Pairing" },
+  { value: "mono", label: "Monospace (this video's style)", group: "Pairing" },
   ...FONT_FAMILIES.map((family) => ({ value: family, label: family, group: "Fonts" })),
 ];
 const WEIGHTS = [300, 400, 500, 600, 700, 800, 900].map((weight) => ({ value: String(weight), label: String(weight) }));
@@ -723,8 +723,8 @@ function AudioInspector({ composition, selection }: { composition: Composition; 
           <SliderField label="Fade in" value={clip.fadeInMs} min={0} max={Math.min(10_000, clip.durationMs)} step={50} unit="s" format={(v) => Math.round(v / 100) / 10} parse={(v) => v * 1000} onCommit={(fadeInMs) => commit("Fade in", [op({ fadeInMs })])} />
           <SliderField label="Fade out" value={clip.fadeOutMs} min={0} max={Math.min(10_000, clip.durationMs)} step={50} unit="s" format={(v) => Math.round(v / 100) / 10} parse={(v) => v * 1000} onCommit={(fadeOutMs) => commit("Fade out", [op({ fadeOutMs })])} />
           {track.role === "music" ? (
-            <FieldRow label="Ducking">
-              <Switch label="Lower under the voice" checked={clip.duckUnderVoice} onCheckedChange={(duckUnderVoice) => commit(duckUnderVoice ? "Duck under voice" : "Stop ducking", [op({ duckUnderVoice })])} />
+            <FieldRow label="Voice-over">
+              <Switch label="Lower under the voice" checked={clip.duckUnderVoice} onCheckedChange={(duckUnderVoice) => commit(duckUnderVoice ? "Lower under the voice" : "Stop lowering under the voice", [op({ duckUnderVoice })])} />
               <span className="text-[11px] text-ds-text-3">Lower under the voice</span>
             </FieldRow>
           ) : null}
@@ -861,6 +861,64 @@ function CaptionInspector({ composition, selection }: { composition: Composition
   return <InspectorFrame icon={<IconBadgeCc />} title={clip.text.slice(0, 40)} subtitle={`Caption · ${(clip.durationMs / 1000).toFixed(2)} s`} tabs={[captionTab, styleTab]} />;
 }
 
+type HistoryEntry = { version: number; label: string; authorKind: string; createdAt: string };
+
+/** Edit history: the latest 50 come with the composition; older ones load a page at a time. */
+function HistoryList({ versions, version, videoId }: { versions: HistoryEntry[]; version: number; videoId: string }) {
+  const [older, setOlder] = useState<HistoryEntry[]>([]);
+  const [hasOlder, setHasOlder] = useState(true);
+  const [loading, setLoading] = useState(false);
+  // New edits shift every offset; start over from the fresh first page.
+  useEffect(() => {
+    setOlder([]);
+    setHasOlder(true);
+  }, [videoId, versions[0]?.version]);
+  const seen = new Set(versions.map((entry) => entry.version));
+  const all = [...versions, ...older.filter((entry) => !seen.has(entry.version))];
+  const canLoadMore = hasOlder && versions.length >= 50;
+  async function loadOlder() {
+    setLoading(true);
+    try {
+      const page = (await callAction("list-composition-versions" as never, { videoId, offset: all.length, limit: 50 } as never)) as { versions: HistoryEntry[]; hasMore: boolean };
+      setOlder((current) => [...current, ...page.versions]);
+      setHasOlder(page.hasMore);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <ul className="flex flex-col p-2">
+      {all.map((entry) => (
+        <li key={entry.version}>
+          <button type="button" onClick={() => void useEditor.getState().restore(entry.version)} disabled={entry.version === version} className={cn("pc-press flex w-full items-start gap-2 rounded-ds-sm px-2 py-1.5 text-left text-xs hover:bg-ds-surface-2 disabled:cursor-default", entry.version === version && "bg-ds-accent-soft")}>
+            {entry.authorKind === "agent" ? <IconRobot className="mt-0.5 size-3.5 shrink-0 text-ds-accent" /> : <IconUser className="mt-0.5 size-3.5 shrink-0 text-ds-text-3" />}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-ds-text">{entry.label.replace(/^Agent: /, "")}</span>
+              <span className="text-[10px] tabular text-ds-text-3">
+                v{entry.version} · {formatAgo(entry.createdAt)}
+              </span>
+            </span>
+          </button>
+        </li>
+      ))}
+      {all.length === 0 ? (
+        <li className="flex items-center gap-1 p-2 text-xs text-ds-text-3">
+          <IconHistory className="size-3.5" /> No edits yet.
+        </li>
+      ) : null}
+      {canLoadMore ? (
+        <li>
+          <Button size="sm" variant="ghost" className="mt-1 w-full" disabled={loading} onClick={() => void loadOlder()}>
+            {loading ? "Loading…" : "Show older edits"}
+          </Button>
+        </li>
+      ) : null}
+    </ul>
+  );
+}
+
 function ProjectInspector({ composition }: { composition: Composition }) {
   const versions = useEditor((state) => state.versions);
   const version = useEditor((state) => state.version);
@@ -926,13 +984,13 @@ function ProjectInspector({ composition }: { composition: Composition }) {
           <p className="text-[11px] text-ds-text-3">
             {brief.typePairing.display} / {brief.typePairing.body} · {brief.layoutGrid} · {brief.motionSignature}
           </p>
-          <Button size="sm" variant="outline" className="pc-press self-start" onClick={() => void askEditorAgent(`Give video ${videoId} a fresh art direction and recompose it. Keep it different from my recent videos.`, { videoId })}>
+          <Button size="sm" variant="outline" className="pc-press self-start" onClick={() => void askEditorAgent(`Give video ${videoId} a fresh look: new colours, type and motion. Keep it different from my recent videos.`, { videoId })}>
             <IconSparkles className="size-4" /> Try a different look
           </Button>
         </Section>
-        <Section title={`Motion review · ${findings.length || "clean"}`} defaultOpen={findings.length > 0}>
+        <Section title={`Motion check · ${findings.length || "all good"}`} defaultOpen={findings.length > 0}>
           {findings.length === 0 ? (
-            <p className="text-xs text-ds-text-3">Springs, entrances, stagger, contrast and blur follow the motion rules.</p>
+            <p className="text-xs text-ds-text-3">Animations move naturally and text stays readable.</p>
           ) : (
             <ul className="flex flex-col gap-1.5">
               {findings.map((finding, index) => (
@@ -951,26 +1009,7 @@ function ProjectInspector({ composition }: { composition: Composition }) {
     id: "history",
     label: "History",
     content: (
-      <ul className="flex flex-col p-2">
-        {versions.slice(0, 40).map((entry) => (
-          <li key={entry.version}>
-            <button type="button" onClick={() => void useEditor.getState().restore(entry.version)} disabled={entry.version === version} className={cn("pc-press flex w-full items-start gap-2 rounded-ds-sm px-2 py-1.5 text-left text-xs hover:bg-ds-surface-2 disabled:cursor-default", entry.version === version && "bg-ds-accent-soft")}>
-              {entry.authorKind === "agent" ? <IconRobot className="mt-0.5 size-3.5 shrink-0 text-ds-accent" /> : <IconUser className="mt-0.5 size-3.5 shrink-0 text-ds-text-3" />}
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-ds-text">{entry.label.replace(/^Agent: /, "")}</span>
-                <span className="text-[10px] tabular text-ds-text-3">
-                  v{entry.version} · {formatAgo(entry.createdAt)}
-                </span>
-              </span>
-            </button>
-          </li>
-        ))}
-        {versions.length === 0 ? (
-          <li className="flex items-center gap-1 p-2 text-xs text-ds-text-3">
-            <IconHistory className="size-3.5" /> No edits yet.
-          </li>
-        ) : null}
-      </ul>
+      <HistoryList versions={versions} version={version} videoId={videoId} />
     ),
   };
   return <InspectorFrame icon={<IconStack2 />} title={composition.title} subtitle={`${composition.ratio} · ${(composition.durationMs / 1000).toFixed(1)} s`} tabs={[project, history]} />;

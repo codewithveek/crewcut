@@ -12,17 +12,17 @@ import {
   IconWand,
   IconX,
 } from "@tabler/icons-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
-import { Button, IconButton, Segmented } from "@/components/ds";
+import { Button, IconButton, Segmented, useDebouncedValue } from "@/components/ds";
 import { STAGE_LABELS, STAGE_PROMPTS, askAgent, errorMessage } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
 import { CreateProjectDialog } from "./dashboard/create-project";
 import { EmptyProjects, ProjectCard, ProjectGridSkeleton, ProjectRow } from "./dashboard/project-card";
-import { type VideoSummary, useLoadDemo, useVideos } from "./dashboard/use-videos";
+import { useLoadDemo, useVideoList } from "./dashboard/use-videos";
 
 type Ratio = "16:9" | "9:16" | "1:1" | "4:5";
 
@@ -35,19 +35,20 @@ function greeting(): string {
 }
 
 /** The bell: every video whose pipeline is waiting on a person's click. */
-function WaitingBell({ videos }: { videos: VideoSummary[] }) {
-  const waiting = videos.filter((video) => video.progress.waiting.length > 0);
+function WaitingBell() {
+  // Its own small query: the bell must count every waiting video, not just the recent ones.
+  const { videos: waiting, total } = useVideoList({ filter: "waiting", pageSize: 20, withCompositions: false });
   return (
     <PopoverPrimitive.Root>
       <PopoverPrimitive.Trigger asChild>
         <button
           type="button"
-          aria-label={waiting.length ? `${waiting.length} video${waiting.length === 1 ? "" : "s"} waiting on you` : "Nothing waiting on you"}
+          aria-label={total ? `${total} video${total === 1 ? "" : "s"} waiting on you` : "Nothing waiting on you"}
           className="pc-press pc-touch-target relative flex size-10 items-center justify-center rounded-full bg-ds-surface text-ds-text shadow-[0_0_0_1px_var(--ds-hairline)] outline-none hover:bg-ds-surface-3 focus-visible:ring-2 focus-visible:ring-ds-accent"
         >
           <IconBell className="size-[18px]" />
-          {waiting.length ? (
-            <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ds-danger px-1 text-[10px] font-semibold text-white tabular">{waiting.length}</span>
+          {total ? (
+            <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ds-danger px-1 text-[10px] font-semibold text-white tabular">{total > 99 ? "99+" : total}</span>
           ) : null}
         </button>
       </PopoverPrimitive.Trigger>
@@ -111,7 +112,8 @@ export function HomePage() {
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [creating, setCreating] = useState(false);
-  const { videos, assetUrls, loading } = useVideos();
+  const settledSearch = useDebouncedValue(search.trim(), 250);
+  const { videos: recent, assetUrls, total: matches, loading, refreshing } = useVideoList({ query: settledSearch, pageSize: settledSearch ? 12 : 8 });
   const start = useActionMutation("start-pipeline");
   const demo = useLoadDemo();
 
@@ -125,11 +127,6 @@ export function HomePage() {
     next.delete("focus");
     setParams(next, { replace: true });
   }, [params, setParams]);
-
-  const recent = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    return videos.filter((video) => !needle || video.title.toLowerCase().includes(needle)).slice(0, needle ? 24 : 8);
-  }, [videos, search]);
 
   async function handleStart() {
     if (brief.trim().length < 3) return;
@@ -174,7 +171,7 @@ export function HomePage() {
           <IconButton label={searchOpen ? "Close search" : "Search projects"} tooltip={false} size="lg" className="rounded-full bg-ds-surface shadow-[0_0_0_1px_var(--ds-hairline)] sm:hidden" onClick={() => setSearchOpen((open) => !open)}>
             {searchOpen ? <IconX /> : <IconSearch />}
           </IconButton>
-          <WaitingBell videos={videos} />
+          <WaitingBell />
         </div>
         {searchOpen ? <div className="flex sm:hidden">{searchInput}</div> : null}
       </header>
@@ -232,7 +229,7 @@ export function HomePage() {
               {start.isPending ? "Starting…" : "Generate"}
             </Button>
           </div>
-          <p className="ds-caption text-ds-text-3">Trend → research → script → QA → motion → voice → publish → analytics. Five gates wait for your click; every claim links to its source.</p>
+          <p className="ds-caption text-ds-text-3">Ideas → research → script → fact-check → animation → voice → publish → results. You approve each key step, and every claim links to its source.</p>
         </form>
       </section>
 
@@ -250,7 +247,7 @@ export function HomePage() {
             }}
           />
           <QuickAction icon={<IconUpload />} label="Upload media" hint="Library for every project" to="/assets" />
-          <QuickAction icon={<IconFlask2 />} label={demo.pending ? "Loading…" : "Load demo"} hint="Sourced script + QA flag" onClick={() => void demo.load()} />
+          <QuickAction icon={<IconFlask2 />} label={demo.pending ? "Loading…" : "Load demo"} hint="Fact-checked script + video" onClick={() => void demo.load()} />
         </div>
       </section>
 
@@ -260,8 +257,8 @@ export function HomePage() {
           <h2 id="recent-heading" className="ds-heading text-ds-text">
             {search.trim() ? `Results for “${search.trim()}”` : "Recent projects"}
           </h2>
-          <Link to="/projects" className="inline-flex items-center gap-1 text-[13px] font-medium text-ds-text-2 hover:text-ds-text">
-            See all <IconArrowRight className="size-3.5" />
+          <Link to={settledSearch ? `/projects?q=${encodeURIComponent(settledSearch)}` : "/projects"} className="inline-flex items-center gap-1 text-[13px] font-medium text-ds-text-2 hover:text-ds-text">
+            {settledSearch && matches > recent.length ? `See all ${matches}` : "See all"} <IconArrowRight className="size-3.5" />
           </Link>
         </div>
         {loading ? (
@@ -274,7 +271,7 @@ export function HomePage() {
           )
         ) : (
           <>
-            <div className="hidden grid-cols-2 gap-x-5 gap-y-7 sm:grid lg:grid-cols-3 2xl:grid-cols-4">
+            <div className={cn("hidden grid-cols-2 gap-x-5 gap-y-7 transition-opacity sm:grid lg:grid-cols-3 2xl:grid-cols-4", refreshing && "opacity-60")}>
               {recent.map((video) => (
                 <ProjectCard key={video.id} video={video} assetUrls={assetUrls} />
               ))}

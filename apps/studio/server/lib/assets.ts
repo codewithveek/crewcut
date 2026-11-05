@@ -1,9 +1,11 @@
 import type { ActionRunContext } from "@agent-native/core/action";
-import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { accessFilter } from "@agent-native/core/sharing";
+import { type SQL, and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import { getDb, schema } from "../db/index.js";
 import { parseJsonLoose } from "./json.js";
-import { identity } from "./identity.js";
+import { accessContext, identity } from "./identity.js";
+import { containsText } from "./search.js";
 import { referencedAssetIds } from "./render-runner.js";
 import { removeFile, resolveFileUrls } from "./blob-store.js";
 import { latestComposition, listVideos } from "./store.js";
@@ -54,19 +56,56 @@ export function toAssetDto(row: AssetRow, url: string): AssetDto {
   };
 }
 
-/** Assets a person can use: their library (no video) plus assets of videos they can see. */
-export async function listVisibleAssets(ctx: ActionRunContext | undefined, options: { videoId?: string; scope: "video" | "library" | "all" }): Promise<AssetRow[]> {
+export type AssetScope = "video" | "video_and_library" | "library" | "all";
+export type AssetMediaFilter = MediaType | "visual";
+
+export interface AssetSearch {
+  scope: AssetScope;
+  videoId?: string;
+  query?: string;
+  mediaType?: AssetMediaFilter;
+  limit: number;
+  offset: number;
+}
+
+const mimeIs = (prefix: string) => sql`${schema.assets.mime} like ${`${prefix}/%`}`;
+const MEDIA_WHERE: Record<AssetMediaFilter, SQL> = {
+  image: mimeIs("image"),
+  video: mimeIs("video"),
+  audio: sql`not (${mimeIs("image")} or ${mimeIs("video")})`,
+  visual: sql`(${mimeIs("image")} or ${mimeIs("video")})`,
+};
+
+/** Rows a person can see for a scope, as one SQL condition (no row cap, no second query). */
+function scopeWhere(ctx: ActionRunContext | undefined, scope: AssetScope, videoId: string | undefined): SQL | undefined {
   const who = identity(ctx);
-  const db = getDb();
-  if (options.scope === "video") {
-    if (!options.videoId) return [];
-    return db.select().from(schema.assets).where(eq(schema.assets.videoId, options.videoId)).orderBy(desc(schema.assets.createdAt)).limit(500);
-  }
   const library = and(isNull(schema.assets.videoId), eq(schema.assets.ownerEmail, who.email));
-  if (options.scope === "library") return db.select().from(schema.assets).where(library).orderBy(desc(schema.assets.createdAt)).limit(500);
-  const videoIds = (await listVideos(ctx)).map((video) => video.id);
-  const where = videoIds.length ? or(library, inArray(schema.assets.videoId, videoIds)) : library;
-  return db.select().from(schema.assets).where(where).orderBy(desc(schema.assets.createdAt)).limit(500);
+  if (scope === "library") return library;
+  if (scope === "video") return videoId ? eq(schema.assets.videoId, videoId) : sql`false`;
+  if (scope === "video_and_library") return videoId ? or(library, eq(schema.assets.videoId, videoId)) : library;
+  const visibleVideos = getDb().select({ id: schema.videos.id }).from(schema.videos).where(accessFilter(schema.videos, schema.videoShares, accessContext(who)));
+  return or(library, inArray(schema.assets.videoId, visibleVideos));
+}
+
+/** One page of assets, newest first, with the total and per-type counts for the same scope and search. */
+export async function searchAssets(ctx: ActionRunContext | undefined, options: AssetSearch): Promise<{ rows: AssetRow[]; total: number; counts: Record<MediaType, number> }> {
+  const db = getDb();
+  const base = and(scopeWhere(ctx, options.scope, options.videoId), options.query?.trim() ? containsText(schema.assets.label, options.query) : undefined);
+  const where = and(base, options.mediaType ? MEDIA_WHERE[options.mediaType] : undefined);
+  const count = (condition: SQL) => sql<number>`coalesce(sum(case when ${condition} then 1 else 0 end), 0)`;
+  const [rows, [totals]] = await Promise.all([
+    db.select().from(schema.assets).where(where).orderBy(desc(schema.assets.createdAt), desc(schema.assets.id)).limit(options.limit).offset(options.offset),
+    db.select({ image: count(MEDIA_WHERE.image), video: count(MEDIA_WHERE.video), audio: count(MEDIA_WHERE.audio) }).from(schema.assets).where(base),
+  ]);
+  const counts = { image: Number(totals?.image ?? 0), video: Number(totals?.video ?? 0), audio: Number(totals?.audio ?? 0) };
+  const total = !options.mediaType ? counts.image + counts.video + counts.audio : options.mediaType === "visual" ? counts.image + counts.video : counts[options.mediaType];
+  return { rows, total, counts };
+}
+
+/** One asset, if the person can see it (their library or a video they can see). */
+export async function findVisibleAsset(ctx: ActionRunContext | undefined, assetId: string): Promise<AssetRow | null> {
+  const [row] = await getDb().select().from(schema.assets).where(and(eq(schema.assets.id, assetId), scopeWhere(ctx, "all", undefined))).limit(1);
+  return row ?? null;
 }
 
 /** Which of the person's videos currently use an asset (latest composition only). */

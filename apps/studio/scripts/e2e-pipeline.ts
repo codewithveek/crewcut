@@ -145,9 +145,34 @@ async function main(): Promise<void> {
     "every gate approval is logged with a human actor",
   );
 
-  // 11. Remote file storage (R2/S3/Builder) through a fake provider: one index, any backend.
+  // 11. Search and paging run in the database, with counts per filter.
+  await checkSearchAndPaging();
+
+  // 12. Remote file storage (R2/S3/Builder) through a fake provider: one index, any backend.
   await checkRemoteStorage();
   console.log(`\nAll ${passed} checks passed.`);
+}
+
+async function checkSearchAndPaging(): Promise<void> {
+  type Page = { videos: Array<{ id: string; title: string }>; total: number; counts: Record<string, number>; nextOffset: number | null };
+  for (let index = 1; index <= 7; index += 1) {
+    await call("create-blank-video", { title: `Paging test ${String(index).padStart(2, "0")}`, ratio: "16:9" }, human);
+  }
+  await call("create-blank-video", { title: "100% literal_match", ratio: "9:16" }, human);
+  const first = await call<Page>("list-videos", { query: "paging test", sort: "title", limit: 3 }, human);
+  check(first.total === 7 && first.videos.length === 3 && first.nextOffset === 3, "project search pages on the server (3 of 7, next page at 3)");
+  check(first.videos.map((video) => video.title).join() === "Paging test 01,Paging test 02,Paging test 03", "sorting by name is applied before paging");
+  const last = await call<Page>("list-videos", { query: "paging test", sort: "title", limit: 3, offset: 6 }, human);
+  check(last.videos.length === 1 && last.nextOffset === null, "the last page reports there is nothing after it");
+  const drafts = await call<Page>("list-videos", { query: "paging", filter: "drafts", limit: 50 }, human);
+  check(drafts.counts.drafts === 7 && drafts.counts.pipeline === 0 && drafts.total === 7, "filter counts follow the search (7 drafts, 0 with agents)");
+  const literal = await call<Page>("list-videos", { query: "100%", limit: 50 }, human);
+  const underscore = await call<Page>("list-videos", { query: "liter_l", limit: 50 }, human);
+  check(literal.total === 1 && underscore.total === 0, "% and _ in a search are literal characters, not wildcards");
+  const waiting = await call<Page>("list-videos", { filter: "waiting", limit: 50 }, human);
+  check(waiting.videos.every((video) => !video.title.startsWith("Paging")), "blank projects never show as waiting on a person");
+  const assets = await call<{ assets: unknown[]; total: number; counts: { image: number; video: number; audio: number } }>("list-assets", { scope: "all", mediaType: "visual", limit: 1 }, human);
+  check(assets.assets.length <= 1 && assets.total === assets.counts.image + assets.counts.video, "asset pages carry the total and per-type counts");
 }
 
 async function checkRemoteStorage(): Promise<void> {

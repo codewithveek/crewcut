@@ -1,4 +1,5 @@
 import { useActionMutation, useActionQuery } from "@agent-native/core/client/hooks";
+import { keepPreviousData } from "@tanstack/react-query";
 import type { Composition } from "@crewcut/composition";
 import type { Stage } from "@crewcut/contracts";
 import { useNavigate } from "react-router";
@@ -22,35 +23,53 @@ export interface VideoSummary {
   composition?: Composition;
 }
 
+export type VideoFilter = "all" | "pipeline" | "drafts" | "published" | "waiting";
+export type VideoSort = "recent" | "created" | "title";
+
 export interface VideosPayload {
   projects: Array<{ id: string; name: string; isDemo: boolean }>;
   videos: VideoSummary[];
   assetUrls?: Record<string, string>;
+  total: number;
+  counts: Record<VideoFilter, number>;
+  nextOffset: number | null;
 }
 
-export type VideoFilter = "all" | "pipeline" | "drafts" | "published";
+const NO_COUNTS: Record<VideoFilter, number> = { all: 0, pipeline: 0, drafts: 0, published: 0, waiting: 0 };
 
-export function useVideos() {
-  const query = useActionQuery("list-videos", { withCompositions: true } as never);
+/**
+ * One page of the person's videos; search, filter and sort run on the server.
+ * The previous page stays on screen while the next one loads (no flash of skeletons).
+ */
+export function useVideoList(options: { query?: string; filter?: VideoFilter; sort?: VideoSort; page?: number; pageSize?: number; withCompositions?: boolean } = {}) {
+  const pageSize = options.pageSize ?? 24;
+  const page = Math.max(1, options.page ?? 1);
+  const params = {
+    withCompositions: options.withCompositions ?? true,
+    ...(options.query?.trim() ? { query: options.query.trim() } : {}),
+    filter: options.filter ?? "all",
+    sort: options.sort ?? "recent",
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+  };
+  const query = useActionQuery("list-videos", params as never, { placeholderData: keepPreviousData } as never);
   const data = query.data as VideosPayload | undefined;
   return {
     query,
     videos: data?.videos ?? [],
     projects: data?.projects ?? [],
     assetUrls: data?.assetUrls ?? {},
+    total: data?.total ?? 0,
+    counts: data?.counts ?? NO_COUNTS,
+    pageSize,
     loading: query.isLoading,
+    /** True while a new page or search is loading behind the current results. */
+    refreshing: query.isFetching && query.isPlaceholderData,
   };
 }
 
 export function isPublished(video: VideoSummary): boolean {
   return video.status === "published" || video.status === "sample";
-}
-
-export function matchesFilter(video: VideoSummary, filter: VideoFilter): boolean {
-  if (filter === "all") return true;
-  if (filter === "published") return isPublished(video);
-  if (filter === "pipeline") return video.mode === "agents" && !isPublished(video);
-  return video.mode === "manual" && !isPublished(video);
 }
 
 /** Where a click on a project should land: the editor when there is something to edit. */

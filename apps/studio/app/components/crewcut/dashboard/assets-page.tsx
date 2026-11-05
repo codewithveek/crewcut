@@ -1,5 +1,6 @@
 import { appPath } from "@agent-native/core/client/api-path";
 import { useActionMutation, useActionQuery } from "@agent-native/core/client/hooks";
+import { keepPreviousData } from "@tanstack/react-query";
 import {
   IconCloudUpload,
   IconDots,
@@ -31,11 +32,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
+  Pagination,
+  SearchField,
   Segmented,
   Tabs,
   TabsList,
   TabsTrigger,
 } from "@/components/ds";
+import { useListParams } from "@/hooks/use-list-params";
 import { errorMessage, formatBytes } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
@@ -90,18 +94,40 @@ async function uploadToLibrary(file: File): Promise<void> {
 type Tab = "media" | "audio";
 type Scope = "all" | "library";
 
+const PAGE_SIZE = 40;
+
+interface AssetPage {
+  assets: AssetItem[];
+  total: number;
+  counts: { image: number; video: number; audio: number };
+}
+
 export function AssetsPage() {
-  const [tab, setTab] = useState<Tab>("media");
-  const [scope, setScope] = useState<Scope>("all");
+  // Tab, search, scope and page live in the URL (?filter=audio&sort=library&q=…&page=2).
+  const list = useListParams<Tab, Scope>({ filter: "media", sort: "all" });
+  const tab = list.filter;
+  const setTab = list.setFilter;
+  const scope = list.sort;
+  const setScope = list.setSort;
   const [uploading, setUploading] = useState<string[]>([]);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
-  const query = useActionQuery("list-assets", { scope } as never);
-  const assets = ((query.data as { assets?: AssetItem[] } | undefined)?.assets ?? []) as AssetItem[];
-  const media = assets.filter((asset) => asset.mediaType !== "audio");
-  const audio = assets.filter((asset) => asset.mediaType === "audio");
-  const shown = tab === "media" ? media : audio;
+  const query = useActionQuery(
+    "list-assets",
+    { scope, mediaType: tab === "media" ? "visual" : "audio", ...(list.query ? { query: list.query } : {}), limit: PAGE_SIZE, offset: (list.page - 1) * PAGE_SIZE } as never,
+    { placeholderData: keepPreviousData } as never,
+  );
+  const data = query.data as AssetPage | undefined;
+  const shown = data?.assets ?? [];
+  const counts = data?.counts ?? { image: 0, video: 0, audio: 0 };
+  const total = data?.total ?? 0;
+  const refreshing = query.isFetching && query.isPlaceholderData;
+  const searching = Boolean(list.query);
+  useEffect(() => {
+    if (!query.isLoading && !refreshing) list.clampPage(total, PAGE_SIZE);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query.isLoading, refreshing, total, list.page]);
 
   async function handleFiles(files: FileList | File[]) {
     const list = [...files];
@@ -178,15 +204,15 @@ export function AssetsPage() {
         <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="min-w-0">
           <TabsList className="px-0">
             <TabsTrigger value="media">
-              <IconPhoto /> Media <span className="rounded-full bg-ds-surface-3 px-1.5 text-[10px] tabular text-ds-text-2">{media.length}</span>
+              <IconPhoto /> Media <span className="rounded-full bg-ds-surface-3 px-1.5 text-[10px] tabular text-ds-text-2">{counts.image + counts.video}</span>
             </TabsTrigger>
             <TabsTrigger value="audio">
-              <IconMusic /> Audio <span className="rounded-full bg-ds-surface-3 px-1.5 text-[10px] tabular text-ds-text-2">{audio.length}</span>
+              <IconMusic /> Audio <span className="rounded-full bg-ds-surface-3 px-1.5 text-[10px] tabular text-ds-text-2">{counts.audio}</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
+        <SearchField value={list.text} onChange={list.setText} label="Search assets" placeholder={tab === "media" ? "Search images and videos" : "Search audio"} className="w-full sm:ml-auto sm:w-60" />
         <Segmented
-          className="ml-auto"
           ariaLabel="Which assets"
           value={scope}
           onChange={setScope}
@@ -212,6 +238,8 @@ export function AssetsPage() {
             <div key={index} className="pc-skeleton aspect-[4/3] rounded-ds-md" />
           ))}
         </div>
+      ) : shown.length === 0 && searching ? (
+        <p className="rounded-ds-lg border border-dashed border-ds-border px-6 py-12 text-center text-[13px] text-ds-text-2">No {tab === "media" ? "images or videos" : "audio"} match “{list.query}”.</p>
       ) : shown.length === 0 ? (
         <button
           type="button"
@@ -225,16 +253,19 @@ export function AssetsPage() {
           </span>
         </button>
       ) : tab === "media" ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {media.map((asset) => (
+        <div className={cn("grid grid-cols-2 gap-4 transition-opacity sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5", refreshing && "opacity-60")}>
+          {shown.map((asset) => (
             <AssetActions key={asset.id} asset={asset} onChanged={() => void query.refetch()}>
               {(menu) => <MediaTile asset={asset} menu={menu} />}
             </AssetActions>
           ))}
         </div>
       ) : (
-        <AudioList assets={audio} onChanged={() => void query.refetch()} />
+        <div className={cn("transition-opacity", refreshing && "opacity-60")}>
+          <AudioList assets={shown} onChanged={() => void query.refetch()} />
+        </div>
       )}
+      {!query.isLoading && shown.length > 0 ? <Pagination page={list.page} pageSize={PAGE_SIZE} total={total} onPageChange={list.setPage} noun={tab === "media" ? "images and videos" : "audio files"} /> : null}
 
       {dragging ? (
         <div className="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center bg-[var(--ds-scrim)] p-6" aria-hidden>

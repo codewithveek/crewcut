@@ -22,12 +22,13 @@ import {
   scriptSchema,
   stageStatesSchema,
 } from "@crewcut/contracts";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { type SQL, and, asc, desc, eq, inArray, not, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "../db/index.js";
 import { type Identity, accessContext, identity } from "./identity.js";
 import { nowIso, parseJson, parseJsonStrict, toJson } from "./json.js";
+import { containsText } from "./search.js";
 import { newId } from "./storage.js";
 
 export type VideoRow = typeof schema.videos.$inferSelect;
@@ -69,6 +70,52 @@ export async function listVideos(ctx: ActionRunContext | undefined): Promise<Vid
     .where(accessFilter(schema.videos, schema.videoShares, accessContext(who)))
     .orderBy(desc(schema.videos.updatedAt))
     .limit(100);
+}
+
+export type VideoFilter = "all" | "pipeline" | "drafts" | "published" | "waiting";
+export type VideoSort = "recent" | "created" | "title";
+export type VideoCounts = Record<VideoFilter, number>;
+
+const V = schema.videos;
+const IS_PUBLISHED = sql`${V.status} in ('published', 'sample')`;
+const HAS_BRIEF = sql`trim(${V.brief}) <> ''`;
+const IS_WAITING = sql`${V.stages} like '%"awaiting_approval"%'`;
+/** Same buckets the projects page shows: agent videos, hand-made drafts, published, and those waiting on the person. */
+const VIDEO_FILTERS: Record<Exclude<VideoFilter, "all">, SQL> = {
+  published: IS_PUBLISHED,
+  pipeline: and(HAS_BRIEF, not(IS_PUBLISHED)) as SQL,
+  drafts: and(not(HAS_BRIEF), not(IS_PUBLISHED)) as SQL,
+  waiting: and(IS_WAITING, not(IS_PUBLISHED)) as SQL,
+};
+
+/** One page of the person's videos with search, filter and sort done in the database, plus counts per filter. */
+export async function searchVideos(
+  ctx: ActionRunContext | undefined,
+  options: { query?: string; filter?: VideoFilter; sort?: VideoSort; limit: number; offset: number },
+): Promise<{ rows: VideoRow[]; total: number; counts: VideoCounts }> {
+  const who = identity(ctx);
+  const db = getDb();
+  const text = options.query?.trim();
+  const base = and(accessFilter(V, schema.videoShares, accessContext(who)), text ? or(containsText(V.title, text), containsText(V.brief, text)) : undefined);
+  const filter = options.filter ?? "all";
+  const order = options.sort === "title" ? [asc(sql`lower(${V.title})`), desc(V.updatedAt)] : options.sort === "created" ? [desc(V.createdAt), desc(V.id)] : [desc(V.updatedAt), desc(V.id)];
+  const count = (condition: SQL) => sql<number>`coalesce(sum(case when ${condition} then 1 else 0 end), 0)`;
+  const [rows, [totals]] = await Promise.all([
+    db.select().from(V).where(and(base, filter === "all" ? undefined : VIDEO_FILTERS[filter])).orderBy(...order).limit(options.limit).offset(options.offset),
+    db
+      .select({
+        all: sql<number>`count(*)`,
+        published: count(VIDEO_FILTERS.published),
+        pipeline: count(VIDEO_FILTERS.pipeline),
+        drafts: count(VIDEO_FILTERS.drafts),
+        waiting: count(VIDEO_FILTERS.waiting),
+      })
+      .from(V)
+      .where(base),
+  ]);
+  const counts: VideoCounts = { all: 0, published: 0, pipeline: 0, drafts: 0, waiting: 0 };
+  for (const key of Object.keys(counts) as VideoFilter[]) counts[key] = Number(totals?.[key] ?? 0);
+  return { rows, total: counts[filter], counts };
 }
 
 export async function listProjects(ctx: ActionRunContext | undefined): Promise<ProjectRow[]> {
@@ -262,7 +309,7 @@ export async function saveComposition(video: VideoRecord, composition: Compositi
   return version;
 }
 
-export async function listCompositionVersions(videoId: string, limit = 50) {
+export async function listCompositionVersions(videoId: string, limit = 50, offset = 0) {
   return getDb()
     .select({
       version: schema.compositions.version,
@@ -274,7 +321,8 @@ export async function listCompositionVersions(videoId: string, limit = 50) {
     .from(schema.compositions)
     .where(eq(schema.compositions.videoId, videoId))
     .orderBy(desc(schema.compositions.version))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 }
 
 /** Fingerprints of the workspace's other recent videos, for the variety guard. */

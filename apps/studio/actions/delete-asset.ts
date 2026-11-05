@@ -3,14 +3,13 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
-import { deleteAssetFile, listVisibleAssets, videosUsingAsset } from "../server/lib/assets.js";
+import { deleteAssetFile, findVisibleAsset, videosUsingAsset } from "../server/lib/assets.js";
 
 export default defineAction({
   description: "Delete an uploaded media asset. Refuses while any of the person's videos still uses it (remove the clips first).",
   schema: z.object({ assetId: z.string() }),
   run: async ({ assetId }, ctx) => {
-    const visible = await listVisibleAssets(ctx, { scope: "all" });
-    const row = visible.find((asset) => asset.id === assetId);
+    const row = await findVisibleAsset(ctx, assetId);
     if (!row) throw new Error(`Asset ${assetId} not found`);
     const users = await videosUsingAsset(ctx, assetId);
     if (users.length > 0) {
