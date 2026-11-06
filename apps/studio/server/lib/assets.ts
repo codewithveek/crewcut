@@ -61,6 +61,7 @@ export type AssetMediaFilter = MediaType | "visual";
 
 export interface AssetSearch {
   scope: AssetScope;
+  /** The video for scopes "video" / "video_and_library"; with "all", its own media is listed first. */
   videoId?: string;
   query?: string;
   mediaType?: AssetMediaFilter;
@@ -94,7 +95,11 @@ export async function searchAssets(ctx: ActionRunContext | undefined, options: A
   const where = and(base, options.mediaType ? MEDIA_WHERE[options.mediaType] : undefined);
   const count = (condition: SQL) => sql<number>`coalesce(sum(case when ${condition} then 1 else 0 end), 0)`;
   const [rows, [totals]] = await Promise.all([
-    db.select().from(schema.assets).where(where).orderBy(desc(schema.assets.createdAt), desc(schema.assets.id)).limit(options.limit).offset(options.offset),
+    db
+      .select()
+      .from(schema.assets)
+      .where(where)
+      .orderBy(...(options.videoId ? [sql`case when ${schema.assets.videoId} = ${options.videoId} then 0 else 1 end`] : []), desc(schema.assets.createdAt), desc(schema.assets.id)).limit(options.limit).offset(options.offset),
     db.select({ image: count(MEDIA_WHERE.image), video: count(MEDIA_WHERE.video), audio: count(MEDIA_WHERE.audio) }).from(schema.assets).where(base),
   ]);
   const counts = { image: Number(totals?.image ?? 0), video: Number(totals?.video ?? 0), audio: Number(totals?.audio ?? 0) };
@@ -117,6 +122,25 @@ export async function videosUsingAsset(ctx: ActionRunContext | undefined, assetI
     if (latest && referencedAssetIds(latest.composition).includes(assetId)) users.push({ id: video.id, title: video.title });
   }
   return users;
+}
+
+/**
+ * Of these assets, the ones another video's edit history references (any
+ * version, so restoring an old version can't break). Media can be used across
+ * projects, so deleting a project must not take shared files with it.
+ */
+export async function assetsUsedElsewhere(assetIds: readonly string[], videoId: string): Promise<Set<string>> {
+  const db = getDb();
+  const used = new Set<string>();
+  for (const assetId of assetIds) {
+    const [hit] = await db
+      .select({ id: schema.compositions.id })
+      .from(schema.compositions)
+      .where(and(sql`${schema.compositions.videoId} <> ${videoId}`, sql`${schema.compositions.body} like ${`%asset:${assetId}%`}`))
+      .limit(1);
+    if (hit) used.add(assetId);
+  }
+  return used;
 }
 
 export async function deleteAssetFile(row: AssetRow): Promise<void> {

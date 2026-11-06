@@ -22,8 +22,8 @@ export interface AssetDto extends AssetLike {
 }
 
 /**
- * This video's uploads plus the person's library, newest first, searched on
- * the server. The panel shows a page and grows by a page per "Show more".
+ * Everything the person can use (this video's media first, then their
+ * library and other projects), newest first, searched on the server. The panel shows a page and grows by a page per "Show more".
  */
 export function useAssets(videoId: string, options: { mediaType?: "visual" | "image" | "video" | "audio"; query?: string; pageSize?: number } = {}) {
   const pageSize = options.pageSize ?? 60;
@@ -33,7 +33,7 @@ export function useAssets(videoId: string, options: { mediaType?: "visual" | "im
   useEffect(() => setPages(1), [search, options.mediaType, videoId]);
   const query = useActionQuery(
     "list-assets",
-    { videoId, scope: "video_and_library", ...(options.mediaType ? { mediaType: options.mediaType } : {}), ...(search ? { query: search } : {}), limit: pageSize * pages } as never,
+    { videoId, scope: "all", ...(options.mediaType ? { mediaType: options.mediaType } : {}), ...(search ? { query: search } : {}), limit: pageSize * pages } as never,
     { placeholderData: keepPreviousData } as never,
   );
   const data = query.data as { assets?: AssetDto[]; total?: number } | undefined;

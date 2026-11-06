@@ -1,10 +1,10 @@
 
 import { defineAction } from "@agent-native/core/action";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
-import { deleteAssetFile } from "../server/lib/assets.js";
+import { assetsUsedElsewhere, deleteAssetFile } from "../server/lib/assets.js";
 import { requireHuman } from "../server/lib/identity.js";
 import { removeFile } from "../server/lib/blob-store.js";
 import { loadVideo } from "../server/lib/store.js";
@@ -28,6 +28,9 @@ export default defineAction({
       db.select().from(schema.assets).where(eq(schema.assets.videoId, videoId)),
       db.select().from(schema.renderJobs).where(eq(schema.renderJobs.videoId, videoId)),
     ]);
+    // Media another project still uses moves to the owner's library instead of being deleted.
+    const shared = await assetsUsedElsewhere(assets.map((asset) => asset.id), videoId);
+    if (shared.size) await db.update(schema.assets).set({ videoId: null }).where(inArray(schema.assets.id, [...shared]));
     const byVideo = [
       schema.sources,
       schema.scripts,
@@ -45,7 +48,7 @@ export default defineAction({
     await db.delete(schema.dossiers).where(eq(schema.dossiers.videoId, videoId));
     await db.delete(schema.videoShares).where(eq(schema.videoShares.resourceId, videoId));
     await db.delete(schema.videos).where(eq(schema.videos.id, videoId));
-    for (const asset of assets) await deleteAssetFile(asset);
+    for (const asset of assets) if (!shared.has(asset.id)) await deleteAssetFile(asset);
     for (const render of renders) {
       if (!render.outputFile) continue;
       await removeFile("renders", render.outputFile);

@@ -18,6 +18,9 @@ process.env.DATABASE_URL = `pglite:${path.join(scratch, "db")}`;
 process.env.CREWCUT_STORAGE_DIR = path.join(scratch, "storage");
 process.env.CREWCUT_RENDER_MODE = "queue"; // queue only: don't launch Chromium in the check
 process.env.NODE_ENV = "development";
+// No network in the check: templates fall back to their designed placeholders and no music.
+delete process.env.PEXELS_API_KEY;
+delete process.env.ELEVENLABS_API_KEY;
 
 type Ctx = { caller: "frontend" | "tool"; userEmail: string; orgId: null };
 const human: Ctx = { caller: "frontend", userEmail: "e2e@crewcut.test", orgId: null };
@@ -145,12 +148,31 @@ async function main(): Promise<void> {
     "every gate approval is logged with a human actor",
   );
 
-  // 11. Search and paging run in the database, with counts per filter.
+  // 11. Templates: search the library, start a project with the person's words.
+  await checkTemplates();
+
+  // 12. Search and paging run in the database, with counts per filter.
   await checkSearchAndPaging();
 
-  // 12. Remote file storage (R2/S3/Builder) through a fake provider: one index, any backend.
+  // 13. Remote file storage (R2/S3/Builder) through a fake provider: one index, any backend.
   await checkRemoteStorage();
   console.log(`\nAll ${passed} checks passed.`);
+}
+
+async function checkTemplates(): Promise<void> {
+  type Listing = { templates: Array<{ id: string; ratios: string[]; slots: Array<{ id: string; kind: string }> }> };
+  const all = await call<Listing>("list-templates", {}, human);
+  check(all.templates.length >= 3 && all.templates.every((template) => template.slots.length > 0), "the template library lists templates with their slots");
+  const portrait = await call<Listing>("list-templates", { ratio: "16:9", query: "quote" }, human);
+  check(portrait.templates.length > 0 && portrait.templates.every((template) => template.ratios.includes("16:9")), "template search filters by ratio and words");
+  const made = await call<{ videoId: string; path: string; ratio: string; note?: string }>("use-template", { templateId: "product-drop", ratio: "16:9", values: { product: "ORBIT ONE", price: "$89" } }, agent);
+  check(made.ratio === "1:1" && Boolean(made.note), "a ratio the template isn't designed for falls back to the closest designed one, and says so");
+  const composition = await call<{ composition: { ratio: string; tracks: Array<{ kind: string; clips: Array<{ layers?: Array<{ slot?: string; text?: string; src?: string }> }> }> } }>("get-composition", { videoId: made.videoId }, human);
+  const layers = composition.composition.tracks.flatMap((track) => (track.kind === "visual" ? track.clips.flatMap((clip) => clip.layers ?? []) : []));
+  check(layers.some((layer) => layer.slot === "product" && layer.text === "ORBIT ONE") && layers.some((layer) => layer.slot === "price" && layer.text === "$89"), "the person's words land in the template's text slots");
+  check(layers.filter((layer) => layer.slot?.startsWith("photo")).every((layer) => layer.src?.startsWith("data:image/svg+xml")), "without stock photos, photo slots keep their designed placeholders");
+  await expectFailure(call("use-template", { templateId: "golden-hour", ratio: "9:16", values: { headline: "x" } }, human), /no slot "headline"/, "an unknown slot id is refused (no silent typos)");
+  await expectFailure(call("generate-template-music", {}, agent), /needs a person/, "the agent can't spend the music allowance");
 }
 
 async function checkSearchAndPaging(): Promise<void> {
@@ -173,6 +195,28 @@ async function checkSearchAndPaging(): Promise<void> {
   check(waiting.videos.every((video) => !video.title.startsWith("Paging")), "blank projects never show as waiting on a person");
   const assets = await call<{ assets: unknown[]; total: number; counts: { image: number; video: number; audio: number } }>("list-assets", { scope: "all", mediaType: "visual", limit: 1 }, human);
   check(assets.assets.length <= 1 && assets.total === assets.counts.image + assets.counts.video, "asset pages carry the total and per-type counts");
+  await checkSharedMedia();
+}
+
+/** The editor's media panel lists everything the person has; deleting a project keeps media other projects use. */
+async function checkSharedMedia(): Promise<void> {
+  const { getDb, schema } = await import("../server/db/index.ts");
+  const { eq } = await import("drizzle-orm");
+  const db = getDb();
+  const a = await call<{ videoId: string }>("create-blank-video", { title: "Shared media A", ratio: "16:9" }, human);
+  const b = await call<{ videoId: string }>("create-blank-video", { title: "Shared media B", ratio: "16:9" }, human);
+  const row = (id: string, videoId: string, label: string) => ({ id, videoId, kind: "upload", label, fileName: `${id}.png`, mime: "image/png", bytes: 1, licence: "{}", ownerEmail: human.userEmail, orgId: null });
+  await db.insert(schema.assets).values([row("ast_e2e_shared", a.videoId, "Shared beach"), row("ast_e2e_only_a", a.videoId, "Only in A"), row("ast_e2e_b", b.videoId, "B's own")]);
+  const listed = await call<{ assets: Array<{ id: string }> }>("list-assets", { scope: "all", videoId: b.videoId, mediaType: "visual", limit: 500 }, human);
+  const ids = listed.assets.map((asset) => asset.id);
+  check(ids[0] === "ast_e2e_b" && ids.includes("ast_e2e_shared"), "the editor's media lists other projects' media too, this project's first");
+  // B starts using A's photo.
+  await db.insert(schema.compositions).values({ id: "cmp_e2e_shared", videoId: b.videoId, version: 99, body: JSON.stringify({ layer: { src: "asset:ast_e2e_shared" } }), fingerprint: "x", label: "Use shared photo", authorKind: "human", author: human.userEmail });
+  await call("delete-video", { videoId: a.videoId }, human);
+  const [kept] = await db.select().from(schema.assets).where(eq(schema.assets.id, "ast_e2e_shared"));
+  const [gone] = await db.select().from(schema.assets).where(eq(schema.assets.id, "ast_e2e_only_a"));
+  check(kept?.videoId === null && !gone, "deleting a project keeps media another project uses (moved to the library) and removes the rest");
+  await db.delete(schema.compositions).where(eq(schema.compositions.id, "cmp_e2e_shared"));
 }
 
 async function checkRemoteStorage(): Promise<void> {

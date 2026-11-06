@@ -7,9 +7,9 @@ import { loadVideo } from "../server/lib/store.js";
 
 export default defineAction({
   description:
-    "Search media the person can use, newest first, one page at a time: a video's uploads, that video's uploads plus their library (video_and_library), their library, or everything they can see. Each asset has an id to reference as `asset:<id>` in image/video layers and audio clips. Returns total and per-type counts; page with offset.",
+    "Search media the person can use, newest first, one page at a time: a video's uploads, that video's uploads plus their library (video_and_library), their library, or everything they can see (all; pass videoId to list that video's media first). Each asset has an id to reference as `asset:<id>` in image/video layers and audio clips. Returns total and per-type counts; page with offset.",
   schema: z.object({
-    videoId: z.string().optional().describe("The video for scope video or video_and_library"),
+    videoId: z.string().optional().describe("The video for scope video or video_and_library; with scope all, its media comes first"),
     scope: z.enum(["video", "video_and_library", "library", "all"]).default("all"),
     mediaType: z.enum(["image", "video", "audio", "visual"]).optional().describe("visual = images and videos"),
     query: z.string().max(200).optional().describe("Search asset names"),
