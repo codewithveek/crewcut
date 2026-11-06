@@ -3,8 +3,8 @@
   "short_name": "Crewcut",
   "description": "A crew of agents makes your video; you approve every step, and every claim links to its source.",
   "start_url": "./home",
-  "background_color": "#09090b",
-  "theme_color": "#5b4bef",
+  "background_color": "#0D0D0F",
+  "theme_color": "#0D0D0F",
   "icons": [
     {
       "src": "icon-192.svg",

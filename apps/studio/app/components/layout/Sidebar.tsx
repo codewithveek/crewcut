@@ -263,7 +263,7 @@ export function MobileNavigationPanel() {
   return (
     <div className="flex h-full min-h-0 flex-col bg-sidebar">
       <div className="flex h-14 shrink-0 items-center gap-3 px-4">
-        <CrewcutMark className="size-7" />
+        <CrewcutMark motion="intro" hover className="size-7" />
         <span className="ds-heading text-ds-text">{APP_TITLE}</span>
       </div>
       <nav className="grid shrink-0 grid-cols-4 gap-1 px-2 pb-3" aria-label="Main">

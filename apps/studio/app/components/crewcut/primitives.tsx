@@ -1,6 +1,6 @@
 import type { ClaimVerdict, StageStatus } from "@crewcut/contracts";
 import { IconCheck, IconCircleDashed, IconLoader2, IconAlertTriangle, IconHandStop, IconX } from "@tabler/icons-react";
-import type { ReactNode } from "react";
+import { type CSSProperties, type ReactNode, useState } from "react";
 
 import { STATUS_META } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
@@ -91,15 +91,61 @@ export function SkeletonLines({ count = 3 }: { count?: number }) {
   );
 }
 
-/** The Crewcut logo mark (kept under its original name so imports stay stable). */
-export function CrewcutMark({ className }: { className?: string }) {
+/** Brand colours of the mark itself (fixed, not themed: the logo looks the same everywhere). */
+export const CREWCUT_BRAND = { ink: "#0D0D0F", paper: "#F5F3EE", cut: "#FF5B2E" } as const;
+
+/**
+ * The Crewcut mark: a C split in two, its lower half slipped sideways like a
+ * jump cut. `tile` sits it on the dark rounded square (app icon); `glyph` is the
+ * bare C, whose upper half follows the text colour.
+ *
+ * Motion (CSS in crewcut.css, all off under reduced motion):
+ * - `intro`: the C draws in, then the lower half is cut loose and slips into place.
+ * - `loop`: the halves close and cut again, on repeat (a loader).
+ * - `hover`: the cut replays while the parent `.group` is hovered.
+ */
+export function CrewcutMark({
+  className,
+  variant = "tile",
+  motion = "none",
+  hover = false,
+  label,
+}: {
+  className?: string;
+  variant?: "tile" | "glyph";
+  motion?: "none" | "intro" | "loop";
+  hover?: boolean;
+  /** Give it a name when it stands alone (e.g. a loader); otherwise it is decorative. */
+  label?: string;
+}) {
+  // The intro plays once; dropping it afterwards lets the hover replay come and go without restarting it.
+  const [introDone, setIntroDone] = useState(false);
+  const activeMotion = motion === "intro" && introDone ? "none" : motion;
+  const glyph = (
+    <>
+      <path className="pc-mark-upper" pathLength={1} d="M74.51 29.43 A32 32 0 0 0 18 50" fill="none" stroke={variant === "tile" ? CREWCUT_BRAND.paper : "currentColor"} strokeWidth="17" />
+      <path className="pc-mark-lower" pathLength={1} d="M18 50 A32 32 0 0 0 74.51 70.57" fill="none" stroke={CREWCUT_BRAND.cut} strokeWidth="17" transform="translate(6 4)" />
+    </>
+  );
   return (
-    <svg viewBox="0 0 24 24" className={cn("size-5", className)} aria-hidden>
-      {/* Crewcut: a "C" with a cut stroke through its tail and a crew dot in the gap. */}
-      <rect x="1" y="1" width="22" height="22" rx="6.5" fill="var(--pc-accent)" />
-      <path d="M16.7 8.3A5.7 5.7 0 1 0 16.7 15.7" fill="none" stroke="var(--pc-on-accent)" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M5.6 18.4L10.1 13.9" fill="none" stroke="var(--pc-on-accent)" strokeWidth="1.7" strokeLinecap="round" />
-      <circle cx="18.2" cy="12" r="1.25" fill="var(--pc-on-accent)" />
+    <svg
+      viewBox={variant === "tile" ? "0 0 112 112" : "0 0 100 100"}
+      className={cn("pc-mark size-5 shrink-0", hover && "pc-mark-hover", className)}
+      data-motion={activeMotion === "none" ? undefined : activeMotion}
+      onAnimationEnd={motion === "intro" ? (event) => event.animationName === "pc-mark-cut" && setIntroDone(true) : undefined}
+      style={variant === "tile" ? undefined : ({ "--pc-mark-paper": "currentColor" } as CSSProperties)}
+      role={label ? "img" : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+    >
+      {variant === "tile" ? (
+        <>
+          <rect width="112" height="112" rx="26" fill={CREWCUT_BRAND.ink} />
+          <g transform="translate(21 21) scale(0.7)">{glyph}</g>
+        </>
+      ) : (
+        glyph
+      )}
     </svg>
   );
 }
