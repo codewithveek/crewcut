@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
-import { Button, Dialog, FieldRow, IconButton, SkeletonLines, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ds";
+import { Button, Dialog, FieldRow, IconButton, Select, SkeletonLines, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ds";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { errorMessage, formatAgo } from "@/lib/crewcut";
 import { TAB_ID } from "@/lib/tab-id";
@@ -365,8 +365,8 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const composition = useEditor((state) => state.composition);
   const videoId = useEditor((state) => state.videoId);
   const version = useEditor((state) => state.version);
-  const [burnCaptions, setBurnCaptions] = useState(true);
-  const [reducedMotion, setReducedMotion] = useState(false);
+  // The export matches the editor: captions are in it when they're shown in the preview.
+  const burnCaptions = useEditor((state) => state.burnCaptions);
   const [starting, setStarting] = useState(false);
   const [watching, setWatching] = useState<string | null>(null);
   const query = useActionQuery("get-video", { videoId, include: ["renders"] } as never, { enabled: open, refetchInterval: open && watching ? 1500 : false } as never);
@@ -382,7 +382,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const start = async () => {
     setStarting(true);
     try {
-      const result = (await callAction("render-video" as never, { videoId, burnCaptions, reducedMotion } as never)) as { renderId: string };
+      const result = (await callAction("render-video" as never, { videoId, burnCaptions } as never)) as { renderId: string };
       setWatching(result.renderId);
       void query.refetch();
     } catch (error) {
@@ -404,7 +404,6 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       open={open}
       onOpenChange={onOpenChange}
       title="Export video"
-      description="Saves your video as an MP4 that looks exactly like the preview."
       footer={
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -412,7 +411,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           </Button>
           <Button onClick={() => void start()} disabled={starting || Boolean(watching)} className="pc-press">
             {starting || watching ? <IconLoader2 className="size-4 motion-safe:animate-spin" /> : <IconUpload className="size-4" />}
-            {watching ? "Rendering…" : "Export MP4"}
+            {watching ? "Exporting…" : "Export"}
           </Button>
         </>
       }
@@ -430,13 +429,15 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
             </div>
           ))}
         </div>
-        <FieldRow label="Captions">
-          <Switch label="Include captions in the video" checked={burnCaptions} onCheckedChange={setBurnCaptions} />
-          <span className="text-xs text-ds-text-2">Include in the video</span>
-        </FieldRow>
-        <FieldRow label="Motion">
-          <Switch label="Reduce motion" checked={reducedMotion} onCheckedChange={setReducedMotion} />
-          <span className="text-xs text-ds-text-2">Reduce motion: simple fades, nothing slides or zooms</span>
+        {/* The project's frame rate (same setting as the Project panel), so the export matches the editor. */}
+        <FieldRow label="Frame rate">
+          <Select
+            label="Frame rate"
+            className="w-full"
+            value={String(composition.fps)}
+            onChange={(fps) => void run(`${fps} fps`, [{ op: "set-format", fps: Number(fps) as 30 }])}
+            options={["24", "25", "30", "50", "60"].map((fps) => ({ value: fps, label: `${fps} fps` }))}
+          />
         </FieldRow>
         {renders.length ? (
           <div className="flex flex-col gap-1.5">
@@ -445,8 +446,8 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
               <div key={render.id} className="flex items-center gap-2 rounded-ds-sm bg-ds-surface-2 px-2.5 py-2">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-ds-text">
-                    v{render.compositionVersion}
-                    {render.compositionVersion !== version ? <span className="text-ds-text-3"> (older edit)</span> : null} · {formatAgo(render.createdAt)}
+                    Exported {formatAgo(render.createdAt)}
+                    {render.compositionVersion !== version ? <span className="text-ds-text-3"> · before your latest edits</span> : null}
                   </p>
                   {render.status === "running" || render.status === "queued" ? (
                     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ds-surface-3" role="progressbar" aria-valuenow={Math.round((render.progress ?? 0) * 100)}>
