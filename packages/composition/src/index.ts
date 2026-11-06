@@ -19,3 +19,4 @@ export * from "./effects";
 export * from "./elements";
 export * from "./templates";
 export * from "./ending";
+export * from "./transitions";

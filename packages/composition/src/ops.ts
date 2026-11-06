@@ -40,6 +40,7 @@ import {
   transitionSchema,
   visualClipSchema,
 } from "./schema";
+import { TRANSITION_CATALOG, defaultTransition } from "./transitions";
 import { type AspectRatio, FRAME_SIZE, designScale } from "./units";
 import { normalizeComposition } from "./validate";
 
@@ -277,7 +278,14 @@ export function updateClip(composition: Composition, input: { clipId: string; pa
 export function setTransition(composition: Composition, input: { clipId: string; transition: Partial<Transition> | null }): Composition {
   return edit(composition, (draft) => {
     const { clip } = requireVisualClip(draft, input.clipId);
-    clip.transitionIn = input.transition ? transitionSchema.parse({ ...clip.transitionIn, ...input.transition }) : undefined;
+    if (!input.transition) {
+      clip.transitionIn = undefined;
+      return;
+    }
+    // A new type without a length (or direction it understands) takes the type's own defaults.
+    const nextType = input.transition.type;
+    const base = nextType && nextType !== clip.transitionIn?.type ? { ...clip.transitionIn, ...defaultTransition(nextType, clip.transitionIn?.direction && TRANSITION_CATALOG[nextType].directions.includes(clip.transitionIn.direction) ? clip.transitionIn.direction : undefined) } : clip.transitionIn;
+    clip.transitionIn = transitionSchema.parse({ ...base, ...input.transition });
   });
 }
 

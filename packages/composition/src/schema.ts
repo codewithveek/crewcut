@@ -398,7 +398,9 @@ export type LayerType = Layer["type"];
 
 // ── Clips and tracks ────────────────────────────────────────────────────────
 
+/** Every transition the renderer draws. Labels, groups and defaults live in `transitions.ts`. */
 export const TRANSITION_TYPES = [
+  // Basic
   "cut",
   "crossfade",
   "blur-crossfade",
@@ -407,6 +409,55 @@ export const TRANSITION_TYPES = [
   "zoom-through",
   "wipe",
   "scale-fade",
+  // Zoom
+  "zoom-in",
+  "zoom-out",
+  "zoom-in-out",
+  "zoom-bounce",
+  "zoom-out-bounce",
+  "bounce-zoom",
+  "zoom-burn",
+  "zoom-spin",
+  "zoom-distort",
+  "countdown-zoom",
+  // Spin
+  "spin",
+  "twist",
+  "double-twist",
+  "spin-twist",
+  "spin-up",
+  "spin-3d",
+  "twist-burn",
+  // Motion
+  "swipe",
+  "zoom-swipe",
+  "motion-scroll",
+  "distort-slide",
+  "quick-distort",
+  "bounce-in",
+  "fracture",
+  "split-bounce",
+  "frame-split",
+  "falling-boxes",
+  // Glitch
+  "static",
+  "digital-static",
+  "retro-interference",
+  "triangle-distort",
+  // Light
+  "film-burn",
+  "swipe-burn",
+  "bokeh-twirl",
+  "bokeh-subtle",
+  "bokeh-bright",
+  // Shapes
+  "liquid-swipe",
+  "liquid-splash",
+  "diagonal-stripes",
+  "circles",
+  "tubes",
+  "color-orbs",
+  "confetti",
 ] as const;
 export const transitionTypeSchema = z.enum(TRANSITION_TYPES);
 export type TransitionType = (typeof TRANSITION_TYPES)[number];

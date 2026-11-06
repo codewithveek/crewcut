@@ -8,9 +8,9 @@ import {
   type Fill,
   type LayerInput,
   type Transition,
-  type TransitionType,
   compositionSchema,
 } from "./schema";
+import { defaultTransition, transitionInfo } from "./transitions";
 import { type AspectRatio, FRAME_SIZE } from "./units";
 import { parseComposition } from "./validate";
 
@@ -83,22 +83,12 @@ export const FIRST_FRAME_LEAD_MS = 450;
 function pickTransition(brief: ArtDirectionBrief, index: number, seed: number): Transition {
   const random = createSeededRandom(seed * 97 + index);
   const type = brief.transitionSet[Math.floor(random() * brief.transitionSet.length)] ?? "crossfade";
-  const durations: Record<TransitionType, number> = {
-    cut: 0,
-    crossfade: 400,
-    "blur-crossfade": 500,
-    push: 560,
-    slide: 560,
-    "zoom-through": 600,
-    wipe: 520,
-    "scale-fade": 480,
-  };
-  const directions = ["left", "up", "right", "down"] as const;
+  const base = defaultTransition(type);
+  const directions = transitionInfo(type).directions;
   return {
-    type,
-    durationMs: brief.pacing === "slow" ? Math.round(durations[type] * 1.3) : durations[type],
-    direction: directions[index % directions.length] ?? "left",
-    easing: type === "slide" ? "spring-smooth" : "move",
+    ...base,
+    durationMs: brief.pacing === "slow" ? Math.round(base.durationMs * 1.3) : base.durationMs,
+    direction: directions.length ? (directions[index % directions.length] ?? base.direction) : base.direction,
   };
 }
 

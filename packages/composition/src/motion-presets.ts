@@ -417,17 +417,6 @@ export const MOTION_PRESETS: readonly MotionPreset[] = [
 ];
 
 /** Clip transitions (applied to a clip's `transitionIn`). */
-export const TRANSITION_PRESETS: ReadonlyArray<{ id: string; label: string; transition: Transition }> = [
-  { id: "crossfade-blur", label: "Crossfade with blur", transition: { type: "blur-crossfade", durationMs: 500, direction: "left", easing: "move" } },
-  { id: "crossfade", label: "Crossfade", transition: { type: "crossfade", durationMs: 400, direction: "left", easing: "move" } },
-  { id: "push", label: "Push", transition: { type: "push", durationMs: 560, direction: "left", easing: "move" } },
-  { id: "zoom-through", label: "Zoom through", transition: { type: "zoom-through", durationMs: 600, direction: "left", easing: "move" } },
-  { id: "slide", label: "Direction-aware slide", transition: { type: "slide", durationMs: 560, direction: "left", easing: "spring-smooth" } },
-  { id: "wipe", label: "Wipe", transition: { type: "wipe", durationMs: 520, direction: "left", easing: "move" } },
-  { id: "scale-fade", label: "Scale fade", transition: { type: "scale-fade", durationMs: 480, direction: "left", easing: "entrance" } },
-  { id: "cut", label: "Cut", transition: { type: "cut", durationMs: 0, direction: "left", easing: "linear" } },
-];
-
 function textAnimation(
   context: PresetContext,
   options: { unit: TextAnimation["unit"]; preset: TextAnimation["preset"]; staggerMs: number; easing?: EasingSpec },
