@@ -2,6 +2,7 @@ import * as ContextMenuPrimitive from "@radix-ui/react-context-menu";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as DropdownPrimitive from "@radix-ui/react-dropdown-menu";
 import { IconCheck, IconChevronRight, IconX } from "@tabler/icons-react";
+import { useEffect, useRef } from "react";
 import { Drawer } from "vaul";
 
 import { cn } from "@/lib/utils";
@@ -193,6 +194,21 @@ export function BottomSheet({
 
 // ── Dialog ──────────────────────────────────────────────────────────────────
 
+/**
+ * Radix blocks clicks on the page (`pointer-events: none` on body) while a menu
+ * or dialog is open. When a dialog opens from a menu item, the two hand that
+ * lock over in the wrong order and it can stay on after both close, freezing
+ * the page (Rename / Delete from a project's ⋯ menu). After a dialog closes or
+ * unmounts, release the lock if nothing modal is still open.
+ */
+function releaseStuckPageLock(): void {
+  window.setTimeout(() => {
+    if (document.body.style.pointerEvents !== "none") return;
+    if (document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"], [role="menu"][data-state="open"]')) return;
+    document.body.style.pointerEvents = "";
+  }, 300);
+}
+
 export function Dialog({
   open,
   onOpenChange,
@@ -210,6 +226,15 @@ export function Dialog({
   footer?: React.ReactNode;
   className?: string;
 }) {
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open) wasOpen.current = true;
+    else if (wasOpen.current) releaseStuckPageLock();
+  }, [open]);
+  // Also when the dialog's owner disappears while it is open (a deleted project's card).
+  useEffect(() => () => {
+    if (wasOpen.current) releaseStuckPageLock();
+  }, []);
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
