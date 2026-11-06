@@ -38,6 +38,15 @@ Units: `x`/`y`/`width`/`height` are % of the frame (anchor point at x,y); `size`
 - **Video is slower than UI:** entrances 400–700 ms.
 - Frame 0 is the thumbnail: the first scene must be readable immediately.
 
+## Transitions
+
+`set-transition` lists every type with its natural length. There are seven groups: basic (crossfades, push, wipe), zoom (zoom-in, zoom-bounce, countdown-zoom…), spin (spin, twist, spin-3d…), motion (swipe, bounce-in, frame-split, falling-boxes…), glitch (static, digital-static, retro-interference…), light (film-burn, bokeh-*) and shapes (liquid-swipe, circles, tubes, confetti…, which are drawn in the brief's palette).
+
+- **Match the energy.** Calm or editorial videos get basic or light transitions. Loud, social or product-drop videos can use zoom, spin, glitch and shapes. Don't mix more than two groups in one video.
+- **Change only the type and the length follows.** A new type takes its own natural length unless you pass `durationMs`.
+- **Big moves are punctuation.** Use spin, glitch, countdown-zoom and confetti once or twice per video, on the cuts that matter (the hook, the reveal). Use a quieter one everywhere else.
+- **The clip needs room.** It must be longer than its transition, and the shape transitions (about 1 s) cover the screen at their midpoint.
+
 ## 4. Edit
 
 - Read `view-screen` for the selection, playhead and in/out range when the person says "this".
