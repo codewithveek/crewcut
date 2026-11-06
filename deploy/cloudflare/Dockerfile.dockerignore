@@ -1,0 +1,17 @@
+**/node_modules
+**/.output
+**/build
+**/dist
+**/.react-router
+**/.generated
+**/.agent-native
+**/data
+**/storage
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+**/.impeccable
+docs
+.git
+deploy

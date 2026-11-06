@@ -1,0 +1,29 @@
+{
+  // Crewcut on Cloudflare: a Worker in front of one container running the app.
+  // Secrets (keys, DATABASE_URL, R2_*): `npx wrangler secret put NAME`.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "crewcut",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "containers": [
+    {
+      "class_name": "CrewcutApp",
+      "image": "./Dockerfile",
+      "image_build_context": "../..",
+      // 2 vCPU, 8 GiB: enough for Chromium renders next to the web app.
+      "instance_type": "standard-3",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "APP", "class_name": "CrewcutApp" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CrewcutApp"] }],
+  "vars": {
+    "APP_URL": "https://crewcut.codewithveek.workers.dev",
+    "BETTER_AUTH_URL": "https://crewcut.codewithveek.workers.dev",
+    "YOUTUBE_REDIRECT_URI": "https://crewcut.codewithveek.workers.dev/api/connections/youtube/callback"
+  }
+}
