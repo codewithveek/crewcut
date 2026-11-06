@@ -148,11 +148,25 @@ export function TabsList({ className, variant = "underline", ...props }: React.C
   );
 }
 
-export function TabsTrigger({ className, variant = "underline", ...props }: React.ComponentProps<typeof TabsPrimitive.Trigger> & { variant?: "underline" | "pill" }) {
+export function TabsTrigger({ className, variant = "underline", onPointerDown, onKeyDown, onBlur, ...props }: React.ComponentProps<typeof TabsPrimitive.Trigger> & { variant?: "underline" | "pill" }) {
   return (
     <TabsPrimitive.Trigger
+      // Radix focuses a tab in a way Chrome reports as keyboard focus, so a mouse
+      // click drew the focus ring. Mark pointer focus and hide the ring for it only.
+      onPointerDown={(event) => {
+        event.currentTarget.dataset.pointer = "";
+        onPointerDown?.(event);
+      }}
+      onKeyDown={(event) => {
+        delete event.currentTarget.dataset.pointer;
+        onKeyDown?.(event);
+      }}
+      onBlur={(event) => {
+        delete event.currentTarget.dataset.pointer;
+        onBlur?.(event);
+      }}
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ds-accent disabled:opacity-40 [&_svg]:size-4",
+        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ds-accent data-[pointer]:focus-visible:ring-0 disabled:opacity-40 [&_svg]:size-4",
         variant === "underline"
           ? "relative h-10 text-[13px] text-ds-text-2 hover:text-ds-text data-[state=active]:text-ds-text after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:rounded-full after:bg-transparent data-[state=active]:after:bg-ds-text"
           : "h-7 flex-1 justify-center rounded-[6px] px-2.5 text-xs text-ds-text-2 hover:text-ds-text data-[state=active]:bg-ds-surface data-[state=active]:text-ds-text data-[state=active]:shadow-[0_1px_2px_rgb(0_0_0/0.08),0_0_0_1px_var(--ds-hairline)]",

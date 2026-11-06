@@ -1,9 +1,10 @@
 import { useActionQuery } from "@agent-native/core/client/hooks";
 import type { Stage } from "@crewcut/contracts";
 import { IconArrowLeft, IconCertificate, IconPlayerPlay, IconSparkles } from "@tabler/icons-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ds";
 import { Button } from "@/components/ui/button";
 import { STAGE_LABELS, STAGE_ORDER, STAGE_PROMPTS, askAgent, formatAgo } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,41 @@ function ApprovalLog({ state }: { state: VideoState }) {
   );
 }
 
+/**
+ * The eight stages as one tab bar: each tab is its stage's status badge over its
+ * name, and the open stage is underlined in the accent. Scrolls sideways on
+ * narrow screens and keeps the open tab in view.
+ */
+function StageTabs({ state, active }: { state: VideoState; active: Stage }) {
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const tab = listRef.current?.querySelector<HTMLElement>('[data-state="active"]');
+    tab?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }, [active]);
+  const done = STAGE_ORDER.filter((stage) => ["approved", "notified"].includes(state.stages[stage].status)).length;
+  return (
+    <div className="pc-panel overflow-hidden">
+      <div ref={listRef} className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <TabsList aria-label={`Pipeline stages, ${done} of ${STAGE_ORDER.length} done`} className="min-w-max gap-0 border-b-0 px-1 sm:min-w-0">
+          {STAGE_ORDER.map((stage, index) => (
+            <TabsTrigger
+              key={stage}
+              value={stage}
+              className="group h-auto min-w-[7.5rem] flex-1 flex-col gap-2 px-3 pt-3.5 pb-3 focus-visible:ring-inset text-ds-text-2 hover:bg-ds-surface-2/60 after:bottom-0 after:inset-x-3 after:h-[2.5px] after:origin-center after:scale-x-50 after:opacity-0 after:transition-[transform,opacity] after:duration-200 after:ease-[var(--ds-ease-out)] data-[state=active]:after:scale-x-100 data-[state=active]:after:bg-ds-accent data-[state=active]:after:opacity-100 motion-reduce:after:transition-none"
+            >
+              <StatusPill status={state.stages[stage].status} className="h-5 gap-1 px-2 text-[10.5px] [&_svg]:size-3 group-data-[state=inactive]:opacity-90" />
+              <span className="flex items-baseline gap-1.5 text-[13px]">
+                <span className="text-[11px] text-ds-text-3 tabular">{index + 1}</span>
+                {STAGE_LABELS[stage].agent}
+              </span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </div>
+    </div>
+  );
+}
+
 export function BoardPage({ videoId }: { videoId: string }) {
   const [busy, setBusy] = useState(false);
   const query = useActionQuery("get-video", { videoId } as never, { refetchInterval: busy ? 2000 : false });
@@ -88,8 +124,8 @@ export function BoardPage({ videoId }: { videoId: string }) {
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-5 sm:px-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <Link to="/home" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-            <IconArrowLeft className="size-3.5" /> Videos
+          <Link to="/projects" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <IconArrowLeft className="size-3.5" /> Projects
           </Link>
           <h1 className="pc-display mt-1 text-2xl leading-tight text-foreground">{state.video.title}</h1>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -115,43 +151,16 @@ export function BoardPage({ videoId }: { videoId: string }) {
         </div>
       </header>
 
-      <nav aria-label="Pipeline stages" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <ol className="flex min-w-max gap-2 sm:grid sm:min-w-0 sm:grid-cols-4 xl:grid-cols-8">
-          {STAGE_ORDER.map((stage, index) => {
-            const status = state.stages[stage].status;
-            const isActive = stage === active;
-            return (
-              <li key={stage} className="w-40 sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => setSelected(stage)}
-                  aria-current={isActive ? "step" : undefined}
-                  className={cn(
-                    "pc-press flex h-full w-full flex-col items-start gap-2 rounded-xl p-3 text-left",
-                    isActive ? "bg-card shadow-[0_0_0_2px_var(--pc-accent)]" : "bg-card/60 shadow-[0_0_0_1px_var(--pc-hairline)] hover:bg-card",
-                  )}
-                >
-                  <span className="text-[11px] text-muted-foreground tabular">
-                    {index + 1}. {STAGE_LABELS[stage].agent}
-                  </span>
-                  <StatusPill status={status} />
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
+      <Tabs value={active} onValueChange={(value) => setSelected(value as Stage)} className="flex flex-col gap-5">
+      <StageTabs state={state} active={active} />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <TabsContent value={active} className="min-w-0 outline-none">
         <Panel
           key={active}
           className="pc-enter min-w-0"
-          title={
-            <span className="flex flex-wrap items-center gap-2">
-              {STAGE_LABELS[active].agent}
-              <StatusPill status={stageState.status} />
-            </span>
-          }
+          // The status badge lives on the stage's tab just above, so the heading stays quiet.
+          title={STAGE_LABELS[active].agent}
           description={stageState.note ?? STAGE_LABELS[active].job}
           actions={
             <Button size="sm" variant="ghost" className="pc-press" onClick={() => askAgent(STAGE_PROMPTS[active](videoId), { videoId, stage: active })}>
@@ -162,8 +171,10 @@ export function BoardPage({ videoId }: { videoId: string }) {
         >
           <StageView state={state} />
         </Panel>
+        </TabsContent>
         <ApprovalLog state={state} />
       </div>
+      </Tabs>
     </div>
   );
 }
