@@ -9,14 +9,24 @@ import { composeMusic } from "@crewcut/voice";
 import { getDb, schema } from "../db/index.js";
 import { isStoredRemotely, putFile } from "./blob-store.js";
 import { toJson } from "./json.js";
-import { STORAGE_DIR, newId, storagePath } from "./storage.js";
+import { STORAGE_DIR, WORKSPACE_ROOT, newId, storagePath } from "./storage.js";
 
 /**
  * Media for templates: stock photo picks (one Pexels result per photo slot,
  * cached per template and orientation so browsing the gallery costs no API
  * calls) and one generated music bed per template, shared by every project
  * made from it.
+ *
+ * Both ship with the app in library/templates/ (committed): every server
+ * starts with the same gallery photos and music, so nothing is regenerated
+ * (no ElevenLabs credits) and browsing costs no Pexels searches. Picks made at
+ * runtime (a slot's search was reworded) go to storage/ on top of the bundled ones.
  */
+
+/** Template media committed with the app. */
+export const TEMPLATE_LIBRARY_DIR = path.resolve(process.env.CREWCUT_TEMPLATE_LIBRARY_DIR ?? path.join(WORKSPACE_ROOT, "apps", "studio", "library", "templates"));
+const BUNDLED_PICKS_FILE = path.join(TEMPLATE_LIBRARY_DIR, "stock-picks.json");
+const bundledMusicPath = (templateId: string) => path.join(TEMPLATE_LIBRARY_DIR, "music", `${templateId}.mp3`);
 
 const PICKS_FILE = path.join(STORAGE_DIR, "templates", "stock-picks.json");
 type PickCache = Record<string, Record<string, StockPhoto>>;
@@ -27,19 +37,31 @@ export function stockEnabled(): boolean {
   return Boolean(process.env.PEXELS_API_KEY);
 }
 
+async function readPicks(file: string): Promise<PickCache> {
+  try {
+    return JSON.parse(await readFile(file, "utf8")) as PickCache;
+  } catch {
+    return {};
+  }
+}
+
+/** Bundled picks, with any picks made on this server on top. */
 async function loadPicks(): Promise<PickCache> {
   if (picksCache) return picksCache;
-  try {
-    picksCache = JSON.parse(await readFile(PICKS_FILE, "utf8")) as PickCache;
-  } catch {
-    picksCache = {};
-  }
+  picksCache = { ...(await readPicks(BUNDLED_PICKS_FILE)), ...(await readPicks(PICKS_FILE)) };
   return picksCache;
 }
 
+/** Saves this server's picks (not the bundled file). Best effort: a read-only host still serves the gallery. */
 async function savePicks(cache: PickCache): Promise<void> {
-  await mkdir(path.dirname(PICKS_FILE), { recursive: true });
-  await writeFile(PICKS_FILE, JSON.stringify(cache, null, 1));
+  const bundled = await readPicks(BUNDLED_PICKS_FILE);
+  const own = Object.fromEntries(Object.entries(cache).filter(([key]) => !bundled[key]));
+  try {
+    await mkdir(path.dirname(PICKS_FILE), { recursive: true });
+    await writeFile(PICKS_FILE, JSON.stringify(own, null, 1));
+  } catch (error) {
+    console.warn("[templates] couldn't save stock picks", error);
+  }
 }
 
 function shortHash(text: string): string {
@@ -115,9 +137,31 @@ export function templateMusicFile(templateId: string): string {
   return `lib-template-${templateId}.mp3`;
 }
 
+const seeding = new Map<string, Promise<boolean>>();
+
+/**
+ * True when the template's music is in storage. A bundled track is copied into
+ * the active storage (disk, or R2 when configured) the first time it's needed,
+ * so previews, exports and media links all find it the usual way.
+ */
 export async function templateMusicReady(templateId: string): Promise<boolean> {
   const fileName = templateMusicFile(templateId);
-  return existsSync(storagePath("assets", fileName)) || (await isStoredRemotely("assets", fileName));
+  if (existsSync(storagePath("assets", fileName)) || (await isStoredRemotely("assets", fileName))) return true;
+  const bundled = bundledMusicPath(templateId);
+  if (!existsSync(bundled)) return false;
+  let job = seeding.get(templateId);
+  if (!job) {
+    job = readFile(bundled)
+      .then((bytes) => putFile("assets", fileName, new Uint8Array(bytes), "audio/mpeg", { keepLocal: true }))
+      .then(() => true)
+      .catch((error) => {
+        console.warn(`[templates] couldn't copy the bundled music for ${templateId}`, error);
+        return false;
+      })
+      .finally(() => seeding.delete(templateId));
+    seeding.set(templateId, job);
+  }
+  return job;
 }
 
 /** Generates the template's music bed with ElevenLabs (once; `force` regenerates). */
@@ -130,6 +174,11 @@ export async function generateTemplateMusic(template: TemplateDefinition, option
   // A little longer than the template so the last cut never lands on silence; the clip is trimmed to the video.
   const bytes = await composeMusic({ apiKey, prompt: template.music.prompt, durationMs: durationMs + 2000 });
   await putFile("assets", fileName, bytes, "audio/mpeg", { keepLocal: true });
+  // On a developer's machine the new track also lands in the bundled library, ready to commit.
+  if (process.env.NODE_ENV !== "production" && existsSync(TEMPLATE_LIBRARY_DIR)) {
+    await mkdir(path.dirname(bundledMusicPath(template.id)), { recursive: true });
+    await writeFile(bundledMusicPath(template.id), bytes);
+  }
   return { fileName, bytes: bytes.byteLength, durationMs, generated: true };
 }
 

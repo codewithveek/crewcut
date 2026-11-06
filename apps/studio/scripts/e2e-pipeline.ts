@@ -9,16 +9,21 @@
  * render job → analytics insight, and checks the guarantees on the way:
  * agents can't approve, approvals are logged, every edit is a version.
  */
-import { mkdtempSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const scratch = mkdtempSync(path.join(os.tmpdir(), "crewcut-e2e-"));
 process.env.DATABASE_URL = `pglite:${path.join(scratch, "db")}`;
 process.env.CREWCUT_STORAGE_DIR = path.join(scratch, "storage");
 process.env.CREWCUT_RENDER_MODE = "queue"; // queue only: don't launch Chromium in the check
 process.env.NODE_ENV = "development";
-// No network in the check: templates fall back to their designed placeholders and no music.
+// The bundled template library, music only: the check stays offline (bundled photo picks would download from Pexels).
+const library = path.join(scratch, "library");
+cpSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "library", "templates", "music"), path.join(library, "music"), { recursive: true });
+process.env.CREWCUT_TEMPLATE_LIBRARY_DIR = library;
+// No network in the check: templates fall back to their designed placeholders; music comes from the bundle.
 delete process.env.PEXELS_API_KEY;
 delete process.env.ELEVENLABS_API_KEY;
 
@@ -171,6 +176,8 @@ async function checkTemplates(): Promise<void> {
   const layers = composition.composition.tracks.flatMap((track) => (track.kind === "visual" ? track.clips.flatMap((clip) => clip.layers ?? []) : []));
   check(layers.some((layer) => layer.slot === "product" && layer.text === "ORBIT ONE") && layers.some((layer) => layer.slot === "price" && layer.text === "$89"), "the person's words land in the template's text slots");
   check(layers.filter((layer) => layer.slot?.startsWith("photo")).every((layer) => layer.src?.startsWith("data:image/svg+xml")), "without stock photos, photo slots keep their designed placeholders");
+  const music = composition.composition.tracks.filter((track) => track.kind === "audio").flatMap((track) => track.clips);
+  check(music.length > 0 && existsSync(path.join(process.env.CREWCUT_STORAGE_DIR ?? "", "assets", "lib-template-product-drop.mp3")), "a fresh server copies the bundled template music into storage (nothing regenerated)");
   await expectFailure(call("use-template", { templateId: "golden-hour", ratio: "9:16", values: { headline: "x" } }, human), /no slot "headline"/, "an unknown slot id is refused (no silent typos)");
   await expectFailure(call("generate-template-music", {}, agent), /needs a person/, "the agent can't spend the music allowance");
 }
