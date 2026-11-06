@@ -34,6 +34,7 @@ import {
   threadIdFromPath,
 } from "@/lib/chat-paths";
 import { TAB_ID } from "@/lib/tab-id";
+import { isLandingPath } from "@/components/landing/landing-paths";
 
 import { i18nCatalog } from "./i18n";
 
@@ -180,6 +181,16 @@ export default function Root() {
   // The path, not the visitor, picks the shell, so the SSR shell stays one
   // cached page per URL.
   const { pathname } = useLocation();
+  // The public landing page: rendered on the server, no sign-in wall, no app chrome.
+  if (isLandingPath(pathname)) {
+    return (
+      <AppToolkitProvider>
+        <AppProviders queryClient={queryClient} isPublicPath i18n={{ catalog: i18nCatalog }}>
+          <Outlet />
+        </AppProviders>
+      </AppToolkitProvider>
+    );
+  }
   return (
     <AppToolkitProvider>
       <AppProviders

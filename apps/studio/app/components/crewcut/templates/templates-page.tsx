@@ -45,13 +45,35 @@ function useGalleryParams() {
     if ((params.get("q") ?? "") !== query) set("q", query || null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
-  return { text, setText, query, ratio, setRatio: (value: AspectRatio | null) => set("ratio", value), category, setCategory: (value: TemplateCategory | null) => set("category", value) };
+  return {
+    text,
+    setText,
+    query,
+    ratio,
+    setRatio: (value: AspectRatio | null) => set("ratio", value),
+    category,
+    setCategory: (value: TemplateCategory | null) => set("category", value),
+    /** ?template=<id> opens that template (links from the landing page, shared links). */
+    templateId: params.get("template"),
+    clearTemplate: () => set("template", null),
+  };
 }
 
 export function TemplatesPage() {
   const gallery = useGalleryParams();
   const { templates, categories, loading, refreshing } = useTemplates({ query: gallery.query, ratio: gallery.ratio, category: gallery.category });
   const [open, setOpen] = useState<TemplateSummary | null>(null);
+  // Open the template named in the link once the list has it.
+  useEffect(() => {
+    if (!gallery.templateId || open) return;
+    const linked = templates.find((template) => template.id === gallery.templateId);
+    if (linked) setOpen(linked);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gallery.templateId, templates]);
+  const close = () => {
+    setOpen(null);
+    if (gallery.templateId) gallery.clearTemplate();
+  };
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-5 px-4 pb-10 pt-5 sm:px-8 sm:pt-9">
@@ -96,7 +118,7 @@ export function TemplatesPage() {
         </div>
       )}
 
-      <TemplateDialog template={open} initialRatio={gallery.ratio} onClose={() => setOpen(null)} />
+      <TemplateDialog template={open} initialRatio={gallery.ratio} onClose={close} />
     </div>
   );
 }

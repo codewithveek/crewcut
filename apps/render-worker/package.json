@@ -8,7 +8,8 @@
     "render": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit -p .",
     "template-stills": "tsx --env-file-if-exists=../studio/.env src/template-stills.ts",
-    "transition-stills": "tsx --env-file-if-exists=../studio/.env src/transition-stills.ts"
+    "transition-stills": "tsx --env-file-if-exists=../studio/.env src/transition-stills.ts",
+    "landing-videos": "tsx --env-file-if-exists=../studio/.env src/landing-videos.ts"
   },
   "dependencies": {
     "@crewcut/composition": "workspace:*",
