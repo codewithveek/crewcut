@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { FRAME_SIZE, aspectRatioSchema, buildTemplate, closestTemplateRatio, getTemplate } from "@crewcut/composition";
+import { FRAME_SIZE, aspectRatioSchema, buildTemplate, closestTemplateRatio, getTemplate, withCrewcutEnding } from "@crewcut/composition";
 import { initialStageStates } from "@crewcut/pipeline";
 import { z } from "zod";
 
@@ -55,7 +55,8 @@ export default defineAction({
       }
     }
     const music = await attachTemplateMusic(template, owner);
-    const composition = (buildTemplate(template, {
+    // New videos end with the Crewcut ending (a normal clip: delete it, or switch it off in Export).
+    const composition = withCrewcutEnding(buildTemplate(template, {
       id,
       title: name,
       ratio: designed,

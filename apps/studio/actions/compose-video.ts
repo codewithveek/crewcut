@@ -7,7 +7,9 @@ import {
   composeSceneSchema,
   composeVideo,
   generateArtDirectionBrief,
+  hasCrewcutEnding,
   lintMotion,
+  withCrewcutEnding,
 } from "@crewcut/composition";
 import { applyNarration, composeFromScript } from "@crewcut/pipeline";
 import { z } from "zod";
@@ -62,7 +64,9 @@ export default defineAction({
         )
       : composeFromScript({ videoId: args.videoId, script: scriptEntry.script, dossier, ratio, seed: video.row.seed, brief, lineAudio });
 
-    const version = await saveComposition(video, composition, args.label);
+    // Keep the Crewcut ending unless the person removed it from the previous version.
+    const keepEnding = !previous?.composition || hasCrewcutEnding(previous.composition);
+    const version = await saveComposition(video, keepEnding ? withCrewcutEnding(composition) : composition, args.label);
     const findings = lintMotion(composition);
     const status = await finishStage(video, "motion", { note: `Draft video ready: ${composition.brief.mood}` });
     return {

@@ -1,6 +1,6 @@
 import { writeClientAppState } from "@agent-native/core/client/application-state";
 import { callAction, useActionQuery } from "@agent-native/core/client/hooks";
-import { type Composition, formatTimecode } from "@crewcut/composition";
+import { type Composition, crewcutEndingClip, crewcutEndingStartMs, formatTimecode, isCrewcutEnding } from "@crewcut/composition";
 import {
   IconAdjustmentsHorizontal,
   IconArrowLeft,
@@ -379,6 +379,12 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     }
   }, [active?.status]);
   if (!composition) return null;
+  const ending = composition.tracks.flatMap((track) => (track.kind === "visual" ? track.clips : [])).find((clip) => isCrewcutEnding(clip)) ?? null;
+  const toggleEnding = (on: boolean) => {
+    if (!on && ending) return void run("Remove the Crewcut ending", [{ op: "delete-clips", clipIds: [ending.id] }]);
+    const main = composition.tracks.find((track) => track.kind === "visual");
+    if (on && main) void run("Add the Crewcut ending", [{ op: "add-clip", trackId: main.id, clip: crewcutEndingClip(composition, crewcutEndingStartMs(composition), `crewcut-ending-${Date.now().toString(36)}`) as never }]);
+  };
   const start = async () => {
     setStarting(true);
     try {
@@ -438,6 +444,10 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
             onChange={(fps) => void run(`${fps} fps`, [{ op: "set-format", fps: Number(fps) as 30 }])}
             options={["24", "25", "30", "50", "60"].map((fps) => ({ value: fps, label: `${fps} fps` }))}
           />
+        </FieldRow>
+        {/* The ending is a clip on the timeline: this switch adds or removes it there, so the editor still shows exactly what exports. */}
+        <FieldRow label="Ending">
+          <Switch label="Crewcut ending" checked={ending !== null} onCheckedChange={(on) => toggleEnding(on)} />
         </FieldRow>
         {renders.length ? (
           <div className="flex flex-col gap-1.5">
