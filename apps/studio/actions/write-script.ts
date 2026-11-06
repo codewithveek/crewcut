@@ -23,7 +23,7 @@ export default defineAction({
     const dossier = await loadDossier(videoId);
     const audit = dossier ? auditClaims({ script, dossier, scriptVersion: version, previous: (await latestAudit(videoId))?.results ?? [] }) : null;
     if (audit) await saveAudit(video, audit);
-    const status = await finishStage(video, "script", { note: `v${version}: ${scriptWordCount(script)} words (budget ${wordBudget(script)})` });
+    const status = await finishStage(video, "script", { note: `Version ${version}: ${scriptWordCount(script)} of ${wordBudget(script)} words` });
     return {
       version,
       status,

@@ -75,7 +75,7 @@ export default defineAction({
     const composition = applyNarration(compositionEntry.composition, lineAudio, { emphasis });
     const version = await saveComposition(video, composition, apiKey ? `Voice: ${synthesized} lines (ElevenLabs)` : "Re-time narration (estimated voice)");
     const status = await finishStage(video, "voice", {
-      note: apiKey ? `${synthesized} lines synthesized with ElevenLabs` : "No voice provider connected — estimated timing kept. Add ELEVENLABS_API_KEY in Settings → Connections.",
+      note: apiKey ? `${synthesized} lines voiced with ElevenLabs` : "No voice connected yet, so timing is estimated. Connect ElevenLabs in Settings to record the voice-over.",
     });
     return { version, synthesized, provider: apiKey ? "elevenlabs" : "estimated", durationMs: composition.durationMs, status };
   },

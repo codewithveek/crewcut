@@ -10,6 +10,8 @@ import { finishStage } from "../server/lib/pipeline-ops.js";
 import { compositionAt, latestComposition, loadVideo } from "../server/lib/store.js";
 import { newId } from "../server/lib/storage.js";
 
+const WINDOW_LABEL = { "48h": "first 48 hours", "7d": "first week", "28d": "first 28 days" } as const;
+
 export default defineAction({
   description:
     "Analytics agent: explain why a video worked or didn't. Maps retention drops to the exact scene and line, grounds CTR in the channel baseline, groups comments into questions/objections/requests, and turns that into learnings the next script and motion agents read. Publish-time advice is labelled low impact.",
@@ -50,7 +52,7 @@ export default defineAction({
         });
       }
     }
-    await finishStage(video, "analytics", { note: `${insights.length} insights from ${window} (${snapshot.source})` });
+    await finishStage(video, "analytics", { note: `${insights.length} takeaways from the ${WINDOW_LABEL[window]}` });
     return { window, source: snapshot.source, insights, learnings: learnings.map((learning) => learning.text) };
   },
 });

@@ -5,6 +5,7 @@ import { Link } from "react-router";
 
 import { Button } from "@/components/ui/button";
 import { STAGE_LABELS, formatAgo } from "@/lib/crewcut";
+import { DECISION_LABEL, describeDecision } from "@/lib/decisions";
 import { cn } from "@/lib/utils";
 
 import { CrewcutMark, SkeletonLines, VerdictBadge } from "./primitives";
@@ -139,17 +140,24 @@ export function ProofReportPage({ videoId }: { videoId: string }) {
       <section className="flex flex-col gap-3">
         <h2 className="pc-display text-lg text-foreground">Human decisions</h2>
         <ol className="flex flex-col divide-y divide-border rounded-xl border border-border">
-          {humanDecisions.map((decision) => (
+          {humanDecisions.map((decision) => {
+            const { detail, link } = describeDecision(decision, { lineText: (lineId) => report.claims.find((claim) => claim.lineId === lineId)?.text });
+            return (
             <li key={decision.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 p-3 text-[13px]">
               <IconUser className="size-3.5 self-center text-muted-foreground" />
               <span className="font-medium text-foreground">{decision.actor}</span>
-              <span className="text-foreground">{decision.decision.replace("_", " ")}</span>
+              <span className="text-foreground">{DECISION_LABEL[decision.decision] ?? decision.decision.replace("_", " ")}</span>
               <span className="text-muted-foreground">{STAGE_LABELS[decision.stage]?.agent ?? decision.stage}</span>
-              {decision.subject ? <span className="text-muted-foreground">· {decision.subject}</span> : null}
-              {decision.reason ? <span className="basis-full pl-5 text-xs text-muted-foreground">{decision.reason}</span> : null}
+              {detail ? <span className="basis-full pl-5 text-xs text-muted-foreground">{detail}</span> : null}
+              {link ? (
+                <a href={link} target="_blank" rel="noreferrer" className="basis-full pl-5 text-xs text-pc-accent underline-offset-2 hover:underline">
+                  View the post
+                </a>
+              ) : null}
               <span className="ml-auto text-[11px] text-muted-foreground">{formatAgo(decision.createdAt)}</span>
             </li>
-          ))}
+            );
+          })}
           {humanDecisions.length === 0 ? <li className="p-3 text-sm text-muted-foreground">No decisions yet.</li> : null}
         </ol>
       </section>

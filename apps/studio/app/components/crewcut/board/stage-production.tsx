@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { STAGE_PROMPTS, askAgent, errorMessage, formatAgo, formatBytes } from "@/lib/crewcut";
+import { plainStageNote } from "@/lib/decisions";
 import { cn } from "@/lib/utils";
 
 import { EmptyState } from "../primitives";
@@ -122,7 +123,7 @@ export function VoiceStage({ state }: { state: VideoState }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-[13px] text-muted-foreground">
-        {state.stages.voice.note ?? "Narration drives timing: scene lengths follow the voice. Hand-trimmed clips keep their length and unlock from narration."}
+        {plainStageNote(state.stages.voice.note) ?? "Narration drives timing: scene lengths follow the voice. Hand-trimmed clips keep their length and unlock from narration."}
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button className="pc-press" disabled={synth.pending || !state.composition} onClick={() => void synth.run({ videoId })}>

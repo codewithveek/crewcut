@@ -35,7 +35,7 @@ import {
 } from "../server/lib/store.js";
 import { newId, sha256 } from "../server/lib/storage.js";
 
-const DEMO_REASON = "Demo seed";
+const DEMO_REASON = "Sample project";
 
 export default defineAction({
   description: "Load the demo workspace: a sample published video with analytics, and 'Why good motion feels physical' advanced to the chosen stage. Everything is labelled as sample data.",
@@ -134,12 +134,12 @@ export default defineAction({
     };
     await saveDossier(video, dossier);
     stages = completeStage(startStage(stages, "research", { now, actor: agent }), "research", { policy: DEFAULT_GATE_POLICY, now, actor: agent, note: "8/8 facts verified against their sources" });
-    await recordApproval(video, { stage: "research", decision: "notified", reason: "Gate set to notify", actor: { ...video.who, kind: "agent", actorId: "agent" } });
+    await recordApproval(video, { stage: "research", decision: "notified", reason: "No sign-off needed for this step", actor: { ...video.who, kind: "agent", actorId: "agent" } });
 
     let script = demoScript();
     let scriptVersion = await saveScript(video, script, "Script draft", { ...video.who, kind: "agent", actorId: "agent" });
     await saveAudit(video, auditClaims({ script, dossier, scriptVersion }));
-    stages = completeStage(startStage(stages, "script", { now, actor: agent }), "script", { policy: DEFAULT_GATE_POLICY, now, actor: agent, note: `v${scriptVersion}` });
+    stages = completeStage(startStage(stages, "script", { now, actor: agent }), "script", { policy: DEFAULT_GATE_POLICY, now, actor: agent, note: `Version ${scriptVersion}` });
     await saveStages(videoId, stages);
     if (through === "script") return { projectId, sampleVideoId: sampleId, videoId, path: `/videos/${videoId}` };
 

@@ -27,7 +27,7 @@ export default defineAction({
       renderId,
       mode,
       compositionVersion: current.version,
-      note: mode === "queue" ? "Queued for a render worker (run `pnpm worker` if none is running)." : "Rendering in a worker process; progress shows on the board.",
+      note: mode === "queue" ? "Waiting to export." : "Exporting. Progress shows here.",
     };
   },
 });

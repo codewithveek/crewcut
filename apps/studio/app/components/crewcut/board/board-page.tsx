@@ -1,5 +1,5 @@
 import { useActionQuery } from "@agent-native/core/client/hooks";
-import type { Stage } from "@crewcut/contracts";
+import { type ApprovalEvent, type Stage, scriptLines } from "@crewcut/contracts";
 import { IconArrowLeft, IconCertificate, IconPlayerPlay, IconSparkles } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
@@ -7,6 +7,7 @@ import { Link } from "react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ds";
 import { Button } from "@/components/ui/button";
 import { STAGE_LABELS, STAGE_ORDER, STAGE_PROMPTS, askAgent, formatAgo } from "@/lib/crewcut";
+import { DECISION_LABEL, describeDecision, plainStageNote } from "@/lib/decisions";
 import { cn } from "@/lib/utils";
 
 import { Panel, SkeletonLines, StatusPill } from "../primitives";
@@ -26,15 +27,6 @@ const STAGE_VIEW: Record<Stage, (props: { state: VideoState }) => React.JSX.Elem
   analytics: AnalyticsStage,
 };
 
-const DECISION_LABEL: Record<string, string> = {
-  approved: "approved",
-  sent_back: "sent back",
-  override: "overrode a claim",
-  rejected: "rejected",
-  notified: "finished",
-  published: "published",
-};
-
 function ApprovalLog({ state }: { state: VideoState }) {
   const events = [...state.approvals].reverse();
   return (
@@ -51,7 +43,7 @@ function ApprovalLog({ state }: { state: VideoState }) {
                   <span className="font-medium">{event.actorKind === "human" ? event.actor : "Agent"}</span> {DECISION_LABEL[event.decision] ?? event.decision}{" "}
                   <span className="text-muted-foreground">{STAGE_LABELS[event.stage].agent}</span>
                 </p>
-                {event.reason || event.subject ? <p className="truncate text-xs text-muted-foreground">{[event.subject, event.reason].filter(Boolean).join(" — ")}</p> : null}
+                <DecisionDetail event={event} state={state} />
                 <p className="text-[11px] text-muted-foreground">{formatAgo(event.createdAt)}</p>
               </div>
             </li>
@@ -94,6 +86,28 @@ function StageTabs({ state, active }: { state: VideoState; active: Stage }) {
         </TabsList>
       </div>
     </div>
+  );
+}
+
+function DecisionDetail({ event, state }: { event: ApprovalEvent; state: VideoState }) {
+  const lines = state.script ? scriptLines(state.script.script) : [];
+  const { detail, link } = describeDecision(event, {
+    lineText: (lineId) => lines.find((line) => line.id === lineId)?.text,
+    ideaTitle: (ideaId) => state.ideas.find((idea) => idea.id === ideaId)?.title,
+  });
+  return (
+    <>
+      {detail ? (
+        <p className="line-clamp-2 text-xs text-muted-foreground" title={detail}>
+          {detail}
+        </p>
+      ) : null}
+      {link ? (
+        <a href={link} target="_blank" rel="noreferrer" className="text-xs text-pc-accent underline-offset-2 hover:underline">
+          View the post
+        </a>
+      ) : null}
+    </>
   );
 }
 
@@ -161,7 +175,7 @@ export function BoardPage({ videoId }: { videoId: string }) {
           className="pc-enter min-w-0"
           // The status badge lives on the stage's tab just above, so the heading stays quiet.
           title={STAGE_LABELS[active].agent}
-          description={stageState.note ?? STAGE_LABELS[active].job}
+          description={plainStageNote(stageState.note) ?? STAGE_LABELS[active].job}
           actions={
             <Button size="sm" variant="ghost" className="pc-press" onClick={() => askAgent(STAGE_PROMPTS[active](videoId), { videoId, stage: active })}>
               <IconSparkles className="size-4" />

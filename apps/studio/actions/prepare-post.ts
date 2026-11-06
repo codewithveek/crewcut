@@ -59,7 +59,7 @@ export default defineAction({
       ownerEmail: video.row.ownerEmail,
       orgId: video.row.orgId,
     });
-    await finishStage(video, "publish", { note: `${spec.label} post ready (${args.privacy}) — waiting for a person to publish` });
+    await finishStage(video, "publish", { note: `${spec.label} post ready (${args.privacy}). Publish it when you're happy with it.` });
     return {
       publishJobId: id,
       preview: adaptCopy(args.platform, copy),

@@ -223,7 +223,7 @@ export function QaStage({ state }: { state: VideoState }) {
               }
             }}
           >
-            {audit.isPending ? "Checking…" : "Re-run QA"}
+            {audit.isPending ? "Checking…" : "Check again"}
           </Button>
           {canApprove ? (
             <Button
@@ -233,7 +233,7 @@ export function QaStage({ state }: { state: VideoState }) {
               onClick={async () => {
                 try {
                   await approve.mutateAsync({ videoId, stage: "qa" } as never);
-                  toast.success("QA approved");
+                  toast.success("Fact-check approved");
                   askAgent(STAGE_PROMPTS.motion(videoId), { videoId });
                 } catch (error) {
                   toast.error(errorMessage(error));

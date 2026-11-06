@@ -43,7 +43,7 @@ export async function finishStage(video: VideoRecord, stage: Stage, options: { n
   const status = video.stages[stage].status;
   // A notify gate completes on its own: the agent did the work, nobody approved it.
   if (status === "notified") {
-    await recordApproval(video, { stage, decision: "notified", reason: options.note ?? "Gate set to notify", actor: { ...video.who, kind: "agent", actorId: "agent" } });
+    await recordApproval(video, { stage, decision: "notified", reason: options.note ?? "No sign-off needed for this step", actor: { ...video.who, kind: "agent", actorId: "agent" } });
   }
   return status;
 }
@@ -93,7 +93,7 @@ export async function runAuditAndQa(video: VideoRecord, options: { completeQaSta
       ...(blockers.length > 0
         ? { blockedReason: `${blockers.length} unsupported claim${blockers.length === 1 ? "" : "s"}: fix, cut, or override with a reason.` }
         : {}),
-      note: `Fact-check score ${qa.score}; ${report.counts.supported} claims backed, ${report.counts.weak} weak.`,
+      note: `Fact-check score ${qa.score}/100: ${report.counts.supported} lines backed by sources, ${report.counts.weak} weak.`,
     });
   }
   return {
