@@ -271,6 +271,10 @@ function mobileLaneKit(composition: Composition, open: (sheet: Sheet) => void): 
           <IconPlus className="size-5" />
         </button>
       ) : null,
+    transition: (clipId) => {
+      useEditor.getState().selectClip(clipId);
+      open({ kind: "left", tab: "transitions", title: "Transition" });
+    },
   };
 }
 

@@ -781,7 +781,7 @@ export function TransitionsTab() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PanelHeader title="Transitions" />
-      <p className="px-3 pb-2 text-[11px] text-ds-text-3">{target ? `Plays into ${target.label}.` : "Select the clip after a cut, or drag a transition onto it."}</p>
+      <p className="px-3 pb-2 text-[11px] text-ds-text-3">{target ? `Plays into ${target.label}. Each cut can have its own.` : "Click the button between two clips on the timeline, or drag a transition onto a clip."}</p>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         <div className="grid grid-cols-2 gap-2">
           {TRANSITION_PRESETS.map((preset) => (

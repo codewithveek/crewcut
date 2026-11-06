@@ -3,6 +3,7 @@ import {
   type AnyClip,
   type Composition,
   type Track,
+  type Transition,
   type VisualClip,
   clipEndMs,
   collectSnapTargets,
@@ -255,10 +256,12 @@ interface ClipBlockProps {
   selected: boolean;
   ghosted: boolean;
   variant: Variant;
+  /** The clip starts at a cut, whose button already shows its transition. */
+  atCut: boolean;
   onPointerDown: (event: React.PointerEvent, kind: "move" | "start" | "end") => void;
 }
 
-const ClipBlock = memo(function ClipBlock({ clip, track, composition, left, width, height, selected, ghosted, variant, onPointerDown }: ClipBlockProps) {
+const ClipBlock = memo(function ClipBlock({ clip, track, composition, left, width, height, selected, ghosted, variant, atCut, onPointerDown }: ClipBlockProps) {
   const kind = clipKind(clip, track);
   const Icon = KIND_ICON[kind];
   const [editing, setEditing] = useState(false);
@@ -318,7 +321,7 @@ const ClipBlock = memo(function ClipBlock({ clip, track, composition, left, widt
             {width > 52 ? <span className="truncate text-[11px] font-medium leading-4 [text-shadow:0_1px_2px_rgb(0_0_0/0.4)]">{label}</span> : null}
             {width > 120 && height > 40 ? <span className="ml-auto shrink-0 rounded bg-black/30 px-1 font-mono text-[10px] tabular">{(clip.durationMs / 1000).toFixed(1)}s</span> : null}
           </div>
-          {transition ? (
+          {transition && !atCut ? (
             <span className="pointer-events-none absolute left-0.5 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow" title={`Transition: ${transition.type}`}>
               <IconArrowsExchange className="size-3" />
             </span>
@@ -413,6 +416,51 @@ export interface MobileLaneKit {
   lead?: (track: Track, isMain: boolean) => ReactNode;
   empty?: (track: Track, isMain: boolean) => { label: string; onSelect: () => void } | null;
   tail?: (track: Track, isMain: boolean) => ReactNode;
+  /** Tapping the button on a cut between two clips (opens the transition picker for the clip after it). */
+  transition?: (clipId: string) => void;
+}
+
+/** Cuts on a visual track where one clip ends right where the next begins: each gets a transition button. */
+function cutsOf(track: Track): Array<{ clipId: string; atMs: number; transition: Transition | undefined }> {
+  if (track.kind !== "visual") return [];
+  const clips = [...track.clips].sort((a, b) => a.startMs - b.startMs);
+  const cuts: Array<{ clipId: string; atMs: number; transition: Transition | undefined }> = [];
+  for (let index = 1; index < clips.length; index += 1) {
+    const before = clips[index - 1];
+    const after = clips[index];
+    if (!before || !after) continue;
+    if (Math.abs(before.startMs + before.durationMs - after.startMs) <= 50) cuts.push({ clipId: after.id, atMs: after.startMs, transition: after.transitionIn });
+  }
+  return cuts;
+}
+
+function openTransitionPicker(clipId: string) {
+  const state = useEditor.getState();
+  state.selectClip(clipId);
+  state.setLeftTab("transitions");
+}
+
+function CutButton({ left, transition, size, onOpen }: { left: number; transition: Transition | undefined; size: number; onOpen: () => void }) {
+  const label = transition ? `Transition: ${transition.type.replace("-", " ")} (change)` : "Add a transition";
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpen();
+      }}
+      className={cn(
+        "pc-press absolute top-1/2 z-[5] flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[5px] shadow-[0_0_0_1.5px_var(--ds-surface),0_1px_3px_rgb(0_0_0/0.35)] outline-none focus-visible:ring-2 focus-visible:ring-ds-accent",
+        transition ? "bg-white text-black hover:bg-ds-accent hover:text-white" : "bg-black/60 text-white hover:bg-white hover:text-black",
+      )}
+      style={{ left, width: size, height: size }}
+    >
+      {transition ? <IconArrowsExchange className="size-3" strokeWidth={2.2} /> : <IconPlus className="size-3" strokeWidth={2.4} />}
+    </button>
+  );
 }
 
 export function Timeline({
@@ -455,7 +503,8 @@ export function Timeline({
   const [laneMenu, setLaneMenu] = useState<{ track: Track; atMs: number } | null>(null);
   const pxPerMs = zoom / 1000;
   // Phones keep the playhead fixed in the middle and scroll the tracks under it (CapCut).
-  const pad = mobile ? Math.round(view.width / 2) : 0;
+  // Desktop keeps a small lead-in so the playhead's head at 0:00 isn't tucked under the track headers.
+  const pad = mobile ? Math.round(view.width / 2) : 12;
   const scrollSync = useRef<"user" | "code" | null>(null);
 
   useEffect(() => {
@@ -823,6 +872,8 @@ export function Timeline({
                 const lead = mobile ? mobileLanes?.lead?.(track, isMain) : null;
                 const tail = mobile ? mobileLanes?.tail?.(track, isMain) : null;
                 const empty = mobile && track.clips.length === 0 ? (mobileLanes?.empty?.(track, isMain) ?? null) : null;
+                const cuts = track.locked ? [] : cutsOf(track);
+                const cutIds = new Set(cuts.map((cut) => cut.clipId));
                 return (
                   <div key={track.id}>
                     <div className="relative flex" style={{ height }}>
@@ -872,10 +923,16 @@ export function Timeline({
                                 selected={selectedClipIds.includes(clip.id)}
                                 ghosted={Boolean(dragging && !inPlace)}
                                 variant={variant}
+                                atCut={cutIds.has(clip.id)}
                                 onPointerDown={(event, kind) => beginClipPointer(event, track, clip, kind)}
                               />
                             );
                           })}
+                        {cuts
+                          .filter((cut) => cut.atMs >= visibleStart - 2000 && cut.atMs <= visibleEnd + 2000 && !(drag?.clipId === cut.clipId && drag.ghost))
+                          .map((cut) => (
+                            <CutButton key={`cut-${cut.clipId}`} left={cut.atMs * pxPerMs} transition={cut.transition} size={mobile ? 24 : 18} onOpen={() => (mobileLanes?.transition ?? openTransitionPicker)(cut.clipId)} />
+                          ))}
                         {empty ? (
                           <button
                             type="button"
@@ -897,7 +954,7 @@ export function Timeline({
                           <div className="sticky left-0 z-20 flex shrink-0 items-center border-b border-r border-ds-border bg-ds-surface pl-6 pr-2" style={{ width: headerWidth }}>
                             <span className="truncate font-mono text-[10px] text-ds-text-3">{lane.property}</span>
                           </div>
-                          <div className="relative flex-1 border-b border-ds-border bg-ds-sunken/60">
+                          <div className="relative flex-1 border-b border-ds-border bg-ds-sunken/60" style={{ marginLeft: pad, marginRight: pad }}>
                             {lane.keyframes.map((keyframe) => {
                               const dragging = keyframeDrag?.property === lane.property && keyframeDrag.fromMs === keyframe.atMs;
                               const atMs = dragging ? keyframeDrag.toMs : keyframe.atMs;
@@ -925,7 +982,7 @@ export function Timeline({
                   <div className="sticky left-0 z-20 flex shrink-0 items-center border-r border-ds-border bg-ds-surface px-1.5" style={{ width: headerWidth }}>
                     <AddTrackMenu />
                   </div>
-                  <div data-lane-id="__new__" data-drop={laneDrop?.trackId === "__new__" || drag?.ghost?.trackId === "__new__" ? "true" : "false"} className="ds-lane relative flex flex-1 items-center px-3 text-[11px] text-ds-text-3" {...laneHandlers(null)}>
+                  <div data-lane-id="__new__" data-drop={laneDrop?.trackId === "__new__" || drag?.ghost?.trackId === "__new__" ? "true" : "false"} className="ds-lane relative flex flex-1 items-center px-3 text-[11px] text-ds-text-3" style={{ marginLeft: pad, marginRight: pad }} {...laneHandlers(null)}>
                     {drag?.ghost?.trackId === "__new__" ? <div className="pointer-events-none absolute top-1 bottom-1 rounded-[7px] border-2 border-dashed border-ds-accent bg-ds-accent-soft" style={{ left: drag.ghost.startMs * pxPerMs, width: drag.ghost.durationMs * pxPerMs }} /> : <span className="sticky left-3">Drop media here, or drag a clip here, to start a new track</span>}
                   </div>
                 </div>
@@ -934,7 +991,7 @@ export function Timeline({
               {/* Playhead line */}
               <div
                 className="pointer-events-none absolute bottom-0 z-20 w-0.5 bg-[var(--ds-text)] shadow-[0_0_0_1px_var(--ds-surface)]"
-                style={{ top: mobile ? 0 : lanesTop, left: mobile ? view.left + view.width / 2 : headerWidth + playheadX, transform: "translateX(-1px)" }}
+                style={{ top: mobile ? 0 : lanesTop, left: mobile ? view.left + view.width / 2 : headerWidth + pad + playheadX, transform: "translateX(-1px)" }}
               />
             </div>
           </div>
