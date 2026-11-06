@@ -182,7 +182,7 @@ export function PublishStage({ state }: { state: VideoState }) {
           ))}
         </ul>
       ) : null}
-      {state.publishJobs.map((job) => (
+      {state.publishJobs.filter((job) => job.status !== "cancelled").map((job) => (
         <div key={job.id} className="flex flex-col gap-3 rounded-xl border border-border p-3">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">

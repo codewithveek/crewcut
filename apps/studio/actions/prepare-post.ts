@@ -1,7 +1,7 @@
 import { defineAction } from "@agent-native/core/action";
 import { PLATFORM_SPECS, platformSchema, privacySchema, publishCopySchema } from "@crewcut/contracts";
 import { adaptCopy, validateForYouTube } from "@crewcut/distribute";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
@@ -45,6 +45,11 @@ export default defineAction({
     });
     const connection = await youtubeConnectionFor(video.row.ownerEmail);
     const id = newId("pub");
+    // The new post replaces any draft that wasn't published, so only the latest copy can go out.
+    await db
+      .update(schema.publishJobs)
+      .set({ status: "cancelled" })
+      .where(and(eq(schema.publishJobs.videoId, args.videoId), inArray(schema.publishJobs.status, ["awaiting_approval", "failed"])));
     await db.insert(schema.publishJobs).values({
       id,
       videoId: args.videoId,

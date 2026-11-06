@@ -138,6 +138,16 @@ async function main(): Promise<void> {
   const render = await call<{ renderId: string; mode: string }>("render-video", { videoId });
   check(render.mode === "queue" && render.renderId.startsWith("rnd_"), "rendering is queued for a separate worker");
   await expectFailure(call("publish-post", { publishJobId: "pub_x" }, agent), /needs a person|signed-in app UI/, "the agent can never publish");
+  // Publishing from the editor prepares a fresh post each time: an older unpublished draft is retired so only the latest copy can go out.
+  const { getDb, schema } = await import("../server/db/index.js");
+  const { eq } = await import("drizzle-orm");
+  await getDb().update(schema.renderJobs).set({ status: "done", outputFile: "e2e.mp4", outputBytes: 1000 }).where(eq(schema.renderJobs.id, render.renderId));
+  const postArgs = (title: string) => ({ videoId, platform: "youtube", privacy: "private", copy: { title, description: "", hashtags: [], keywords: [], sources: [], language: "en" } });
+  const firstPost = await call<{ publishJobId: string }>("prepare-post", postArgs("First draft"));
+  const secondPost = await call<{ publishJobId: string }>("prepare-post", postArgs("Second draft"), human);
+  const posts = await call<{ publishJobs: Array<{ id: string; status: string }> }>("get-video", { videoId, include: ["publish"] }, human);
+  const statusOf = (id: string) => posts.publishJobs.find((job) => job.id === id)?.status;
+  check(statusOf(firstPost.publishJobId) === "cancelled" && statusOf(secondPost.publishJobId) === "awaiting_approval", "a newer post retires the unpublished draft");
 
   // 9. Analytics on the seeded sample video, through the demo seed.
   const seed = await call<{ sampleVideoId: string }>("seed-demo", { through: "ideas" }, human);

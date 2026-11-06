@@ -29,6 +29,8 @@ import { Inspector } from "./inspector";
 import { LeftPanel } from "./left-panel";
 import { MobileEditor } from "./mobile-editor";
 import { PreviewPanel } from "./preview";
+import { ShareDialog } from "./share-dialog";
+import { type PublishPlatform, PUBLISH_PLATFORMS, PublishBody, PublishButton, PublishFooter, usePublishFlow } from "./publish";
 import { Timeline } from "./timeline";
 
 type Layout = "phone" | "tablet" | "laptop" | "desktop";
@@ -361,8 +363,20 @@ interface RenderRow {
   compositionVersion: number;
 }
 
-export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+interface ExportDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Set when the dialog shows the publish step for that platform. */
+  platform: PublishPlatform | null;
+  onPlatformChange: (platform: PublishPlatform | null) => void;
+}
+
+export function ExportDialog(props: ExportDialogProps) {
   const composition = useEditor((state) => state.composition);
+  return composition ? <ExportDialogContent {...props} composition={composition} /> : null;
+}
+
+function ExportDialogContent({ open, onOpenChange, platform, onPlatformChange, composition }: ExportDialogProps & { composition: Composition }) {
   const videoId = useEditor((state) => state.videoId);
   const version = useEditor((state) => state.version);
   // The export matches the editor: captions are in it when they're shown in the preview.
@@ -370,15 +384,15 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const [starting, setStarting] = useState(false);
   const [watching, setWatching] = useState<string | null>(null);
   const query = useActionQuery("get-video", { videoId, include: ["renders"] } as never, { enabled: open, refetchInterval: open && watching ? 1500 : false } as never);
-  const renders = ((query.data as { renders?: RenderRow[] } | undefined)?.renders ?? []).slice(0, 4);
+  const allRenders = (query.data as { renders?: RenderRow[] } | undefined)?.renders ?? [];
+  const renders = allRenders.slice(0, 4);
   const active = renders.find((render) => render.id === watching);
   useEffect(() => {
     if (active && (active.status === "done" || active.status === "failed")) {
-      if (active.status === "done") toast.success("Your video is ready to download");
+      if (active.status === "done") toast.success(platform ? "Export finished: ready to publish" : "Your video is ready to download");
       setWatching(null);
     }
   }, [active?.status]);
-  if (!composition) return null;
   const ending = composition.tracks.flatMap((track) => (track.kind === "visual" ? track.clips : [])).find((clip) => isCrewcutEnding(clip)) ?? null;
   const toggleEnding = (on: boolean) => {
     if (!on && ending) return void run("Remove the Crewcut ending", [{ op: "delete-clips", clipIds: [ending.id] }]);
@@ -397,6 +411,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       setStarting(false);
     }
   };
+  const flow = usePublishFlow({ videoId, composition, platform, renders: allRenders, exporting: starting || Boolean(watching), startExport: () => void start() });
   const download = async (renderId: string) => {
     try {
       const { url } = (await callAction("get-render-link" as never, { videoId, renderId, download: true } as never)) as { url: string };
@@ -409,19 +424,27 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Export video"
+      title={platform ? `Publish to ${PUBLISH_PLATFORMS[platform]?.label ?? ""}` : "Export video"}
       footer={
+        platform ? (
+          <PublishFooter flow={flow} onBack={() => (flow.reset(), onPlatformChange(null))} />
+        ) : (
         <>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Close
           </Button>
+          <PublishButton onChoose={onPlatformChange} size="default" />
           <Button onClick={() => void start()} disabled={starting || Boolean(watching)} className="pc-press">
             {starting || watching ? <IconLoader2 className="size-4 motion-safe:animate-spin" /> : <IconUpload className="size-4" />}
             {watching ? "Exporting…" : "Export"}
           </Button>
         </>
+        )
       }
     >
+      {platform ? (
+        <PublishBody flow={flow} composition={composition} version={version} />
+      ) : (
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-3 gap-2 rounded-ds-md bg-ds-surface-2 p-3 text-center">
           {[
@@ -479,6 +502,7 @@ export function ExportDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           </div>
         ) : null}
       </div>
+      )}
     </Dialog>
   );
 }
@@ -506,8 +530,10 @@ function RightPanel({ className }: { className?: string }) {
   );
 }
 
-function TopBar({ onExport, onInspector, compact, short }: { onExport: () => void; onInspector?: () => void; compact?: boolean; short?: boolean }) {
+function TopBar({ onExport, onPublish, onInspector, compact, short }: { onExport: () => void; onPublish: (platform: PublishPlatform) => void; onInspector?: () => void; compact?: boolean; short?: boolean }) {
   const videoId = useEditor((state) => state.videoId);
+  const title = useEditor((state) => state.composition?.title ?? "");
+  const [shareOpen, setShareOpen] = useState(false);
   return (
     <header className={cn("flex shrink-0 items-center gap-2 px-3", short ? "h-12" : "h-14")}>
       <Link to="/projects" className="pc-press flex size-8 shrink-0 items-center justify-center rounded-ds-sm text-ds-text-2 hover:bg-ds-surface-3 hover:text-ds-text" aria-label="Back to projects">
@@ -521,21 +547,16 @@ function TopBar({ onExport, onInspector, compact, short }: { onExport: () => voi
             <IconGitBranch className="size-4" /> Pipeline
           </Link>
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="pc-press hidden sm:inline-flex"
-          onClick={() => {
-            void navigator.clipboard?.writeText(window.location.href).then(() => toast.success("Editor link copied"));
-          }}
-        >
+        <Button variant="outline" size="sm" className="pc-press hidden sm:inline-flex" onClick={() => setShareOpen(true)}>
           <IconLink className="size-4" /> {compact ? null : "Share"}
         </Button>
+        <ShareDialog open={shareOpen} onOpenChange={setShareOpen} videoId={videoId} title={title} />
         {onInspector ? (
           <IconButton label="Properties" variant="soft" onClick={onInspector}>
             <IconAdjustmentsHorizontal />
           </IconButton>
         ) : null}
+        <PublishButton onChoose={onPublish} className="hidden md:inline-flex" />
         <Button size="sm" onClick={onExport} className="pc-press">
           <IconUpload className="size-4" /> Export
         </Button>
@@ -548,7 +569,7 @@ function TopBar({ onExport, onInspector, compact, short }: { onExport: () => voi
 
 export function EditorPage({ videoId }: { videoId: string }) {
   const layout = useLayout();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const query = useActionQuery("get-composition", { videoId } as never);
   const composition = useEditor((state) => state.composition);
   const loadedFor = useEditor((state) => state.videoId);
@@ -556,6 +577,29 @@ export function EditorPage({ videoId }: { videoId: string }) {
   const timeline = useTimelineSizing();
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [publishTo, setPublishTo] = useState<PublishPlatform | null>(null);
+  const openExport = () => (setPublishTo(null), setExportOpen(true));
+  const openPublish = (platform: PublishPlatform) => (setPublishTo(platform), setExportOpen(true));
+  // Back from connecting YouTube: carry on to publishing.
+  useEffect(() => {
+    const connected = params.get("connected");
+    const error = params.get("error");
+    if (!connected && !error) return;
+    if (connected && connected in PUBLISH_PLATFORMS) {
+      toast.success(`${PUBLISH_PLATFORMS[connected]?.label} connected`);
+      openPublish(connected);
+    }
+    if (error) toast.error(error);
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("connected");
+        next.delete("error");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [params]);
   useEditorKeys();
   usePublishSelection();
 
@@ -610,8 +654,8 @@ export function EditorPage({ videoId }: { videoId: string }) {
   if (layout === "phone") {
     return (
       <>
-        <MobileEditor onExport={() => setExportOpen(true)} />
-        <ExportDialog open={exportOpen} onOpenChange={setExportOpen} />
+        <MobileEditor onExport={openExport} />
+        <ExportDialog open={exportOpen} onOpenChange={setExportOpen} platform={publishTo} onPlatformChange={setPublishTo} />
       </>
     );
   }
@@ -650,7 +694,7 @@ export function EditorPage({ videoId }: { videoId: string }) {
   const tablet = layout === "tablet";
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col bg-ds-bg">
-      <TopBar onExport={() => setExportOpen(true)} {...(tablet ? { onInspector: () => setInspectorOpen(true) } : {})} compact={tablet} short={timeline.compact} />
+      <TopBar onExport={openExport} onPublish={openPublish} {...(tablet ? { onInspector: () => setInspectorOpen(true) } : {})} compact={tablet} short={timeline.compact} />
       <div className={cn("flex min-h-0 flex-1", timeline.compact ? "gap-1.5 px-1.5" : "gap-2 px-2")}>
         <div className="relative flex min-h-0">
           <LeftPanel className={cn("ds-panel h-full", tablet && leftOpen && "absolute inset-y-0 left-0 z-40 shadow-[var(--ds-shadow-lg)]")} />
@@ -673,7 +717,7 @@ export function EditorPage({ videoId }: { videoId: string }) {
           </SheetContent>
         </Sheet>
       ) : null}
-      <ExportDialog open={exportOpen} onOpenChange={setExportOpen} />
+      <ExportDialog open={exportOpen} onOpenChange={setExportOpen} platform={publishTo} onPlatformChange={setPublishTo} />
     </div>
   );
 }

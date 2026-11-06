@@ -76,7 +76,7 @@ export function ConnectionsPage() {
         ) : data.accounts.length === 0 ? (
           <p className="text-[13px] text-muted-foreground">
             No accounts yet.{" "}
-            {data.youtubeConfigured ? "Connect YouTube to publish privately and read analytics." : import.meta.env.DEV ? "Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in apps/studio/.env to connect YouTube." : "Whoever runs this Crewcut server needs to turn on YouTube first."}
+            {data.youtubeConfigured ? "Connect YouTube to publish privately and read analytics." : import.meta.env.DEV ? "Developer note: set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in apps/studio/.env to connect YouTube." : "YouTube isn't available here yet. It's on our side; nothing for you to set up."}
           </p>
         ) : (
           <ul className="flex flex-col gap-3">

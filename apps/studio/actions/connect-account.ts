@@ -30,7 +30,9 @@ export default defineAction({
     const who = requireHuman(ctx, "Connecting an account");
     const client = youtubeOAuthClient(allowedOrigin(origin));
     if (!client) {
-      return { configured: false, message: "Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET (a Google Cloud OAuth client with the YouTube Data and Analytics APIs) to enable YouTube." };
+      // Server setup (YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET: a Google Cloud OAuth client with the
+      // YouTube Data and Analytics APIs) is the operator's job, never the person's: tell them plainly.
+      return { configured: false, message: "YouTube isn't available on this Crewcut yet. It's on our side, not yours; please try again later." };
     }
     const { verifier, challenge } = await pkcePair();
     const nonce = randomToken(16);
