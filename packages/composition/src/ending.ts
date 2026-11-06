@@ -48,25 +48,23 @@ export function crewcutEndingStartMs(composition: Composition): number {
 
 const kf = (atMs: number, value: number, easing: EasingSpec = "move"): Keyframe => ({ atMs, value, easing });
 
-/** The ending clip for a frame size, starting at `startMs` (layout follows the frame's shape). */
+/** The ending clip for a frame size, starting at `startMs`: the side-by-side lockup, centred. */
 export function crewcutEndingClip(composition: Pick<Composition, "width" | "height">, startMs: number, id = "crewcut-ending"): VisualClip {
   const short = Math.min(composition.width, composition.height);
-  // Design px are measured against a 1080 short side (as text sizes are).
+  // Design px are measured against a 1080 short side (as text sizes are), so the
+  // lockup is the same size relative to the frame's short side in every ratio.
   const designW = (1080 * composition.width) / short;
   const designH = (1080 * composition.height) / short;
-  const portrait = composition.height > composition.width * 1.1;
-  const landscape = composition.width > composition.height * 1.1;
 
-  const font = portrait ? 150 : landscape ? 150 : 124;
-  const mark = portrait ? 420 : Math.round(font * 1.87);
-  const gap = Math.round(font * 0.47);
+  const font = 84;
+  const mark = Math.round(font * 1.87);
+  // The C's box has empty space on its open side, so the gap is tighter than it looks.
+  const gap = Math.round(font * 0.28);
   const wordWidth = font * 3.55;
-  // Stacked on tall frames; a side-by-side lockup (the logo sheet's) elsewhere.
-  const markX = portrait ? 50 : (((designW - (mark + gap + wordWidth)) / 2 + mark / 2) / designW) * 100;
-  const markY = portrait ? 43 : 50;
-  const wordX = portrait ? 50 : (((designW - (mark + gap + wordWidth)) / 2 + mark + gap) / designW) * 100;
-  const wordY = portrait ? markY + ((mark / 2 + 130) / designH) * 100 : 50;
-  const box = { x: markX, y: markY, width: (mark / designW) * 100, height: (mark / designH) * 100 };
+  const left = (designW - (mark + gap + wordWidth)) / 2;
+  const markX = ((left + mark / 2) / designW) * 100;
+  const wordX = ((left + mark + gap) / designW) * 100;
+  const box = { x: markX, y: 50, width: (mark / designW) * 100, height: (mark / designH) * 100 };
 
   const slipAt = 760;
   const slip = (share: number): Keyframe[] => [kf(slipAt, 0, "hold"), kf(slipAt + 560, Math.round(mark * share * 10) / 10, "spring-snappy")];
@@ -103,8 +101,8 @@ export function crewcutEndingClip(composition: Pick<Composition, "width" | "heig
       name: "Wordmark",
       text: "crewcut",
       startMs: 880,
-      style: { font: "Geist", size: font, weight: 600, color: PAPER, align: portrait ? "center" : "left", tracking: -0.045, leading: 1, maxWidth: 90 },
-      transform: { x: wordX, y: wordY, anchorX: portrait ? 0.5 : 0, anchorY: 0.5 },
+      style: { font: "Geist", size: font, weight: 600, color: PAPER, align: "left", tracking: -0.045, leading: 1, maxWidth: 90 },
+      transform: { x: wordX, y: 50, anchorX: 0, anchorY: 0.5 },
       animation: { unit: "char", preset: "mask-rise", delayMs: 0, staggerMs: 34, durationMs: 560, easing: "spring-smooth" },
     } as LayerInput,
   ];
