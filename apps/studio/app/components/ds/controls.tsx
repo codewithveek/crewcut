@@ -509,7 +509,7 @@ export function Select({ value, onChange, options, label, className, size = "md"
 
 // ── Colour ──────────────────────────────────────────────────────────────────
 
-export const SWATCHES = ["#ffffff", "#000000", "#15171d", "#f3f3f6", "#5b4bef", "#8b7bff", "#ff5d5d", "#f97316", "#ffd400", "#3ccf7f", "#0f97ad", "#2b7de9", "#b546c9", "#ff8fab"];
+export const SWATCHES = ["#ffffff", "#000000", "#15171d", "#f3f3f6", "#ff5b2e", "#f5f3ee", "#ff4d6a", "#f97316", "#ffd400", "#3ccf7f", "#0f97ad", "#2b7de9", "#b546c9", "#ff8fab"];
 
 export function ColorField({ value, onChange, label, swatches = SWATCHES, allowNone }: { value: string | undefined; onChange: (value: string | null) => void; label: string; swatches?: readonly string[]; allowNone?: boolean }) {
   const [open, setOpen] = useState(false);

@@ -14,7 +14,7 @@
  * Reference page: /design.
  */
 :root {
-  /* Neutral cool canvas, white panels, ink-black primary actions, one violet brand accent. */
+  /* Neutral cool canvas, white panels, ink-black primary actions, one orange brand accent (the logo's cut). */
   --background: 220 14% 95%;
   --foreground: 224 15% 10%;
   --card: 0 0% 100%;
@@ -33,7 +33,7 @@
   --destructive-foreground: 0 0% 100%;
   --border: 220 13% 89%;
   --input: 220 13% 86%;
-  --ring: 248 84% 61%;
+  --ring: 15 88% 42%;
   --radius: 0.75rem;
   --sidebar-background: 0 0% 100%;
   --sidebar-foreground: 220 9% 40%;
@@ -42,7 +42,7 @@
   --sidebar-accent: 220 14% 94%;
   --sidebar-accent-foreground: 224 15% 10%;
   --sidebar-border: 220 13% 90%;
-  --sidebar-ring: 248 84% 61%;
+  --sidebar-ring: 15 88% 42%;
 
   /* Surfaces */
   --ds-bg: #eff1f4;
@@ -60,19 +60,19 @@
   --ds-border: #dfe3e8;
   --ds-hairline: rgb(17 20 28 / 0.08);
   /* Brand + semantic */
-  --ds-accent: #5b4bef;
-  --ds-accent-soft: rgb(91 75 239 / 0.12);
+  --ds-accent: #c93c0d; /* the logo orange, deepened so text and white labels stay readable on light surfaces */
+  --ds-accent-soft: rgb(201 60 13 / 0.1);
   --ds-on-accent: #ffffff;
   --ds-success: #1e9e5a;
   --ds-warning: #b97a07;
-  --ds-danger: #d83a3a;
+  --ds-danger: #d9294a; /* crimson, kept clear of the orange accent */
   --ds-info: #2b7de9;
   /* Timeline clip colours (white text sits on every one, both themes) */
   --clip-media: #3a4150;
   --clip-graphic: #6a55e8;
   --clip-text: #0f97ad;
   --clip-caption: #2b7de9;
-  --clip-voice: #e0534f;
+  --clip-voice: #d6457a;
   --clip-music: #1f9a66;
   --clip-sfx: #c98a12;
   --clip-effect: #b546c9;
@@ -321,7 +321,7 @@
   --destructive-foreground: 0 0% 98%;
   --border: 240 5% 16%;
   --input: 240 5% 20%;
-  --ring: 248 100% 72%;
+  --ring: 13 100% 59%;
   --sidebar-background: 240 6% 6%;
   --sidebar-foreground: 240 5% 62%;
   --sidebar-primary: 240 5% 96%;
@@ -329,7 +329,7 @@
   --sidebar-accent: 240 5% 13%;
   --sidebar-accent-foreground: 240 5% 96%;
   --sidebar-border: 240 5% 13%;
-  --sidebar-ring: 248 100% 72%;
+  --sidebar-ring: 13 100% 59%;
 
   --ds-bg: #09090b;
   --ds-surface: #131316;
@@ -343,18 +343,18 @@
   --ds-text-3: #71717a;
   --ds-border: #26262b;
   --ds-hairline: rgb(255 255 255 / 0.07);
-  --ds-accent: #8b7bff;
-  --ds-accent-soft: rgb(139 123 255 / 0.16);
-  --ds-on-accent: #0d0a1f;
+  --ds-accent: #ff5b2e; /* the logo orange; ink labels on it */
+  --ds-accent-soft: rgb(255 91 46 / 0.15);
+  --ds-on-accent: #0d0d0f;
   --ds-success: #3ccf7f;
   --ds-warning: #f2b13c;
-  --ds-danger: #ff5d5d;
+  --ds-danger: #ff4d6a;
   --ds-info: #5ea2ff;
   --clip-media: #2c3140;
   --clip-graphic: #5b48d6;
   --clip-text: #0d8597;
   --clip-caption: #2a6fd0;
-  --clip-voice: #c9433f;
+  --clip-voice: #b8396b;
   --clip-music: #1a8659;
   --clip-sfx: #b07812;
   --clip-effect: #9c3bb0;

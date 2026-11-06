@@ -188,7 +188,7 @@ export function DesignPage() {
   const [scale, setScale] = useState(100);
   const [x, setX] = useState(50);
   const [blend, setBlend] = useState("normal");
-  const [color, setColor] = useState<string | undefined>("#5b4bef");
+  const [color, setColor] = useState<string | undefined>("#ff5b2e");
   const [title, setTitle] = useState("Why good motion feels physical");
   const [section, setSection] = useState(true);
   const [dialog, setDialog] = useState(false);

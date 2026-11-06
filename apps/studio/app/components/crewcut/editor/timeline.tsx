@@ -454,7 +454,7 @@ function CutButton({ left, transition, size, onOpen }: { left: number; transitio
       }}
       className={cn(
         "pc-press absolute top-1/2 z-[5] flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[5px] shadow-[0_0_0_1.5px_var(--ds-surface),0_1px_3px_rgb(0_0_0/0.35)] outline-none focus-visible:ring-2 focus-visible:ring-ds-accent",
-        transition ? "bg-white text-black hover:bg-ds-accent hover:text-white" : "bg-black/60 text-white hover:bg-white hover:text-black",
+        transition ? "bg-white text-black hover:bg-ds-accent hover:text-ds-on-accent" : "bg-black/60 text-white hover:bg-white hover:text-black",
       )}
       style={{ left, width: size, height: size }}
     >
