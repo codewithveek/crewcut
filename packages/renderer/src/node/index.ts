@@ -118,6 +118,8 @@ export async function renderFrame(request: {
   outputPath: string;
   browserExecutable?: string | null;
   bundleDir?: string;
+  /** Output scale (0.25 = quarter size): contact sheets and thumbnails. */
+  scale?: number;
 }): Promise<string> {
   const { renderStill, selectComposition } = await import("@remotion/renderer");
   const serveUrl = await bundleRenderer(request.bundleDir ? { outDir: request.bundleDir } : {});
@@ -131,6 +133,7 @@ export async function renderFrame(request: {
     frame: Math.min(composition.durationInFrames - 1, Math.max(0, Math.round((request.atMs / 1000) * composition.fps))),
     output: request.outputPath,
     imageFormat: "png",
+    ...(request.scale ? { scale: request.scale } : {}),
     browserExecutable: request.browserExecutable ?? null,
     logLevel: "error",
   });

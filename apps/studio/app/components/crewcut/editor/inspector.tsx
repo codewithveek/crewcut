@@ -88,6 +88,7 @@ import { errorMessage, formatAgo } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
 import { FILTER_SAMPLE } from "./left-panel";
+import { ReplaceMediaDialog } from "./replace-media";
 import { type Selection, applyFilter, applyMotion, copySelection, deleteSelection, describeSelection, duplicateSelection, setFormat, transformOps } from "./commands";
 import { LayerMenu } from "./context-menus";
 import { askEditorAgent } from "./assistant";
@@ -254,8 +255,24 @@ function TransformSections({ composition, clip, layer }: { composition: Composit
 }
 
 function MediaSection({ clip, layer }: { clip: VisualClip; layer: Extract<Layer, { type: "image" | "video" }> }) {
+  const [replacing, setReplacing] = useState(false);
+  const assetUrls = useEditor((state) => state.assetUrls);
+  const src = layer.src.startsWith("asset:") ? (assetUrls[layer.src.slice(6)] ?? "") : layer.src;
+  const slotLabel = layer.slot ? (layer.name ?? layer.slot) : undefined;
   return (
     <Section title={layer.type === "video" ? "Video" : "Image"}>
+      <div className="flex items-center gap-3">
+        <span className="block size-14 shrink-0 overflow-hidden rounded-ds-sm bg-ds-surface-2 shadow-[0_0_0_1px_var(--ds-hairline)]">
+          {src ? layer.type === "image" ? <img src={src} alt="" className="h-full w-full object-cover" /> : <video src={src} muted preload="metadata" className="h-full w-full object-cover" /> : null}
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          {layer.slot ? <span className="truncate text-[11px] text-ds-text-3">Template spot · {slotLabel}</span> : null}
+          <Button size="sm" variant="outline" className="pc-press self-start" onClick={() => setReplacing(true)}>
+            {layer.type === "image" ? "Replace photo" : "Replace video"}
+          </Button>
+        </div>
+      </div>
+      <ReplaceMediaDialog open={replacing} onOpenChange={setReplacing} target={{ clipId: clip.id, layerId: layer.id }} kind={layer.type} slotLabel={slotLabel} />
       <FieldRow label="Fit">
         <Segmented ariaLabel="Fit" size="sm" value={layer.fit} onChange={(fit) => commit(fit === "cover" ? "Fill frame" : "Fit frame", [{ op: "update-layer", clipId: clip.id, layerId: layer.id, patch: { fit } }])} options={[{ value: "contain", label: "Fit" }, { value: "cover", label: "Fill" }]} />
       </FieldRow>

@@ -6,6 +6,7 @@ import {
   IconPhoto,
   IconPlugConnected,
   IconSettings,
+  IconTemplate,
 } from "@tabler/icons-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
@@ -24,6 +25,7 @@ export interface NavItem {
 export const PRIMARY_NAV: readonly NavItem[] = [
   { to: HOME_PATH, label: "Home", title: "Home", icon: IconHome, match: (path) => path === HOME_PATH || path === "/" },
   { to: "/projects", label: "Projects", title: "Projects", icon: IconFolder, match: (path) => path.startsWith("/projects") || path.startsWith("/videos/") },
+  { to: "/templates", label: "Templates", title: "Templates", icon: IconTemplate, match: (path) => path.startsWith("/templates") },
   { to: "/assets", label: "Assets", title: "Assets", icon: IconPhoto, match: (path) => path.startsWith("/assets") },
   { to: NEW_CHAT_PATH, label: "Chats", title: "Chats with the agent", icon: IconMessageCircle, match: isChatPathname },
   { to: "/connections", label: "Connect", title: "Connections", icon: IconPlugConnected, match: (path) => path.startsWith("/connections") },
@@ -45,6 +47,7 @@ export function isCrewcutPage(pathname: string): boolean {
     pathname === HOME_PATH ||
     pathname.startsWith("/projects") ||
     pathname.startsWith("/assets") ||
+    pathname.startsWith("/templates") ||
     pathname.startsWith("/design") ||
     pathname.startsWith("/connections") ||
     (pathname.startsWith("/videos/") && !isEditorPath(pathname))

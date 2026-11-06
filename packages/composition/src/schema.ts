@@ -226,6 +226,8 @@ const layerBaseShape = {
   locked: z.boolean().default(false),
   /** Claim ids (from the script) that this layer shows on screen. */
   claimIds: z.array(z.string()).default([]),
+  /** Template slot this layer fills ("photo-1", "headline"): the editor offers Replace and the agent fills it by id. */
+  slot: z.string().max(40).optional(),
 };
 
 export const textAnimationSchema = z.object({

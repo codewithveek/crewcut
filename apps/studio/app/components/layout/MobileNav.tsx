@@ -1,4 +1,4 @@
-import { IconChevronLeft, IconChevronRight, IconDots, IconFlask2, IconFolder, IconHome, IconPhoto, IconPlus, IconSparkles } from "@tabler/icons-react";
+import { IconChevronLeft, IconChevronRight, IconDots, IconFlask2, IconFolder, IconHome, IconPlus, IconSparkles, IconTemplate } from "@tabler/icons-react";
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
@@ -61,8 +61,12 @@ export function MobileNav() {
   const [moreOpen, setMoreOpen] = useState(false);
   const theme = useThemeToggle();
   const demo = useLoadDemo();
-  const [home, projects, assets] = PRIMARY_NAV;
-  const moreItems = [...PRIMARY_NAV.slice(3), ...SECONDARY_NAV];
+  // Picked by path, not position: the bar holds Home, Projects, Create, Templates; the rest live under More.
+  const byPath = (to: string) => PRIMARY_NAV.find((item) => item.to === to);
+  const home = byPath(HOME_PATH);
+  const projects = byPath("/projects");
+  const templates = byPath("/templates");
+  const moreItems = [...PRIMARY_NAV.filter((item) => item !== home && item !== projects && item !== templates), ...SECONDARY_NAV];
   const moreActive = moreItems.some((item) => item.match(pathname));
 
   return (
@@ -82,7 +86,7 @@ export function MobileNav() {
           >
             <IconPlus className="size-6" strokeWidth={2.2} />
           </button>
-          {assets ? <NavButton to={assets.to} label="Assets" icon={IconPhoto} active={assets.match(pathname)} /> : null}
+          {templates ? <NavButton to={templates.to} label="Templates" icon={IconTemplate} active={templates.match(pathname)} /> : null}
           <button
             type="button"
             aria-label="More"
@@ -113,6 +117,15 @@ export function MobileNav() {
           <CreateProjectForm autoFocus={false} onDone={() => setCreateOpen(false)} />
         ) : (
           <div className="flex flex-col gap-1">
+            <SheetRow
+              icon={<IconTemplate />}
+              title="Start from a template"
+              hint="Designed videos: swap in your words and photos"
+              onClick={() => {
+                setCreateOpen(false);
+                navigate("/templates");
+              }}
+            />
             <SheetRow icon={<IconPlus />} title="Blank project" hint="Pick a format and edit by hand" onClick={() => setBlank(true)} />
             <SheetRow
               icon={<IconSparkles />}

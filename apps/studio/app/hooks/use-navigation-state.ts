@@ -82,6 +82,7 @@ function viewForPath(pathname: string): string {
   if (pathname.startsWith("/connections")) return "connections";
   if (pathname.startsWith("/projects")) return "projects";
   if (pathname.startsWith("/assets")) return "assets";
+  if (pathname.startsWith("/templates")) return "templates";
   if (pathname.startsWith("/design")) return "design";
   if (isChatPathname(pathname)) return "chat";
   if (pathname === HOME_PATH) return "home";
@@ -107,6 +108,8 @@ function pathForView(view?: string, videoId?: string): string {
       return "/projects";
     case "assets":
       return "/assets";
+    case "templates":
+      return "/templates";
     case "chat":
     case "ask":
       return NEW_CHAT_PATH;

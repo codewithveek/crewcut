@@ -56,7 +56,8 @@
     "@remotion/player": "4.0.536",
     "remotion": "4.0.536",
     "@fontsource-variable/geist": "5.3.0",
-    "@fontsource-variable/geist-mono": "5.3.0"
+    "@fontsource-variable/geist-mono": "5.3.0",
+    "@crewcut/stock": "workspace:*"
   },
   "devDependencies": {
     "@radix-ui/react-accordion": "^1.2.12",

@@ -42,6 +42,9 @@ importers:
       '@crewcut/renderer':
         specifier: workspace:*
         version: link:../../packages/renderer
+      '@crewcut/stock':
+        specifier: workspace:*
+        version: link:../../packages/stock
       '@remotion/bundler':
         specifier: 4.0.536
         version: 4.0.536(postcss@8.5.32)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -121,6 +124,9 @@ importers:
       '@crewcut/renderer':
         specifier: workspace:*
         version: link:../../packages/renderer
+      '@crewcut/stock':
+        specifier: workspace:*
+        version: link:../../packages/stock
       '@crewcut/voice':
         specifier: workspace:*
         version: link:../../packages/voice
@@ -422,6 +428,12 @@ importers:
       '@crewcut/motion':
         specifier: workspace:*
         version: link:../motion
+      '@fontsource-variable/bricolage-grotesque':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource-variable/caveat':
+        specifier: 5.3.0
+        version: 5.3.0
       '@fontsource-variable/dm-sans':
         specifier: 5.3.0
         version: 5.3.0
@@ -443,10 +455,19 @@ importers:
       '@fontsource-variable/jetbrains-mono':
         specifier: 5.3.0
         version: 5.3.0
+      '@fontsource-variable/playfair-display':
+        specifier: 5.3.0
+        version: 5.3.0
       '@fontsource-variable/plus-jakarta-sans':
         specifier: 5.3.0
         version: 5.3.0
       '@fontsource-variable/space-grotesk':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource-variable/syne':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/anton':
         specifier: 5.3.0
         version: 5.3.0
       '@fontsource/instrument-serif':
@@ -480,6 +501,8 @@ importers:
       react-dom:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
+
+  packages/stock: {}
 
   packages/voice:
     dependencies:
@@ -1269,6 +1292,12 @@ packages:
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
 
+  '@fontsource-variable/bricolage-grotesque@5.3.0':
+    resolution: {integrity: sha512-TLi9Q4hJjS2UvoTMRSS2nHu6c4R56lAw60NR9QYtVRCHn0XtsFpiEhNffZ8Glsoxu6wEEwLKBP8lb94J52PNBA==}
+
+  '@fontsource-variable/caveat@5.3.0':
+    resolution: {integrity: sha512-Q3mjghoYIlXgwqBPJKZ4q6f3zu921Gq7UU76r9Z+NAmhapHfX130GIFpOCYf8vt2SIcgCi9RHDT7anfJKg/kiA==}
+
   '@fontsource-variable/dm-sans@5.3.0':
     resolution: {integrity: sha512-BpUG5bqePiDFMBM4ZtLSlPdAIOM990uB1dlXzIf4aw21yQR7BmykedLXXXMqGWsR18aMLOsbWccwJNh3ztTQaA==}
 
@@ -1290,11 +1319,20 @@ packages:
   '@fontsource-variable/jetbrains-mono@5.3.0':
     resolution: {integrity: sha512-F32xpS2NsGYoQi2ADSkKTgpJj7ozajsGgDJ8woTnqjmIB+dxDIqImjl4pXZVEExu8UFZ2ndhmX18EBS/hdz3Lw==}
 
+  '@fontsource-variable/playfair-display@5.3.0':
+    resolution: {integrity: sha512-IHdzTvE8eGIXHteZql7KXoqdc3Gfm+Zs1u4XlSC3MeplkwviT3sx/P6gI0tLwg/xIYLF4ZJYveZ5V+bl9cnDwA==}
+
   '@fontsource-variable/plus-jakarta-sans@5.3.0':
     resolution: {integrity: sha512-/l/4r0yyWK9JzAlmA0LiYgGgmJe/Gswt4jTJEzr5QhJfwMbvJZDmYWyW0M4X7yCK69BajMVlV/Lx8g7WDc1+sw==}
 
   '@fontsource-variable/space-grotesk@5.3.0':
     resolution: {integrity: sha512-2IxmvfB08i9vnGB3Ym/AXvhRE+8XOjWMXIyDum03c+tPwH0FUoMNQfGpU8NXPxjbws0Vvss3AH0Zqt4oJBBAdw==}
+
+  '@fontsource-variable/syne@5.3.0':
+    resolution: {integrity: sha512-GUNH65fUfWHQcX7bO0BGgScE465gawpTId45aDfhHcVj/upbb6b+2d++5keKP128vK8+LtE4dvLkKTsxoh7TwA==}
+
+  '@fontsource/anton@5.3.0':
+    resolution: {integrity: sha512-OR1D5n124n2XRs66SbX7IjcOSptljEJE8FcDNnlni2y1/M6KpTx7cU2PIWzTSsBj4WFkHPw24On8qw3qkQZuTw==}
 
   '@fontsource/instrument-serif@5.3.0':
     resolution: {integrity: sha512-mDiaIg0u67sYV59fie92Wz4sM8UiVlbL7fLxnFPCKkX15DMASEnQTREbaP5S5/3DCcsoAOcQ0sV9E4AeY4QqYQ==}
@@ -7140,6 +7178,10 @@ snapshots:
 
   '@floating-ui/utils@0.2.12': {}
 
+  '@fontsource-variable/bricolage-grotesque@5.3.0': {}
+
+  '@fontsource-variable/caveat@5.3.0': {}
+
   '@fontsource-variable/dm-sans@5.3.0': {}
 
   '@fontsource-variable/fraunces@5.3.0': {}
@@ -7154,9 +7196,15 @@ snapshots:
 
   '@fontsource-variable/jetbrains-mono@5.3.0': {}
 
+  '@fontsource-variable/playfair-display@5.3.0': {}
+
   '@fontsource-variable/plus-jakarta-sans@5.3.0': {}
 
   '@fontsource-variable/space-grotesk@5.3.0': {}
+
+  '@fontsource-variable/syne@5.3.0': {}
+
+  '@fontsource/anton@5.3.0': {}
 
   '@fontsource/instrument-serif@5.3.0': {}
 

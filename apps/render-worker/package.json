@@ -6,7 +6,8 @@
   "scripts": {
     "start": "tsx src/main.ts",
     "render": "tsx src/cli.ts",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "template-stills": "tsx --env-file-if-exists=../studio/.env src/template-stills.ts"
   },
   "dependencies": {
     "@crewcut/composition": "workspace:*",
@@ -18,7 +19,8 @@
     "react-dom": "19.3.1",
     "postgres": "^3.4.9",
     "zod": "^4.4.3",
-    "@crewcut/pipeline": "workspace:*"
+    "@crewcut/pipeline": "workspace:*",
+    "@crewcut/stock": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.2.14"

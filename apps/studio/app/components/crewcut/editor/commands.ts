@@ -246,6 +246,23 @@ export interface AssetLike {
   url: string;
 }
 
+/**
+ * Swaps the photo or video inside a layer and keeps everything else: position,
+ * crop, motion, grade and its template slot. Photos replace photos, videos replace videos.
+ */
+export async function replaceLayerMedia(target: { clipId: string; layerId: string }, asset: AssetLike): Promise<boolean> {
+  const composition = state().composition;
+  const location = composition ? findClip(composition, target.clipId) : null;
+  const found = location && "layers" in location.clip ? findLayer(location.clip, target.layerId) : null;
+  if (!found || (found.layer.type !== "image" && found.layer.type !== "video")) return false;
+  if (asset.mediaType !== found.layer.type) {
+    toast.message(found.layer.type === "image" ? "That's a video. Drop a photo onto a photo, or drop the video elsewhere to add it." : "That's a photo. Drop a video onto a video, or drop the photo elsewhere to add it.");
+    return false;
+  }
+  state().mergeAssetUrls({ [asset.id]: asset.url });
+  return run(found.layer.type === "image" ? "Replace photo" : "Replace video", [{ op: "update-layer", clipId: target.clipId, layerId: target.layerId, patch: { src: `asset:${asset.id}`, alt: asset.label.slice(0, 200) } }]);
+}
+
 export async function addMediaAt(asset: AssetLike, atMs = playhead(), options: { trackId?: string; mode?: "auto" | "overlay" } = {}): Promise<void> {
   state().mergeAssetUrls({ [asset.id]: asset.url });
   const media: MediaRef = { assetId: asset.id, mediaType: asset.mediaType, label: asset.label, ...(asset.durationMs ? { durationMs: asset.durationMs } : {}), ...(asset.kind ? { kind: asset.kind } : {}) };

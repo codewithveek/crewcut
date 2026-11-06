@@ -25,15 +25,17 @@ import {
   IconPlayerSkipForward,
 } from "@tabler/icons-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { ContextMenu, ContextMenuTrigger, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, IconButton } from "@/components/ds";
+import { errorMessage } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
-import { currentSelection, describeSelection, setFormat, transformOps } from "./commands";
+import { currentSelection, describeSelection, replaceLayerMedia, setFormat, transformOps } from "./commands";
 import { LayerMenu } from "./context-menus";
 import { dropFiles, dropPayload } from "./drop";
 import { useEditor } from "./editor-store";
-import { dragPayload, hasFiles, isCrewcutDrag } from "./media";
+import { dragPayload, hasFiles, isCrewcutDrag, uploadMedia } from "./media";
 
 /**
  * The live preview is the exact component the render worker draws, so what
@@ -100,6 +102,14 @@ function captionAtPoint(stage: HTMLElement, x: number, y: number): string | null
     if (x >= rect.left - 6 && x <= rect.right + 6 && y >= rect.top - 6 && y <= rect.bottom + 6) return element.dataset.captionBox ?? null;
   }
   return null;
+}
+
+/** "image" / "video" when the hit layer holds media (drop-to-replace), else null. */
+function mediaLayerAt(hit: { clipId: string; layerId: string }): "image" | "video" | null {
+  const composition = useEditor.getState().composition;
+  const location = composition ? findClip(composition, hit.clipId) : null;
+  const found = location && "layers" in location.clip ? findLayer(location.clip, hit.layerId) : null;
+  return found && (found.layer.type === "image" || found.layer.type === "video") ? found.layer.type : null;
 }
 
 function layerAtPoint(stage: HTMLElement, x: number, y: number): { clipId: string; layerId: string } | null {
@@ -462,11 +472,29 @@ export function PreviewStage({ className, interactive = true, playerRefOut }: { 
     event.preventDefault();
     setDropping(false);
     const atMs = useEditor.getState().playheadMs;
+    const stage = stageRef.current;
+    const hit = stage ? layerAtPoint(stage, event.clientX, event.clientY) : null;
+    const hitLayer = hit ? mediaLayerAt(hit) : null;
     if (hasFiles(event)) {
+      const file = event.dataTransfer.files[0];
+      // One photo/video dropped onto a photo/video swaps it (template spots); anything else adds media.
+      if (hit && hitLayer && event.dataTransfer.files.length === 1 && file && file.type.startsWith(hitLayer === "image" ? "image/" : "video/")) {
+        try {
+          const asset = await uploadMedia(file, { videoId: useEditor.getState().videoId });
+          await replaceLayerMedia(hit, asset);
+        } catch (error) {
+          toast.error(errorMessage(error));
+        }
+        return;
+      }
       await dropFiles(event.dataTransfer.files, { atMs, surface: "preview" });
       return;
     }
     const payload = dragPayload(event);
+    if (payload?.type === "asset" && hit && hitLayer && payload.asset.mediaType === hitLayer) {
+      await replaceLayerMedia(hit, payload.asset);
+      return;
+    }
     if (payload) await dropPayload(payload, { atMs, surface: "preview" });
   };
 

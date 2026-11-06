@@ -252,6 +252,7 @@ export function pageSkeletonForPath(pathname: string): ReactNode | null {
   if (path === "/" || path === "/home") return <HomeSkeleton />;
   if (path === "/projects") return <ListPageSkeleton assets={false} />;
   if (path === "/assets") return <ListPageSkeleton assets />;
+  if (path === "/templates") return <ListPageSkeleton assets />;
   if (/^\/videos\/[^/]+$/.test(path)) return <BoardSkeleton />;
   if (/^\/videos\/[^/]+\/proof/.test(path) || path === "/connections") return <PageSkeletonGeneric />;
   return null;

@@ -14,19 +14,24 @@
   "dependencies": {
     "@crewcut/composition": "workspace:*",
     "@crewcut/motion": "workspace:*",
-    "remotion": "4.0.536",
-    "@remotion/fonts": "4.0.536",
-    "@fontsource-variable/inter": "5.3.0",
-    "@fontsource-variable/inter-tight": "5.3.0",
-    "@fontsource-variable/space-grotesk": "5.3.0",
-    "@fontsource-variable/fraunces": "5.3.0",
-    "@fontsource-variable/jetbrains-mono": "5.3.0",
-    "@fontsource-variable/plus-jakarta-sans": "5.3.0",
+    "@fontsource-variable/bricolage-grotesque": "5.3.0",
+    "@fontsource-variable/caveat": "5.3.0",
     "@fontsource-variable/dm-sans": "5.3.0",
-    "@fontsource/instrument-serif": "5.3.0",
+    "@fontsource-variable/fraunces": "5.3.0",
     "@fontsource-variable/geist": "5.3.0",
     "@fontsource-variable/geist-mono": "5.3.0",
-    "lucide-react": "1.59.0"
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource-variable/inter-tight": "5.3.0",
+    "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@fontsource-variable/playfair-display": "5.3.0",
+    "@fontsource-variable/plus-jakarta-sans": "5.3.0",
+    "@fontsource-variable/space-grotesk": "5.3.0",
+    "@fontsource-variable/syne": "5.3.0",
+    "@fontsource/anton": "5.3.0",
+    "@fontsource/instrument-serif": "5.3.0",
+    "@remotion/fonts": "4.0.536",
+    "lucide-react": "1.59.0",
+    "remotion": "4.0.536"
   },
   "peerDependencies": {
     "react": ">=19.2.7",
@@ -35,9 +40,9 @@
   "devDependencies": {
     "@remotion/bundler": "4.0.536",
     "@remotion/renderer": "4.0.536",
-    "react": "19.3.1",
-    "react-dom": "19.3.1",
     "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3"
+    "@types/react-dom": "^19.2.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   }
 }
