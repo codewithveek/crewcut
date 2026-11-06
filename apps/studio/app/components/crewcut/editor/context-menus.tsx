@@ -6,6 +6,8 @@ import {
   type LeafLayer,
   MOTION_PRESETS,
   TEXT_PRESETS,
+  TRANSITION_GROUPS,
+  TRANSITION_GROUP_LABELS,
   TRANSITION_PRESETS,
   type Track,
   type VisualClip,
@@ -122,10 +124,17 @@ function VisualEffectSubs({ clip, layerId }: { clip: VisualClip; layerId?: strin
         <ContextMenuSubTrigger icon={<IconArrowsExchange />}>Transition in</ContextMenuSubTrigger>
         <ContextMenuSubContent>
           <ContextMenuItem onSelect={() => applyTransition(clip.id, null)}>None (cut)</ContextMenuItem>
-          {TRANSITION_PRESETS.filter((preset) => preset.transition.type !== "cut").map((preset) => (
-            <ContextMenuItem key={preset.id} onSelect={() => applyTransition(clip.id, preset.transition)}>
-              {preset.label}
-            </ContextMenuItem>
+          {TRANSITION_GROUPS.map((group) => (
+            <ContextMenuSub key={group}>
+              <ContextMenuSubTrigger>{TRANSITION_GROUP_LABELS[group]}</ContextMenuSubTrigger>
+              <ContextMenuSubContent>
+                {TRANSITION_PRESETS.filter((preset) => preset.group === group && preset.transition.type !== "cut").map((preset) => (
+                  <ContextMenuItem key={preset.id} onSelect={() => applyTransition(clip.id, preset.transition)}>
+                    {preset.label}
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
           ))}
         </ContextMenuSubContent>
       </ContextMenuSub>

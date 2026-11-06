@@ -8,8 +8,13 @@ import {
   SHAPE_ELEMENTS,
   STICKER_ICONS,
   TEXT_PRESETS,
+  TRANSITION_CATALOG,
+  TRANSITION_GROUPS,
+  TRANSITION_GROUP_LABELS,
   TRANSITION_PRESETS,
   type CaptionClip,
+  type TransitionGroup,
+  type TransitionPreset,
   colorFilterCss,
   cssFontStack,
   formatTimecode,
@@ -59,6 +64,7 @@ import { cn } from "@/lib/utils";
 
 import { addCaptionAt, addElementAt, addLibraryAudioAt, addMediaAt, applyFilter, applyMotion, applyTransition, currentSelection, generateCaptionsFromNarration, run, soloLayer } from "./commands";
 import { type LeftTab, useEditor } from "./editor-store";
+import { TransitionThumb } from "./transition-thumb";
 import { ACCEPTED_MEDIA, type AssetDto, type DragPayload, type LibraryItemDto, endDrag, hasFiles, startDrag, uploadMedia, useAssets, useAudioLibrary, useVideoFrames } from "./media";
 
 export const LEFT_TABS: ReadonlyArray<{ id: LeftTab; label: string; icon: typeof IconPhoto }> = [
@@ -765,43 +771,91 @@ export function EffectsTab() {
 
 // ── Transitions ─────────────────────────────────────────────────────────────
 
-function TransitionDemo({ type }: { type: string }) {
-  return (
-    <span className="ds-transition-demo relative block aspect-video w-full overflow-hidden rounded-[6px]" data-type={type}>
-      <span className="absolute inset-0 bg-[#3a3f4f]" />
-      {/* The logo orange, not the theme accent: it's an illustration and should read the same in both themes. */}
-      <span className="ds-transition-b absolute inset-0 bg-[#ff5b2e]" />
-    </span>
-  );
+/** Hover-capable pointer and motion allowed: tiles play on hover; otherwise only the chosen one plays. */
+function usePreviewMode(): { hover: boolean; reduced: boolean } {
+  const [mode, setMode] = useState({ hover: true, reduced: false });
+  useEffect(() => {
+    const hover = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setMode({ hover: hover.matches, reduced: reduced.matches });
+    update();
+    hover.addEventListener("change", update);
+    reduced.addEventListener("change", update);
+    return () => {
+      hover.removeEventListener("change", update);
+      reduced.removeEventListener("change", update);
+    };
+  }, []);
+  return mode;
 }
+
+type TransitionFilter = "all" | TransitionGroup;
 
 export function TransitionsTab() {
   const target = useEffectTarget();
   const composition = useEditor((state) => state.composition);
+  const [group, setGroup] = useState<TransitionFilter>("all");
+  const [previewing, setPreviewing] = useState<string | null>(null);
+  const { hover, reduced } = usePreviewMode();
   const current = target && composition ? composition.tracks.flatMap((track) => (track.kind === "visual" ? track.clips : [])).find((clip) => clip.id === target.clipId)?.transitionIn : undefined;
+  const isCurrent = (preset: TransitionPreset) =>
+    preset.transition.type === "cut"
+      ? Boolean(target) && !current
+      : current?.type === preset.transition.type && (TRANSITION_CATALOG[current.type].directions.length === 0 || current.direction === preset.transition.direction);
+  const groups = group === "all" ? TRANSITION_GROUPS : [group];
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PanelHeader title="Transitions" />
       <p className="px-3 pb-2 text-[11px] text-ds-text-3">{target ? `Plays into ${target.label}. Each cut can have its own.` : "Click the button between two clips on the timeline, or drag a transition onto a clip."}</p>
+      <div role="group" aria-label="Transition groups" className="ds-no-scrollbar flex shrink-0 gap-1 overflow-x-auto px-3 pb-2">
+        {(["all", ...TRANSITION_GROUPS] as const).map((id) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={group === id}
+            onClick={() => setGroup(id)}
+            className={cn(
+              "pc-press h-7 shrink-0 rounded-full px-2.5 text-[11px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ds-accent",
+              group === id ? "bg-ds-text text-ds-bg" : "bg-ds-surface-2 text-ds-text-2 hover:bg-ds-surface-3 hover:text-ds-text",
+            )}
+          >
+            {id === "all" ? "All" : TRANSITION_GROUP_LABELS[id]}
+          </button>
+        ))}
+      </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-        <div className="grid grid-cols-2 gap-2">
-          {TRANSITION_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              disabled={!target}
-              {...draggable({ type: "transition", transition: preset.transition, label: preset.label })}
-              onClick={() => target && applyTransition(target.clipId, preset.transition.type === "cut" ? null : preset.transition)}
-              className={cn(
-                "ds-transition-tile pc-press flex flex-col gap-1.5 rounded-ds-sm bg-ds-surface-2 p-1.5 text-left outline-none hover:bg-ds-surface-3 focus-visible:ring-2 focus-visible:ring-ds-accent disabled:cursor-grab disabled:opacity-80",
-                current?.type === preset.transition.type && "ring-2 ring-ds-accent",
-              )}
-            >
-              <TransitionDemo type={preset.transition.type} />
-              <span className="truncate px-0.5 text-[11px] font-medium text-ds-text">{preset.label}</span>
-            </button>
-          ))}
-        </div>
+        {groups.map((id) => (
+          <section key={id} aria-label={TRANSITION_GROUP_LABELS[id]} className="pb-3">
+            {group === "all" ? <h3 className="ds-overline pb-1.5 pt-1 text-ds-text-3">{TRANSITION_GROUP_LABELS[id]}</h3> : null}
+            <div className="grid grid-cols-2 gap-2">
+              {TRANSITION_PRESETS.filter((preset) => preset.group === id).map((preset) => {
+                const selected = isCurrent(preset);
+                const playing = !reduced && (hover ? previewing === preset.id : selected);
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    disabled={!target}
+                    title={preset.description}
+                    {...draggable({ type: "transition", transition: preset.transition, label: preset.label })}
+                    onClick={() => target && applyTransition(target.clipId, preset.transition.type === "cut" ? null : preset.transition)}
+                    onPointerEnter={(event) => event.pointerType === "mouse" && setPreviewing(preset.id)}
+                    onPointerLeave={() => setPreviewing((value) => (value === preset.id ? null : value))}
+                    onFocus={() => setPreviewing(preset.id)}
+                    onBlur={() => setPreviewing((value) => (value === preset.id ? null : value))}
+                    className={cn(
+                      "pc-press flex flex-col gap-1.5 rounded-ds-sm bg-ds-surface-2 p-1.5 text-left outline-none hover:bg-ds-surface-3 focus-visible:ring-2 focus-visible:ring-ds-accent disabled:cursor-grab disabled:opacity-80",
+                      selected && "ring-2 ring-ds-accent",
+                    )}
+                  >
+                    <TransitionThumb transition={preset.transition} playing={playing} />
+                    <span className="truncate px-0.5 text-[11px] font-medium text-ds-text">{preset.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
     </div>
   );

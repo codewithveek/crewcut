@@ -14,6 +14,7 @@ import {
   frameToMs,
   snapSpan,
   snapTime,
+  TRANSITION_CATALOG,
 } from "@crewcut/composition";
 import { CrewcutVideo } from "@crewcut/renderer";
 import { Thumbnail } from "@remotion/player";
@@ -322,7 +323,7 @@ const ClipBlock = memo(function ClipBlock({ clip, track, composition, left, widt
             {width > 120 && height > 40 ? <span className="ml-auto shrink-0 rounded bg-black/30 px-1 font-mono text-[10px] tabular">{(clip.durationMs / 1000).toFixed(1)}s</span> : null}
           </div>
           {transition && !atCut ? (
-            <span className="pointer-events-none absolute left-0.5 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow" title={`Transition: ${transition.type}`}>
+            <span className="pointer-events-none absolute left-0.5 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow" title={`Transition: ${TRANSITION_CATALOG[transition.type].label}`}>
               <IconArrowsExchange className="size-3" />
             </span>
           ) : null}
@@ -441,7 +442,7 @@ function openTransitionPicker(clipId: string) {
 }
 
 function CutButton({ left, transition, size, onOpen }: { left: number; transition: Transition | undefined; size: number; onOpen: () => void }) {
-  const label = transition ? `Transition: ${transition.type.replace("-", " ")} (change)` : "Add a transition";
+  const label = transition ? `Transition: ${TRANSITION_CATALOG[transition.type].label} (change)` : "Add a transition";
   return (
     <button
       type="button"

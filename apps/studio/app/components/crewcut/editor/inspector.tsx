@@ -20,7 +20,11 @@ import {
   type LeafLayer,
   MOTION_PRESETS,
   TRANSITION_PRESETS,
+  TRANSITION_CATALOG,
+  TRANSITION_GROUP_LABELS,
   TRANSITION_TYPES,
+  type TransitionType,
+  defaultTransition,
   type TextLayer,
   type VisualClip,
   colorFilterCss,
@@ -661,12 +665,32 @@ function ClipInspector({ composition, clip }: { composition: Composition; clip: 
         </Section>
         <Section title="Transition in" enabled={Boolean(transition)} onEnabledChange={(on) => commit(on ? "Add transition" : "Remove transition", [{ op: "set-transition", clipId: clip.id, transition: on ? (TRANSITION_PRESETS[0]?.transition ?? null) : null }])}>
           <FieldRow label="Type">
-            <Select label="Transition type" className="w-full" value={transition?.type ?? "crossfade"} onChange={(type) => commit(`Transition: ${type}`, [{ op: "set-transition", clipId: clip.id, transition: { ...(TRANSITION_PRESETS.find((preset) => preset.transition.type === type)?.transition ?? {}), type: type as (typeof TRANSITION_TYPES)[number] } }])} options={TRANSITION_TYPES.filter((type) => type !== "cut").map((type) => ({ value: type, label: type.replace("-", " ") }))} />
+            <Select
+              label="Transition type"
+              className="w-full"
+              value={transition?.type ?? "crossfade"}
+              onChange={(type) => {
+                const next = type as TransitionType;
+                const directions = TRANSITION_CATALOG[next].directions;
+                const direction = transition && directions.includes(transition.direction) ? transition.direction : undefined;
+                commit(`Transition: ${TRANSITION_CATALOG[next].label}`, [{ op: "set-transition", clipId: clip.id, transition: defaultTransition(next, direction) }]);
+              }}
+              options={TRANSITION_TYPES.filter((type) => type !== "cut").map((type) => ({ value: type, label: TRANSITION_CATALOG[type].label, group: TRANSITION_GROUP_LABELS[TRANSITION_CATALOG[type].group] }))}
+            />
           </FieldRow>
           <SliderField label="Duration" value={transition?.durationMs ?? 500} min={100} max={3000} step={10} unit="ms" onCommit={(durationMs) => commit("Transition length", [{ op: "set-transition", clipId: clip.id, transition: { durationMs } }])} />
-          {transition && ["push", "slide", "wipe"].includes(transition.type) ? (
+          {transition && TRANSITION_CATALOG[transition.type].directions.length > 1 ? (
             <FieldRow label="Direction">
-              <Segmented ariaLabel="Direction" size="sm" value={transition.direction} onChange={(direction) => commit(`Transition ${direction}`, [{ op: "set-transition", clipId: clip.id, transition: { direction } }])} options={[{ value: "left", label: "←" }, { value: "right", label: "→" }, { value: "up", label: "↑" }, { value: "down", label: "↓" }]} />
+              <Segmented
+                ariaLabel="Direction"
+                size="sm"
+                value={transition.direction}
+                onChange={(direction) => commit(`Transition ${direction}`, [{ op: "set-transition", clipId: clip.id, transition: { direction } }])}
+                options={TRANSITION_CATALOG[transition.type].directions.map((direction) => ({
+                  value: direction,
+                  label: TRANSITION_CATALOG[transition.type].group === "spin" || ["triangle-distort", "bokeh-twirl", "zoom-spin"].includes(transition.type) ? (direction === "left" ? "↺" : "↻") : { left: "←", right: "→", up: "↑", down: "↓" }[direction],
+                }))}
+              />
             </FieldRow>
           ) : null}
         </Section>
