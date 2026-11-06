@@ -769,7 +769,8 @@ function TransitionDemo({ type }: { type: string }) {
   return (
     <span className="ds-transition-demo relative block aspect-video w-full overflow-hidden rounded-[6px]" data-type={type}>
       <span className="absolute inset-0 bg-[#3a3f4f]" />
-      <span className="ds-transition-b absolute inset-0 bg-ds-accent" />
+      {/* The logo orange, not the theme accent: it's an illustration and should read the same in both themes. */}
+      <span className="ds-transition-b absolute inset-0 bg-[#ff5b2e]" />
     </span>
   );
 }
@@ -792,7 +793,7 @@ export function TransitionsTab() {
               {...draggable({ type: "transition", transition: preset.transition, label: preset.label })}
               onClick={() => target && applyTransition(target.clipId, preset.transition.type === "cut" ? null : preset.transition)}
               className={cn(
-                "pc-press flex flex-col gap-1.5 rounded-ds-sm bg-ds-surface-2 p-1.5 text-left outline-none hover:bg-ds-surface-3 focus-visible:ring-2 focus-visible:ring-ds-accent disabled:cursor-grab disabled:opacity-80",
+                "ds-transition-tile pc-press flex flex-col gap-1.5 rounded-ds-sm bg-ds-surface-2 p-1.5 text-left outline-none hover:bg-ds-surface-3 focus-visible:ring-2 focus-visible:ring-ds-accent disabled:cursor-grab disabled:opacity-80",
                 current?.type === preset.transition.type && "ring-2 ring-ds-accent",
               )}
             >

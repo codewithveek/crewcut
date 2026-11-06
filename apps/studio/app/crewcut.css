@@ -298,7 +298,9 @@ body {
   box-shadow: inset 0 0 0 1px var(--ds-accent);
 }
 
-/* Transition thumbnails: B plays into A on a loop (paused under reduced motion). */
+/* Transition thumbnails: B plays into A on a loop (paused under reduced motion).
+   With a mouse, a tile rests on a still midpoint and plays only while hovered or
+   focused: a whole grid looping at once is too busy. Touch screens keep the loop. */
 .ds-transition-b {
   animation: ds-tr-crossfade 2.2s var(--ds-ease-in-out) infinite;
 }
@@ -342,6 +344,33 @@ body {
 @keyframes ds-tr-cut {
   0%, 49% { opacity: 0; }
   50%, 100% { opacity: 1; }
+}
+@media (hover: hover) {
+  /* Fades rest on a soft left-to-right blend of A into B (half opacity reads muddy). */
+  .ds-transition-tile:not(:hover):not(:focus-visible) .ds-transition-b {
+    animation: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent 10%, #000 90%);
+    mask-image: linear-gradient(90deg, transparent 10%, #000 90%);
+  }
+  .ds-transition-tile:not(:hover):not(:focus-visible) .ds-transition-demo:is([data-type="push"], [data-type="slide"], [data-type="wipe"], [data-type="zoom-through"], [data-type="scale-fade"], [data-type="cut"]) .ds-transition-b {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .ds-transition-tile:not(:hover):not(:focus-visible) .ds-transition-demo:is([data-type="push"], [data-type="slide"]) .ds-transition-b {
+    transform: translateX(50%);
+    /* A panel sliding over, unlike the wipe's flat edge. */
+    box-shadow: -6px 0 12px rgb(0 0 0 / 0.4);
+  }
+  .ds-transition-tile:not(:hover):not(:focus-visible) .ds-transition-demo[data-type="wipe"] .ds-transition-b {
+    clip-path: inset(0 0 0 50%);
+  }
+  .ds-transition-tile:not(:hover):not(:focus-visible) .ds-transition-demo:is([data-type="zoom-through"], [data-type="scale-fade"]) .ds-transition-b {
+    transform: scale(0.72);
+    border-radius: 3px;
+  }
+  .ds-transition-tile:not(:hover):not(:focus-visible) .ds-transition-demo[data-type="blur-crossfade"] .ds-transition-b {
+    filter: blur(3px);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .ds-transition-b {
