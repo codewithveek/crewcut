@@ -214,7 +214,7 @@ export function HomePage() {
               if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void handleStart();
             }}
             rows={3}
-            placeholder="An idea, a URL, a repo, or notes — e.g. “Why spring animations feel more natural than easing curves”"
+            placeholder="An idea, a link, or a few notes — e.g. “Why we yawn, and why it's contagious”"
             className="w-full resize-none rounded-ds-md bg-ds-surface-2 px-3 py-2.5 text-[14px] leading-relaxed text-ds-text shadow-[inset_0_0_0_1px_var(--ds-hairline)] outline-none placeholder:text-ds-text-3 focus:shadow-[inset_0_0_0_1.5px_var(--ds-accent)]"
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
