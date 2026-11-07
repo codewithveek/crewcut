@@ -63,6 +63,7 @@ import {
   IconTypography,
   IconUser,
   IconVideo,
+  IconWaveSine,
 } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -74,6 +75,7 @@ import {
   ContextMenuTrigger,
   FieldRow,
   IconButton,
+  InfiniteSentinel,
   KeyframeToggle,
   type KeyframeToggleProps,
   ScrubField,
@@ -93,7 +95,7 @@ import { cn } from "@/lib/utils";
 
 import { FILTER_SAMPLE } from "./left-panel";
 import { ReplaceMediaDialog } from "./replace-media";
-import { type Selection, applyFilter, applyMotion, copySelection, deleteSelection, describeSelection, duplicateSelection, setFormat, transformOps } from "./commands";
+import { type Selection, applyFilter, applyMotion, copySelection, deleteSelection, describeSelection, duplicateSelection, offerLookForAll, offerTransitionForAll, setFormat, snapCutsToBeat, transformOps } from "./commands";
 import { LayerMenu } from "./context-menus";
 import { askEditorAgent } from "./assistant";
 import { useEditor } from "./editor-store";
@@ -102,6 +104,12 @@ import { useEditor } from "./editor-store";
 
 const preview = (ops: CompositionOpInput[]) => useEditor.getState().preview(ops);
 const commit = (label: string, ops: CompositionOpInput[]) => void useEditor.getState().commitOps(label, ops);
+/** Commit, then (if it saved) run a follow-up such as an "apply to all" offer. */
+const commitThen = (label: string, ops: CompositionOpInput[], after: () => void) =>
+  void useEditor
+    .getState()
+    .commitOps(label, ops)
+    .then((ok) => ok && after());
 
 function useLocalMs(clip: VisualClip, layer: { startMs: number }): number {
   const playheadMs = useEditor((state) => state.playheadMs);
@@ -511,9 +519,9 @@ function ColorSections({ target, adjust, filter, allowVignette }: { target: { cl
             );
           })}
         </div>
-        {filter ? <SliderField label="Intensity" value={filter.intensity} min={0} max={1} step={0.01} unit="%" format={(v) => Math.round(v * 100)} parse={(v) => v / 100} onChange={(intensity) => preview([opFor({ filter: { ...filter, intensity } })])} onCommit={(intensity) => commit("Filter intensity", [opFor({ filter: { ...filter, intensity } })])} /> : null}
+        {filter ? <SliderField label="Intensity" value={filter.intensity} min={0} max={1} step={0.01} unit="%" format={(v) => Math.round(v * 100)} parse={(v) => v / 100} onChange={(intensity) => preview([opFor({ filter: { ...filter, intensity } })])} onCommit={(intensity) => commitThen("Filter intensity", [opFor({ filter: { ...filter, intensity } })], () => offerLookForAll(target, "filter"))} /> : null}
       </Section>
-      <Section title="Adjust" actions={changed ? <IconButton size="xs" label="Reset adjustments" onClick={() => commit("Reset adjustments", [opFor({ adjust: null })])}><IconRefresh /></IconButton> : undefined}>
+      <Section title="Adjust" actions={changed ? <IconButton size="xs" label="Reset adjustments" onClick={() => commitThen("Reset adjustments", [opFor({ adjust: null })], () => offerLookForAll(target, "adjust"))}><IconRefresh /></IconButton> : undefined}>
         {ADJUST_FIELDS.filter((field) => allowVignette || !field.media).map((field) => (
           <SliderField
             key={field.key}
@@ -524,7 +532,7 @@ function ColorSections({ target, adjust, filter, allowVignette }: { target: { cl
             step={1}
             centered={field.min < 0}
             onChange={(value) => preview([opFor({ adjust: { ...current, [field.key]: value } })])}
-            onCommit={(value) => commit(field.label, [opFor({ adjust: { ...current, [field.key]: value } })])}
+            onCommit={(value) => commitThen(field.label, [opFor({ adjust: { ...current, [field.key]: value } })], () => offerLookForAll(target, "adjust"))}
           />
         ))}
       </Section>
@@ -663,7 +671,7 @@ function ClipInspector({ composition, clip }: { composition: Composition; clip: 
             <ColorField label="Clip background" allowNone value={typeof clip.background === "string" ? clip.background : undefined} onChange={(background) => commit("Clip background", [{ op: "update-clip", clipId: clip.id, patch: { background } }])} swatches={[brief.palette.background, brief.palette.surface, brief.palette.accent, ...(brief.palette.accent2 ? [brief.palette.accent2] : []), "#000000", "#ffffff", "#15171d", "#f3f3f6"]} />
           </FieldRow>
         </Section>
-        <Section title="Transition in" enabled={Boolean(transition)} onEnabledChange={(on) => commit(on ? "Add transition" : "Remove transition", [{ op: "set-transition", clipId: clip.id, transition: on ? (TRANSITION_PRESETS[0]?.transition ?? null) : null }])}>
+        <Section title="Transition in" enabled={Boolean(transition)} onEnabledChange={(on) => commitThen(on ? "Add transition" : "Remove transition", [{ op: "set-transition", clipId: clip.id, transition: on ? (TRANSITION_PRESETS[0]?.transition ?? null) : null }], () => offerTransitionForAll(clip.id))}>
           <FieldRow label="Type">
             <Select
               label="Transition type"
@@ -673,19 +681,19 @@ function ClipInspector({ composition, clip }: { composition: Composition; clip: 
                 const next = type as TransitionType;
                 const directions = TRANSITION_CATALOG[next].directions;
                 const direction = transition && directions.includes(transition.direction) ? transition.direction : undefined;
-                commit(`Transition: ${TRANSITION_CATALOG[next].label}`, [{ op: "set-transition", clipId: clip.id, transition: defaultTransition(next, direction) }]);
+                commitThen(`Transition: ${TRANSITION_CATALOG[next].label}`, [{ op: "set-transition", clipId: clip.id, transition: defaultTransition(next, direction) }], () => offerTransitionForAll(clip.id));
               }}
               options={TRANSITION_TYPES.filter((type) => type !== "cut").map((type) => ({ value: type, label: TRANSITION_CATALOG[type].label, group: TRANSITION_GROUP_LABELS[TRANSITION_CATALOG[type].group] }))}
             />
           </FieldRow>
-          <SliderField label="Duration" value={transition?.durationMs ?? 500} min={100} max={3000} step={10} unit="ms" onCommit={(durationMs) => commit("Transition length", [{ op: "set-transition", clipId: clip.id, transition: { durationMs } }])} />
+          <SliderField label="Duration" value={transition?.durationMs ?? 500} min={100} max={3000} step={10} unit="ms" onCommit={(durationMs) => commitThen("Transition length", [{ op: "set-transition", clipId: clip.id, transition: { durationMs } }], () => offerTransitionForAll(clip.id))} />
           {transition && TRANSITION_CATALOG[transition.type].directions.length > 1 ? (
             <FieldRow label="Direction">
               <Segmented
                 ariaLabel="Direction"
                 size="sm"
                 value={transition.direction}
-                onChange={(direction) => commit(`Transition ${direction}`, [{ op: "set-transition", clipId: clip.id, transition: { direction } }])}
+                onChange={(direction) => commitThen(`Transition ${direction}`, [{ op: "set-transition", clipId: clip.id, transition: { direction } }], () => offerTransitionForAll(clip.id))}
                 options={TRANSITION_CATALOG[transition.type].directions.map((direction) => ({
                   value: direction,
                   label: TRANSITION_CATALOG[transition.type].group === "spin" || ["triangle-distort", "bokeh-twirl", "zoom-spin"].includes(transition.type) ? (direction === "left" ? "↺" : "↻") : { left: "←", right: "→", up: "↑", down: "↓" }[direction],
@@ -747,6 +755,32 @@ function ClipInspector({ composition, clip }: { composition: Composition; clip: 
   );
 }
 
+/** Beat sync for a music clip: snap the cuts to its beat, with an optional tempo when the measured one is off. */
+function BeatSyncRow({ clipId }: { clipId: string }) {
+  const [bpm, setBpm] = useState("");
+  const value = Number(bpm);
+  const valid = !bpm || (value >= 40 && value <= 300);
+  return (
+    <FieldRow label="Beat">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <Button size="sm" variant="outline" className="pc-press min-w-0 flex-1" disabled={!valid} onClick={() => void snapCutsToBeat(clipId, bpm ? value : undefined)}>
+          <IconWaveSine className="size-4 shrink-0" /> <span className="truncate">Snap cuts to the beat</span>
+        </Button>
+        <input
+          value={bpm}
+          inputMode="decimal"
+          onChange={(event) => setBpm(event.target.value.replace(/[^\d.]/g, "").slice(0, 5))}
+          onKeyDown={(event) => event.stopPropagation()}
+          placeholder="Auto"
+          aria-label="Tempo in BPM (leave empty to find it automatically)"
+          title="Tempo in BPM. Leave empty to use the track's own or measure it."
+          className={cn("h-7 w-14 rounded-ds-xs bg-ds-surface-2 px-1.5 text-center font-mono text-xs tabular text-ds-text outline-none shadow-[inset_0_0_0_1px_var(--ds-hairline)] placeholder:text-ds-text-3 focus:shadow-[inset_0_0_0_1.5px_var(--ds-accent)]", !valid && "shadow-[inset_0_0_0_1.5px_var(--ds-danger)]")}
+        />
+      </div>
+    </FieldRow>
+  );
+}
+
 function AudioInspector({ composition, selection }: { composition: Composition; selection: Extract<Selection, { kind: "audio" }> }) {
   const { clip, track } = selection;
   const op = (patch: Record<string, unknown>): CompositionOpInput => ({ op: "update-clip", clipId: clip.id, patch });
@@ -763,6 +797,9 @@ function AudioInspector({ composition, selection }: { composition: Composition; 
           <SliderField label="Volume" value={clip.volume} min={0} max={2} step={0.01} unit="%" format={(v) => Math.round(v * 100)} parse={(v) => v / 100} onChange={(volume) => preview([op({ volume })])} onCommit={(volume) => commit("Volume", [op({ volume })])} />
           <SliderField label="Fade in" value={clip.fadeInMs} min={0} max={Math.min(10_000, clip.durationMs)} step={50} unit="s" format={(v) => Math.round(v / 100) / 10} parse={(v) => v * 1000} onCommit={(fadeInMs) => commit("Fade in", [op({ fadeInMs })])} />
           <SliderField label="Fade out" value={clip.fadeOutMs} min={0} max={Math.min(10_000, clip.durationMs)} step={50} unit="s" format={(v) => Math.round(v / 100) / 10} parse={(v) => v * 1000} onCommit={(fadeOutMs) => commit("Fade out", [op({ fadeOutMs })])} />
+          {track.role === "music" ? (
+            <BeatSyncRow clipId={clip.id} />
+          ) : null}
           {track.role === "music" ? (
             <FieldRow label="Voice-over">
               <Switch label="Lower under the voice" checked={clip.duckUnderVoice} onCheckedChange={(duckUnderVoice) => commit(duckUnderVoice ? "Lower under the voice" : "Stop lowering under the voice", [op({ duckUnderVoice })])} />
@@ -917,14 +954,18 @@ function HistoryList({ versions, version, videoId }: { versions: HistoryEntry[];
   const seen = new Set(versions.map((entry) => entry.version));
   const all = [...versions, ...older.filter((entry) => !seen.has(entry.version))];
   const canLoadMore = hasOlder && versions.length >= 50;
+  const [loadError, setLoadError] = useState<unknown>(null);
+  useEffect(() => setLoadError(null), [videoId, versions[0]?.version]);
   async function loadOlder() {
+    if (loading) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const page = (await callAction("list-composition-versions" as never, { videoId, offset: all.length, limit: 50 } as never)) as { versions: HistoryEntry[]; hasMore: boolean };
       setOlder((current) => [...current, ...page.versions]);
       setHasOlder(page.hasMore);
     } catch (error) {
-      toast.error(errorMessage(error));
+      setLoadError(error);
     } finally {
       setLoading(false);
     }
@@ -949,13 +990,9 @@ function HistoryList({ versions, version, videoId }: { versions: HistoryEntry[];
           <IconHistory className="size-3.5" /> No edits yet.
         </li>
       ) : null}
-      {canLoadMore ? (
-        <li>
-          <Button size="sm" variant="ghost" className="mt-1 w-full" disabled={loading} onClick={() => void loadOlder()}>
-            {loading ? "Loading…" : "Show older edits"}
-          </Button>
-        </li>
-      ) : null}
+      <li>
+        <InfiniteSentinel hasMore={canLoadMore} loading={loading} onLoadMore={() => void loadOlder()} count={all.length} error={loadError} resetKey={`${videoId}|${versions[0]?.version ?? 0}`} />
+      </li>
     </ul>
   );
 }

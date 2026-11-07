@@ -3,7 +3,7 @@ import { toast } from "sonner";
 
 import { errorMessage } from "@/lib/crewcut";
 
-import { addElementAt, addLibraryAudioAt, addMediaAt, applyFilter, applyMotion, applyTransition, soloLayer } from "./commands";
+import { addElementAt, addLibraryAudioAt, addMediaAt, applyFilter, applyMotion, applyTransition, importStockPhoto, soloLayer } from "./commands";
 import { useEditor } from "./editor-store";
 import { type DragPayload, uploadMedia } from "./media";
 
@@ -50,6 +50,18 @@ export async function dropPayload(payload: DragPayload, target: DropTarget): Pro
       }
       const isMain = track?.id === mainTrackId();
       await addMediaAt(asset, atMs, track?.kind === "visual" ? { trackId: track.id, mode: isMain ? "auto" : "overlay" } : {});
+      return;
+    }
+    case "stock": {
+      // Saved into the video's media first, then placed exactly like a dropped photo.
+      const toastId = toast.loading("Adding photo…");
+      try {
+        const asset = await importStockPhoto(payload.photo);
+        toast.dismiss(toastId);
+        await dropPayload({ type: "asset", asset }, target);
+      } catch (error) {
+        toast.error(errorMessage(error), { id: toastId });
+      }
       return;
     }
     case "library":

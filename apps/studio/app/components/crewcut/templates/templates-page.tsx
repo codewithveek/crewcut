@@ -1,13 +1,16 @@
 import type { AspectRatio, TemplateCategory } from "@crewcut/composition";
-import { IconMusic, IconSparkles, IconTemplate, IconVolume, IconVolumeOff } from "@tabler/icons-react";
+import { callAction } from "@agent-native/core/client/hooks";
+import { IconMusic, IconSparkles, IconTemplate, IconTrash, IconVolume, IconVolumeOff } from "@tabler/icons-react";
 import type { PlayerRef } from "@remotion/player";
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
+import { toast } from "sonner";
 
 import { Button, CrewcutMark, Dialog, SearchField, Segmented, useDebouncedValue } from "@/components/ds";
-import { askAgent } from "@/lib/crewcut";
+import { askAgent, errorMessage } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
+import { ProBadge } from "../catalog/pro-badge";
 import { formatDuration } from "../dashboard/use-videos";
 import { VideoThumb } from "../dashboard/video-thumb";
 import { type TemplateSummary, useStartFromTemplate, useTemplatePreview, useTemplates } from "./use-templates";
@@ -53,6 +56,9 @@ function useGalleryParams() {
     setRatio: (value: AspectRatio | null) => set("ratio", value),
     category,
     setCategory: (value: TemplateCategory | null) => set("category", value),
+    /** ?source=yours shows only the workspace's saved templates. */
+    source: params.get("source") === "yours" ? ("yours" as const) : ("all" as const),
+    setSource: (value: "all" | "yours") => set("source", value === "yours" ? "yours" : null),
     /** ?template=<id> opens that template (links from the landing page, shared links). */
     templateId: params.get("template"),
     clearTemplate: () => set("template", null),
@@ -61,7 +67,7 @@ function useGalleryParams() {
 
 export function TemplatesPage() {
   const gallery = useGalleryParams();
-  const { templates, categories, loading, refreshing } = useTemplates({ query: gallery.query, ratio: gallery.ratio, category: gallery.category });
+  const { templates, categories, yours, loading, refreshing, refetch } = useTemplates({ query: gallery.query, ratio: gallery.ratio, category: gallery.category, source: gallery.source });
   const [open, setOpen] = useState<TemplateSummary | null>(null);
   // Open the template named in the link once the list has it.
   useEffect(() => {
@@ -83,6 +89,7 @@ export function TemplatesPage() {
       </header>
 
       <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center">
+        <Segmented ariaLabel="Whose templates" className="self-start md:self-auto" value={gallery.source} onChange={gallery.setSource} options={[{ value: "all", label: "All templates" }, { value: "yours", label: yours ? `Yours · ${yours}` : "Yours" }]} />
         <SearchField value={gallery.text} onChange={gallery.setText} label="Search templates" placeholder="Search: launch, travel, quote…" className="md:w-72" />
         <Segmented ariaLabel="Format" className="md:ml-auto" value={gallery.ratio ?? "all"} onChange={(value) => gallery.setRatio(value === "all" ? null : value)} options={RATIO_FILTERS} />
       </div>
@@ -105,6 +112,10 @@ export function TemplatesPage() {
             </div>
           ))}
         </div>
+      ) : templates.length === 0 && gallery.source === "yours" && !gallery.query && !gallery.ratio && !gallery.category ? (
+        <p className="rounded-ds-lg border border-dashed border-ds-border px-6 py-12 text-center text-[13px] text-ds-text-2">
+          Your workspace hasn't saved any templates yet. In the editor, open the <span className="font-medium text-ds-text">More</span> menu and choose <span className="font-medium text-ds-text">Save as template</span>. Everyone in your workspace can then start from it.
+        </p>
       ) : templates.length === 0 ? (
         <p className="rounded-ds-lg border border-dashed border-ds-border px-6 py-12 text-center text-[13px] text-ds-text-2">
           No templates match{gallery.query ? ` “${gallery.query}”` : ""}
@@ -118,7 +129,7 @@ export function TemplatesPage() {
         </div>
       )}
 
-      <TemplateDialog template={open} initialRatio={gallery.ratio} onClose={close} />
+      <TemplateDialog template={open} initialRatio={gallery.ratio} onClose={close} onRemoved={() => (close(), void refetch())} />
     </div>
   );
 }
@@ -148,12 +159,12 @@ function TemplateCard({ template, ratio, onOpen }: { template: TemplateSummary; 
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="h-full max-w-full" style={{ aspectRatio: `${composition.width} / ${composition.height}` }}>
               <Suspense fallback={null}>
-                <TemplatePlayer composition={composition} />
+                <TemplatePlayer composition={composition} assetUrls={template.assetUrls} />
               </Suspense>
             </div>
           </div>
         ) : (
-          <VideoThumb composition={composition ?? undefined} assetUrls={{}} ratio={ratio} className="absolute inset-0" />
+          <VideoThumb composition={composition ?? undefined} assetUrls={template.assetUrls ?? {}} ratio={ratio} className="absolute inset-0" />
         )}
         <span className="pointer-events-none absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 font-mono text-[11px] tabular text-white backdrop-blur">{formatDuration(template.durationMs)}</span>
         {template.musicUrl ? (
@@ -161,10 +172,12 @@ function TemplateCard({ template, ratio, onOpen }: { template: TemplateSummary; 
             <IconMusic className="size-3.5" />
           </span>
         ) : null}
+        {template.tier === "pro" ? <ProBadge className="pointer-events-none absolute right-2 top-2" /> : null}
       </div>
       <div className="min-w-0">
         <p className="truncate text-[14px] font-semibold text-ds-text">{template.name}</p>
         <p className="mt-0.5 truncate text-[12px] text-ds-text-3">
+          {template.source === "workspace" ? "Yours · " : ""}
           {template.categoryLabel} · {template.ratios.join(" · ")}
         </p>
       </div>
@@ -172,7 +185,8 @@ function TemplateCard({ template, ratio, onOpen }: { template: TemplateSummary; 
   );
 }
 
-function TemplateDialog({ template, initialRatio, onClose }: { template: TemplateSummary | null; initialRatio: AspectRatio | null; onClose: () => void }) {
+function TemplateDialog({ template, initialRatio, onClose, onRemoved }: { template: TemplateSummary | null; initialRatio: AspectRatio | null; onClose: () => void; onRemoved: () => void }) {
+  const [removing, setRemoving] = useState(false);
   const [ratio, setRatio] = useState<AspectRatio | null>(null);
   const [text, setText] = useState<Record<string, string>>({});
   const [brief, setBrief] = useState("");
@@ -195,7 +209,7 @@ function TemplateDialog({ template, initialRatio, onClose }: { template: Templat
   const withAgent = () => {
     if (!ratio || brief.trim().length < 3) return;
     askAgent(
-      `Make a video from the "${template.name}" template (${template.id}) in ${ratio}: ${brief.trim()}. Write fresh copy for every text slot that fits its length, keep the template's stock photos unless I give you mine, start it with use-template, then open it in the editor.`,
+      `Make a video from the "${template.name}" template (${template.id}) in ${ratio}: ${brief.trim()}. Write fresh copy for every text slot that fits its length, keep the template's photos unless I give you mine, start it with use-template, then open it in the editor.`,
       { templateId: template.id, ratio },
     );
     onClose();
@@ -205,6 +219,28 @@ function TemplateDialog({ template, initialRatio, onClose }: { template: Templat
     <Dialog open={Boolean(template)} onOpenChange={(open) => !open && onClose()} title={template.name} description={template.description} className="w-[min(960px,calc(100vw-32px))] max-h-[min(860px,92dvh)]"
       footer={
         <>
+          {template.canDelete ? (
+            <Button
+              variant="ghost"
+              className="mr-auto text-ds-danger hover:text-ds-danger"
+              disabled={removing}
+              onClick={async () => {
+                if (!window.confirm(`Remove “${template.name}” from your templates? Videos already made from it keep everything.`)) return;
+                setRemoving(true);
+                try {
+                  await callAction("delete-template" as never, { templateId: template.id } as never);
+                  toast.success(`Removed “${template.name}”`);
+                  onRemoved();
+                } catch (error) {
+                  toast.error(errorMessage(error));
+                } finally {
+                  setRemoving(false);
+                }
+              }}
+            >
+              <IconTrash className="size-4" /> {removing ? "Removing…" : "Remove"}
+            </Button>
+          ) : null}
           <Button variant="ghost" onClick={onClose}>
             Close
           </Button>
@@ -220,7 +256,7 @@ function TemplateDialog({ template, initialRatio, onClose }: { template: Templat
           {composition ? (
             <div className="h-full max-w-full" style={{ aspectRatio: `${composition.width} / ${composition.height}` }}>
               <Suspense fallback={<div className="pc-skeleton h-full w-full" />}>
-                <TemplatePlayer key={`${template.id}-${ratio}`} composition={composition} muted={muted} playerRef={playerRef} />
+                <TemplatePlayer key={`${template.id}-${ratio}`} composition={composition} muted={muted} playerRef={playerRef} assetUrls={template.assetUrls} />
               </Suspense>
             </div>
           ) : null}
@@ -252,6 +288,12 @@ function TemplateDialog({ template, initialRatio, onClose }: { template: Templat
         </div>
 
         <div className="flex min-w-0 flex-col gap-4">
+          {template.tier === "pro" ? (
+            <p className="flex items-start gap-2 rounded-ds-md bg-ds-surface-2 p-3 text-[12px] text-ds-text-2 shadow-[inset_0_0_0_1px_var(--ds-hairline)]">
+              <ProBadge className="shrink-0" />
+              <span>Free to try and edit. Exporting a video made from it needs Crewcut Pro for your workspace.</span>
+            </p>
+          ) : null}
           <div className="flex flex-col gap-2">
             <p className="ds-overline text-ds-text-3">Format</p>
             <div className="flex flex-wrap gap-2">
@@ -284,6 +326,7 @@ function TemplateDialog({ template, initialRatio, onClose }: { template: Templat
                 />
               </label>
             ))}
+            {textSlots.length === 0 ? <p className="text-[12px] text-ds-text-3">There are no words to fill in. Swap its photos in the editor.</p> : null}
             <p className="text-[11px] text-ds-text-3">Leave a field empty to keep the sample. Wrap a word in *stars* to colour it. You can swap the photos in the editor.</p>
           </div>
 

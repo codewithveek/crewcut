@@ -25,6 +25,7 @@ import {
   IconShape,
   IconSparkles,
   IconStack2,
+  IconTemplate,
   IconTrash,
   IconTypography,
   IconUpload,
@@ -42,6 +43,7 @@ import { cn } from "@/lib/utils";
 
 import { type Selection, addCaptionAt, copySelection, deleteSelection, describeSelection, duplicateSelection, generateCaptionsFromNarration, paste, run, setFormat, splitAtPlayhead, toggleTrack } from "./commands";
 import { type LeftTab, useEditor } from "./editor-store";
+import { SaveTemplateDialog } from "./save-template";
 import { EditorAssistant, askEditorAgent } from "./assistant";
 import { EditableTitle } from "./editor-page";
 import { Inspector } from "./inspector";
@@ -307,6 +309,7 @@ export function MobileEditor({ onExport }: { onExport: () => void }) {
   const assistantOpen = useEditor((state) => state.assistantOpen);
   const redoCount = useEditor((state) => state.redoStack.length);
   const [sheet, setSheet] = useState<Sheet>(null);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const { fullscreen, enter, exit } = useFullscreen(stageRef);
   if (!composition) return null;
@@ -327,6 +330,10 @@ export function MobileEditor({ onExport }: { onExport: () => void }) {
           <IconArrowLeft className="size-5" />
         </Link>
         <EditableTitle className="min-w-0 flex-1 text-center" />
+        <button type="button" aria-label="Save as template" title="Save as template" onClick={() => setTemplateOpen(true)} className="pc-press flex size-10 shrink-0 items-center justify-center rounded-full text-ds-text-2">
+          <IconTemplate className="size-5" />
+        </button>
+        <SaveTemplateDialog open={templateOpen} onOpenChange={setTemplateOpen} />
         <Button size="sm" className="pc-press shrink-0 rounded-full" onClick={onExport}>
           <IconUpload className="size-4" /> Export
         </Button>

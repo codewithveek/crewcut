@@ -2,13 +2,14 @@ import { IconUpload } from "@tabler/icons-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { Button, Dialog, SearchField, useDebouncedValue } from "@/components/ds";
+import { Button, Dialog, InfiniteSentinel, SearchField, Segmented, useDebouncedValue } from "@/components/ds";
 import { errorMessage } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
 import { replaceLayerMedia } from "./commands";
 import { useEditor } from "./editor-store";
 import { uploadMedia, useAssets } from "./media";
+import { StockBrowser } from "./stock-browser";
 
 /**
  * Pick the photo (or video) that goes into a layer: this video's media and
@@ -19,8 +20,11 @@ export function ReplaceMediaDialog({ open, onOpenChange, target, kind, slotLabel
   const videoId = useEditor((state) => state.videoId);
   const [search, setSearch] = useState("");
   const query = useDebouncedValue(search, 250);
-  const { assets, loading, hasMore, loadMore, loadingMore, refetch } = useAssets(videoId, { mediaType: kind, query, pageSize: 30 });
+  const { assets, loading, error, hasMore, loadMore, loadingMore, refetch, listKey } = useAssets(videoId, { mediaType: kind, query, pageSize: 30 });
   const [uploading, setUploading] = useState(false);
+  // Photos can also come from free stock; videos only from the person's media.
+  const [source, setSource] = useState<"yours" | "stock">("yours");
+  const showStock = kind === "image" && source === "stock";
   const input = useRef<HTMLInputElement>(null);
   const noun = kind === "image" ? "photo" : "video";
 
@@ -60,6 +64,11 @@ export function ReplaceMediaDialog({ open, onOpenChange, target, kind, slotLabel
       }
     >
       <div className="flex flex-col gap-3">
+        {kind === "image" ? <Segmented ariaLabel="Photo source" className="self-start" value={source} onChange={setSource} options={[{ value: "yours", label: "Your photos" }, { value: "stock", label: "Free stock photos" }]} /> : null}
+        {showStock ? (
+          <StockBrowser mode="picker" onPicked={choose} />
+        ) : (
+        <>
         <SearchField size="sm" value={search} onChange={setSearch} label={`Search ${noun}s`} placeholder={`Search your ${noun}s`} />
         {loading ? (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -81,11 +90,9 @@ export function ReplaceMediaDialog({ open, onOpenChange, target, kind, slotLabel
             ))}
           </div>
         )}
-        {hasMore ? (
-          <Button size="sm" variant="ghost" className="self-center" disabled={loadingMore} onClick={loadMore}>
-            {loadingMore ? "Loading…" : "Show more"}
-          </Button>
-        ) : null}
+        <InfiniteSentinel hasMore={hasMore} loading={loadingMore} onLoadMore={loadMore} count={assets.length} error={error} resetKey={listKey} />
+        </>
+        )}
       </div>
     </Dialog>
   );

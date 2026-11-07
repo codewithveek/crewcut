@@ -1,8 +1,8 @@
 import { appPath } from "@agent-native/core/client/api-path";
-import { useActionQuery } from "@agent-native/core/client/hooks";
-import { keepPreviousData } from "@tanstack/react-query";
+import { callAction, useActionQuery } from "@agent-native/core/client/hooks";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import type { LayerDraft, Transition } from "@crewcut/composition";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { AssetLike, LibraryAudio } from "./commands";
 
@@ -21,32 +21,54 @@ export interface AssetDto extends AssetLike {
   createdAt: string;
 }
 
+interface AssetPage {
+  assets: AssetDto[];
+  total: number;
+  nextOffset: number | null;
+}
+
 /**
  * Everything the person can use (this video's media first, then their
- * library and other projects), newest first, searched on the server. The panel shows a page and grows by a page per "Show more".
+ * library and other projects), newest first, searched on the server, one page
+ * at a time for infinite scroll. Each page is fetched once (offset paging),
+ * so scrolling far never re-downloads what's already shown. The key starts
+ * with "action", "list-assets", so every media change that refreshes asset
+ * lists refreshes this one too.
  */
 export function useAssets(videoId: string, options: { mediaType?: "visual" | "image" | "video" | "audio"; query?: string; pageSize?: number } = {}) {
   const pageSize = options.pageSize ?? 60;
-  const [pages, setPages] = useState(1);
   const search = options.query?.trim() ?? "";
-  // A new search or type starts again from the first page.
-  useEffect(() => setPages(1), [search, options.mediaType, videoId]);
-  const query = useActionQuery(
-    "list-assets",
-    { videoId, scope: "all", ...(options.mediaType ? { mediaType: options.mediaType } : {}), ...(search ? { query: search } : {}), limit: pageSize * pages } as never,
-    { placeholderData: keepPreviousData } as never,
-  );
-  const data = query.data as { assets?: AssetDto[]; total?: number } | undefined;
-  const assets = data?.assets ?? [];
-  const total = data?.total ?? 0;
+  const params = { videoId, scope: "all", ...(options.mediaType ? { mediaType: options.mediaType } : {}), ...(search ? { query: search } : {}) };
+  const result = useInfiniteQuery({
+    queryKey: ["action", "list-assets", params, "pages", pageSize],
+    initialPageParam: 0,
+    placeholderData: keepPreviousData,
+    staleTime: 15_000,
+    queryFn: ({ pageParam, signal }) => callAction("list-assets" as never, { ...params, limit: pageSize, offset: pageParam } as never, { method: "GET", signal }) as Promise<AssetPage>,
+    getNextPageParam: (last) => last.nextOffset ?? undefined,
+  });
+  const pages = result.data?.pages;
+  // New uploads shift the offsets of later pages; an item can arrive twice, so keep the first.
+  const assets = useMemo(() => {
+    const seen = new Set<string>();
+    return (pages ?? []).flatMap((page) => page.assets).filter((asset) => (seen.has(asset.id) ? false : (seen.add(asset.id), true)));
+  }, [pages]);
+  const total = pages?.[pages.length - 1]?.total ?? 0;
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = result;
   return {
     assets,
     total,
-    loading: query.isLoading,
-    refetch: query.refetch,
-    hasMore: assets.length < total,
-    loadingMore: query.isFetching && query.isPlaceholderData,
-    loadMore: () => setPages((count) => count + 1),
+    loading: result.isLoading,
+    error: result.error,
+    refetch: result.refetch,
+    hasMore: Boolean(hasNextPage),
+    loadingMore: isFetchingNextPage,
+    /** Safe to call repeatedly: never starts a second request or cancels the one in flight. */
+    loadMore: () => {
+      if (hasNextPage && !isFetchingNextPage) void fetchNextPage({ cancelRefetch: false });
+    },
+    /** Changes when the list starts over (for the infinite-scroll sentinel). */
+    listKey: `${videoId}|${options.mediaType ?? ""}|${search}`,
   };
 }
 
@@ -54,11 +76,78 @@ export interface LibraryItemDto extends LibraryAudio {
   mood: string;
   bpm: number | null;
   url: string;
+  /** Catalog items ("cat:…") come in Free or Pro packs; built-in sounds are free. */
+  tier?: "free" | "pro";
+  packName?: string | null;
 }
 
 export function useAudioLibrary() {
   const query = useActionQuery("list-audio-library", {} as never);
   return { items: (query.data as { items?: LibraryItemDto[] } | undefined)?.items ?? [], loading: query.isLoading };
+}
+
+// ── Stock photos ────────────────────────────────────────────────────────────
+
+export type StockOrientation = "portrait" | "landscape" | "square";
+
+export interface StockPhotoDto {
+  id: number;
+  width: number;
+  height: number;
+  alt: string;
+  avgColor: string;
+  thumbUrl: string;
+  previewUrl: string;
+  photographer: string;
+  photographerUrl: string;
+  pageUrl: string;
+  credit: string;
+}
+
+interface StockPage {
+  enabled: boolean;
+  photos: StockPhotoDto[];
+  total: number;
+  page: number;
+  hasMore: boolean;
+}
+
+/** Free stock photos from Pexels, searched on the server (curated picks while the search is empty), a page at a time. */
+export function useStockPhotos(options: { query: string; orientation?: StockOrientation | undefined; enabled?: boolean }) {
+  const query = options.query.trim();
+  const result = useInfiniteQuery({
+    queryKey: ["crewcut-stock", query, options.orientation ?? ""],
+    enabled: options.enabled ?? true,
+    initialPageParam: 1,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+    placeholderData: keepPreviousData,
+    queryFn: ({ pageParam, signal }) =>
+      callAction("search-stock-photos" as never, { ...(query ? { query } : {}), ...(options.orientation && query ? { orientation: options.orientation } : {}), page: pageParam, perPage: 30 } as never, { method: "GET", signal }) as Promise<StockPage>,
+    getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+  });
+  const pages = result.data?.pages;
+  // Pexels can repeat a photo across pages; keep the first.
+  const photos = useMemo(() => {
+    const seen = new Set<number>();
+    return (pages ?? []).flatMap((page) => page.photos).filter((photo) => (seen.has(photo.id) ? false : (seen.add(photo.id), true)));
+  }, [pages]);
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = result;
+  return {
+    photos,
+    enabled: pages?.[0]?.enabled ?? true,
+    total: pages?.[0]?.total ?? 0,
+    loading: result.isLoading,
+    searching: result.isFetching && !result.isFetchingNextPage,
+    error: result.error,
+    hasMore: Boolean(hasNextPage),
+    loadingMore: isFetchingNextPage,
+    // Every Pexels request counts against the hourly limit: never double-fetch a page.
+    loadMore: () => {
+      if (hasNextPage && !isFetchingNextPage) void fetchNextPage({ cancelRefetch: false });
+    },
+    listKey: `${query}|${options.orientation ?? ""}`,
+  };
 }
 
 export const ACCEPTED_MEDIA = "image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/ogg,audio/webm";
@@ -118,6 +207,11 @@ export async function uploadMedia(file: Blob, options: { videoId?: string; role?
 
 export const PEAKS_PER_SECOND = 50;
 const peakCache = new Map<string, Promise<Float32Array | null>>();
+
+/** The audio's loudness envelope (PEAKS_PER_SECOND values per second, 0..1), decoded once per file. */
+export function loadPeaks(url: string): Promise<Float32Array | null> {
+  return decodePeaks(url);
+}
 
 function decodePeaks(url: string): Promise<Float32Array | null> {
   const key = url.split("?")[0] ?? url;
@@ -242,6 +336,7 @@ export const DRAG_MIME = "application/x-crewcut";
 
 export type DragPayload =
   | { type: "asset"; asset: AssetLike }
+  | { type: "stock"; photo: StockPhotoDto; label: string }
   | { type: "library"; item: LibraryAudio }
   | { type: "element"; layer: LayerDraft; label: string }
   | { type: "transition"; transition: Transition; label: string }

@@ -9,6 +9,7 @@
 export * from "./controls";
 export * from "./menus";
 export * from "./pagination";
+export * from "./infinite";
 export { Button } from "@/components/ui/button";
 export { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 export { EmptyState, Kbd, Panel, CrewcutMark, SkeletonLines, StatusPill, VerdictBadge } from "@/components/crewcut/primitives";

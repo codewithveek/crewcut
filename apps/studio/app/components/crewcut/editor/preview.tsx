@@ -33,7 +33,7 @@ import { ContextMenu, ContextMenuTrigger, DropdownMenu, DropdownMenuContent, Dro
 import { errorMessage } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
-import { currentSelection, describeSelection, replaceLayerMedia, setFormat, transformOps } from "./commands";
+import { currentSelection, describeSelection, importStockPhoto, replaceLayerMedia, setFormat, transformOps } from "./commands";
 import { LayerMenu } from "./context-menus";
 import { dropFiles, dropPayload } from "./drop";
 import { PLAYBACK_RATES, useEditor } from "./editor-store";
@@ -527,6 +527,17 @@ export function PreviewStage({ className, interactive = true, playerRefOut }: { 
     const payload = dragPayload(event);
     if (payload?.type === "asset" && hit && hitLayer && payload.asset.mediaType === hitLayer) {
       await replaceLayerMedia(hit, payload.asset);
+      return;
+    }
+    if (payload?.type === "stock" && hit && hitLayer === "image") {
+      const toastId = toast.loading("Adding photo…");
+      try {
+        const asset = await importStockPhoto(payload.photo);
+        toast.dismiss(toastId);
+        await replaceLayerMedia(hit, asset);
+      } catch (error) {
+        toast.error(errorMessage(error), { id: toastId });
+      }
       return;
     }
     if (payload) await dropPayload(payload, { atMs, surface: "preview" });

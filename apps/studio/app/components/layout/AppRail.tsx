@@ -6,7 +6,9 @@ import { CrewcutMark } from "@/components/crewcut/primitives";
 import { HOME_PATH } from "@/lib/chat-paths";
 import { cn } from "@/lib/utils";
 
-import { type NavItem, PRIMARY_NAV, SECONDARY_NAV, useThemeToggle } from "./nav-items";
+import { useCatalogAccess } from "@/components/crewcut/catalog/use-catalog-access";
+
+import { ADMIN_NAV, type NavItem, PRIMARY_NAV, SECONDARY_NAV, useThemeToggle } from "./nav-items";
 
 /** Shorter windows (laptops at 768px and below) get a tighter rail, so nothing scrolls or overlaps. */
 const ITEM = cn(
@@ -37,6 +39,7 @@ function RailLink({ item }: { item: NavItem }) {
  */
 export function AppRail() {
   const theme = useThemeToggle();
+  const access = useCatalogAccess();
   return (
     <aside className={cn("flex h-full w-[76px] shrink-0 flex-col items-center border-e border-ds-border bg-sidebar py-3", "[@media(max-height:820px)]:py-2")} aria-label="App navigation">
       <Link to={HOME_PATH} aria-label="Crewcut home" className={cn("group pc-press mb-3 flex size-10 shrink-0 items-center justify-center rounded-ds-md outline-none focus-visible:ring-2 focus-visible:ring-ds-accent", "[@media(max-height:820px)]:mb-1.5 [@media(max-height:820px)]:size-9")}>
@@ -46,6 +49,7 @@ export function AppRail() {
         {PRIMARY_NAV.map((item) => (
           <RailLink key={item.to} item={item} />
         ))}
+        {access?.admin ? <RailLink item={ADMIN_NAV} /> : null}
       </nav>
       <div className={cn("flex shrink-0 flex-col items-center gap-1 pt-2", "[@media(max-height:820px)]:gap-0.5 [@media(max-height:820px)]:pt-1")}>
         <button

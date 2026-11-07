@@ -1,22 +1,25 @@
 import { writeClientAppState } from "@agent-native/core/client/application-state";
 import { callAction, useActionQuery } from "@agent-native/core/client/hooks";
-import { type Composition, crewcutEndingClip, crewcutEndingStartMs, formatTimecode, isCrewcutEnding } from "@crewcut/composition";
+import { type Composition, DEFAULT_EXPORT_RESOLUTION, EXPORT_RESOLUTIONS, type ExportResolution, crewcutEndingClip, crewcutEndingStartMs, exportSize, formatTimecode, isCrewcutEnding } from "@crewcut/composition";
 import {
   IconAdjustmentsHorizontal,
   IconArrowLeft,
   IconCloud,
+  IconDots,
   IconDownload,
   IconGitBranch,
   IconLink,
   IconLoader2,
   IconSparkles,
+  IconTemplate,
   IconUpload,
 } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
-import { Button, Dialog, FieldRow, IconButton, Select, SkeletonLines, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ds";
+import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, FieldRow, IconButton, Select, SkeletonLines, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ds";
+import { SaveTemplateDialog } from "./save-template";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { errorMessage, formatAgo } from "@/lib/crewcut";
 import { TAB_ID } from "@/lib/tab-id";
@@ -361,7 +364,34 @@ interface RenderRow {
   error: string | null;
   createdAt: string;
   compositionVersion: number;
+  resolution?: ExportResolution;
 }
+
+const RESOLUTION_KEY = "crewcut.export-resolution";
+
+/** The export size this person picked last (per browser; 1080p until they choose). */
+function useExportResolution(): [ExportResolution, (value: ExportResolution) => void] {
+  const [value, setValue] = useState<ExportResolution>(DEFAULT_EXPORT_RESOLUTION);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(RESOLUTION_KEY);
+      if (saved && EXPORT_RESOLUTIONS.some((entry) => entry.id === saved)) setValue(saved as ExportResolution);
+    } catch {
+      // Storage blocked: keep the default.
+    }
+  }, []);
+  const choose = (next: ExportResolution) => {
+    setValue(next);
+    try {
+      window.localStorage.setItem(RESOLUTION_KEY, next);
+    } catch {
+      // Storage blocked: the choice lasts until the page closes.
+    }
+  };
+  return [value, choose];
+}
+
+const resolutionLabel = (id: ExportResolution | undefined) => EXPORT_RESOLUTIONS.find((entry) => entry.id === (id ?? DEFAULT_EXPORT_RESOLUTION))?.label ?? "1080p";
 
 interface ExportDialogProps {
   open: boolean;
@@ -383,6 +413,8 @@ function ExportDialogContent({ open, onOpenChange, platform, onPlatformChange, c
   const burnCaptions = useEditor((state) => state.burnCaptions);
   const [starting, setStarting] = useState(false);
   const [watching, setWatching] = useState<string | null>(null);
+  const [resolution, setResolution] = useExportResolution();
+  const output = exportSize(composition.width, composition.height, resolution);
   const query = useActionQuery("get-video", { videoId, include: ["renders"] } as never, { enabled: open, refetchInterval: open && watching ? 1500 : false } as never);
   const allRenders = (query.data as { renders?: RenderRow[] } | undefined)?.renders ?? [];
   const renders = allRenders.slice(0, 4);
@@ -402,7 +434,7 @@ function ExportDialogContent({ open, onOpenChange, platform, onPlatformChange, c
   const start = async () => {
     setStarting(true);
     try {
-      const result = (await callAction("render-video" as never, { videoId, burnCaptions } as never)) as { renderId: string };
+      const result = (await callAction("render-video" as never, { videoId, burnCaptions, resolution } as never)) as { renderId: string };
       setWatching(result.renderId);
       void query.refetch();
     } catch (error) {
@@ -449,7 +481,7 @@ function ExportDialogContent({ open, onOpenChange, platform, onPlatformChange, c
         <div className="grid grid-cols-3 gap-2 rounded-ds-md bg-ds-surface-2 p-3 text-center">
           {[
             ["Format", `${composition.ratio}`],
-            ["Size", `${composition.width}×${composition.height}`],
+            ["Size", `${output.width}×${output.height}`],
             ["Length", formatTimecode(composition.durationMs, { fps: composition.fps }).slice(3, 8)],
           ].map(([label, value]) => (
             <div key={label}>
@@ -458,6 +490,18 @@ function ExportDialogContent({ open, onOpenChange, platform, onPlatformChange, c
             </div>
           ))}
         </div>
+        <FieldRow label="Resolution">
+          <Select
+            label="Resolution"
+            className="w-full"
+            value={resolution}
+            onChange={(value) => setResolution(value as ExportResolution)}
+            options={EXPORT_RESOLUTIONS.map((entry) => {
+              const size = exportSize(composition.width, composition.height, entry.id);
+              return { value: entry.id, label: `${entry.label} · ${size.width}×${size.height}` };
+            })}
+          />
+        </FieldRow>
         {/* The project's frame rate (same setting as the Project panel), so the export matches the editor. */}
         <FieldRow label="Frame rate">
           <Select
@@ -487,7 +531,7 @@ function ExportDialogContent({ open, onOpenChange, platform, onPlatformChange, c
                       <div className="h-full rounded-full bg-ds-accent transition-[width] duration-500" style={{ width: `${Math.max(3, Math.round((render.progress ?? 0) * 100))}%` }} />
                     </div>
                   ) : (
-                    <p className={cn("text-[11px]", render.status === "failed" ? "text-ds-danger" : "text-ds-text-3")}>{render.status === "failed" ? (render.error ?? "Failed") : render.status === "done" ? `Ready · ${((render.outputBytes ?? 0) / 1048576).toFixed(1)} MB` : render.status}</p>
+                    <p className={cn("text-[11px]", render.status === "failed" ? "text-ds-danger" : "text-ds-text-3")}>{render.status === "failed" ? (render.error ?? "Failed") : render.status === "done" ? `Ready · ${resolutionLabel(render.resolution)} · ${((render.outputBytes ?? 0) / 1048576).toFixed(1)} MB` : render.status}</p>
                   )}
                 </div>
                 {render.status === "done" ? (
@@ -534,6 +578,8 @@ function TopBar({ onExport, onPublish, onInspector, compact, short }: { onExport
   const videoId = useEditor((state) => state.videoId);
   const title = useEditor((state) => state.composition?.title ?? "");
   const [shareOpen, setShareOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const navigate = useNavigate();
   return (
     <header className={cn("flex shrink-0 items-center gap-2 px-3", short ? "h-12" : "h-14")}>
       <Link to="/projects" className="pc-press flex size-8 shrink-0 items-center justify-center rounded-ds-sm text-ds-text-2 hover:bg-ds-surface-3 hover:text-ds-text" aria-label="Back to projects">
@@ -551,6 +597,22 @@ function TopBar({ onExport, onPublish, onInspector, compact, short }: { onExport
           <IconLink className="size-4" /> {compact ? null : "Share"}
         </Button>
         <ShareDialog open={shareOpen} onOpenChange={setShareOpen} videoId={videoId} title={title} />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <IconButton label="More" variant="ghost">
+              <IconDots />
+            </IconButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem icon={<IconTemplate />} onSelect={() => setTemplateOpen(true)}>
+              Save as template
+            </DropdownMenuItem>
+            <DropdownMenuItem icon={<IconGitBranch />} onSelect={() => navigate(`/videos/${videoId}`)}>
+              Pipeline
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <SaveTemplateDialog open={templateOpen} onOpenChange={setTemplateOpen} />
         {onInspector ? (
           <IconButton label="Properties" variant="soft" onClick={onInspector}>
             <IconAdjustmentsHorizontal />

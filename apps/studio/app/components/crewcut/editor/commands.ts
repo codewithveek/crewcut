@@ -15,9 +15,17 @@ import {
   type Transition,
   type TrackSpec,
   type VisualClip,
+  STEADY_BEAT,
+  TRANSITION_CATALOG,
+  beatPhaseMs,
   clipEndMs,
+  estimateTempo,
+  onsetEnvelope,
+  snapCutsToBeats,
+  timelineBeats,
   findClip,
   findLayer,
+  isCrewcutEnding,
 } from "@crewcut/composition";
 import { SHORT_FORM_CAPTIONS, buildCaptionCues, estimateWordTimings } from "@crewcut/voice";
 import { toast } from "sonner";
@@ -25,6 +33,7 @@ import { toast } from "sonner";
 import { errorMessage } from "@/lib/crewcut";
 
 import { useEditor } from "./editor-store";
+import { type AssetDto, PEAKS_PER_SECOND, type StockPhotoDto, loadPeaks } from "./media";
 
 /**
  * Editor commands. Keyboard shortcuts, context menus, toolbars and the
@@ -279,6 +288,45 @@ export async function addElementAt(layer: LayerDraft, atMs = playhead(), options
   if (ok) state().selectClip(clipId);
 }
 
+// ── Stock photos ────────────────────────────────────────────────────────────
+
+const stockImports = new Map<string, Promise<AssetDto>>();
+
+/**
+ * Saves a stock photo into this video's media (with the photographer's credit)
+ * and returns it as an asset. The server reuses a photo the video already has;
+ * clicks on the same photo while it downloads share one download.
+ */
+export function importStockPhoto(photo: Pick<StockPhotoDto, "id">): Promise<AssetDto> {
+  const videoId = state().videoId;
+  const key = `${videoId}:${photo.id}`;
+  let job = stockImports.get(key);
+  if (!job) {
+    job = (callAction("import-stock-photo" as never, { photoId: photo.id, videoId } as never) as Promise<{ asset: AssetDto }>)
+      .then((result) => {
+        state().mergeAssetUrls({ [result.asset.id]: result.asset.url });
+        return result.asset;
+      })
+      .finally(() => stockImports.delete(key));
+    stockImports.set(key, job);
+  }
+  return job;
+}
+
+/** Adds a stock photo to the timeline, like any photo from the media panel. */
+export async function addStockAt(photo: StockPhotoDto, atMs = playhead(), options: { trackId?: string; mode?: "auto" | "overlay" } = {}): Promise<boolean> {
+  const toastId = toast.loading("Adding photo…");
+  try {
+    const asset = await importStockPhoto(photo);
+    await addMediaAt(asset, atMs, options);
+    toast.dismiss(toastId);
+    return true;
+  } catch (error) {
+    toast.error(errorMessage(error), { id: toastId });
+    return false;
+  }
+}
+
 export interface LibraryAudio {
   id: string;
   label: string;
@@ -328,7 +376,7 @@ export async function generateCaptionsFromNarration(): Promise<void> {
 }
 
 export function applyTransition(clipId: string, transition: Transition | null): void {
-  void run(transition ? `Transition: ${transition.type}` : "Remove transition", [{ op: "set-transition", clipId, transition }]);
+  void run(transition ? `Transition: ${TRANSITION_CATALOG[transition.type]?.label ?? transition.type}` : "Remove transition", [{ op: "set-transition", clipId, transition }]).then((ok) => ok && offerTransitionForAll(clipId));
 }
 
 /** Filters apply to a selected media/element layer, else to the whole clip. */
@@ -336,7 +384,175 @@ export function applyFilter(target: { clipId: string; layerId?: string }, preset
   const filter = preset ? { preset, intensity } : null;
   void run(preset ? `Filter: ${preset}` : "Remove filter", [
     target.layerId ? { op: "update-layer", clipId: target.clipId, layerId: target.layerId, patch: { filter } } : { op: "update-clip", clipId: target.clipId, patch: { filter } },
-  ]);
+  ]).then((ok) => ok && offerLookForAll(target, "filter"));
+}
+
+// ── Beat sync ───────────────────────────────────────────────────────────────
+
+/** The music clip beat sync follows: the given one, else the selected music clip, else the longest. */
+export function beatSyncMusic(clipId?: string): { clip: Extract<AnyClip, { src: string }>; track: AudioTrack } | null {
+  const composition = state().composition;
+  if (!composition) return null;
+  const music = composition.tracks.flatMap((track) => (track.kind === "audio" && track.role === "music" ? track.clips.map((clip) => ({ clip, track })) : []));
+  const wanted = clipId ?? state().selectedClipIds[0];
+  return music.find((entry) => entry.clip.id === wanted) ?? [...music].sort((a, b) => b.clip.durationMs - a.clip.durationMs)[0] ?? null;
+}
+
+let syncing = false;
+
+/**
+ * Moves the cuts on the main track onto the music's beat (one undoable step).
+ * The tempo comes from where the music came from (templates, library and
+ * catalog tracks know theirs) or is measured from the audio; where the beat
+ * starts is always measured, so the cuts land on the real hits.
+ */
+export async function snapCutsToBeat(clipId?: string, bpmOverride?: number): Promise<void> {
+  if (syncing) return;
+  const found = beatSyncMusic(clipId);
+  if (!found) {
+    toast.message("Add music first, then snap the cuts to its beat.");
+    return;
+  }
+  const assetId = found.clip.src.startsWith("asset:") ? found.clip.src.slice(6) : null;
+  const url = assetId ? state().assetUrls[assetId] : found.clip.src;
+  if (!url) {
+    toast.error("The music file isn't available. Reload the editor and try again.");
+    return;
+  }
+  syncing = true;
+  const toastId = toast.loading("Finding the beat…");
+  try {
+    const known = assetId ? ((await callAction("get-music-tempo" as never, { videoId: state().videoId, assetId } as never, { method: "GET" }).catch(() => null)) as { bpm: number | null } | null) : null;
+    const peaks = await loadPeaks(url);
+    if (!peaks || peaks.length < PEAKS_PER_SECOND * 2) {
+      toast.error("Couldn't read this music. Try another track.", { id: toastId });
+      return;
+    }
+    const onsets = onsetEnvelope(peaks);
+    let bpm = bpmOverride && bpmOverride >= 40 && bpmOverride <= 300 ? bpmOverride : (known?.bpm ?? null);
+    let measured = false;
+    if (!bpm) {
+      const estimate = estimateTempo(onsets, PEAKS_PER_SECOND);
+      if (!estimate || estimate.confidence < STEADY_BEAT) {
+        toast.error("This music doesn't have a steady enough beat to snap to.", { id: toastId });
+        return;
+      }
+      bpm = estimate.bpm;
+      measured = true;
+    }
+    const phaseMs = beatPhaseMs(onsets, PEAKS_PER_SECOND, bpm);
+    // Re-read the edit now: it may have changed while the audio was analysed.
+    const latest = beatSyncMusic(found.clip.id);
+    const composition = state().composition;
+    const main = composition?.tracks.find((track) => track.kind === "visual");
+    if (!latest || !composition || !main) return void toast.dismiss(toastId);
+    const { clip } = latest;
+    const beats = timelineBeats({ bpm, phaseMs, clipStartMs: clip.startMs, clipDurationMs: clip.durationMs, trimStartMs: clip.trimStartMs, playbackRate: clip.playbackRate });
+    if (main.locked) {
+      toast.error(`Unlock ${main.name} to move its cuts.`, { id: toastId });
+      return;
+    }
+    const { ops, moved } = snapCutsToBeats(composition, { trackId: main.id, beats, fromMs: clip.startMs, toMs: clipEndMs(clip) });
+    const tempo = `${Math.round(bpm)} BPM${measured ? ", measured" : ""}`;
+    if (moved === 0) {
+      toast.success(`Every cut is already on the beat (${tempo}).`, { id: toastId });
+      return;
+    }
+    const ok = await run("Snap cuts to the beat", ops);
+    if (ok) toast.success(`Cuts snapped to the beat (${tempo}). Undo puts them back.`, { id: toastId });
+    else toast.dismiss(toastId);
+  } catch (error) {
+    toast.error(errorMessage(error), { id: toastId });
+  } finally {
+    syncing = false;
+  }
+}
+
+// ── "Apply to all" offers ───────────────────────────────────────────────────
+
+/**
+ * After a change that people usually want everywhere (a transition, a filter,
+ * a colour adjustment), a toast offers to repeat it on the rest of the track.
+ * One toast at a time: a newer change replaces the offer, so they never pile up.
+ * Taking it is one undoable step.
+ */
+const OFFER_TOAST = "crewcut-apply-to-all";
+const OFFER_MS = 8000;
+
+function offer(message: string, description: string, actionLabel: string, apply: () => void): void {
+  toast(message, { id: OFFER_TOAST, description, duration: OFFER_MS, action: { label: actionLabel, onClick: apply } });
+}
+
+const sameTransition = (a: Transition | undefined, b: Transition | null) => (!a && !b) || (Boolean(a) && Boolean(b) && a?.type === b?.type && a?.durationMs === b?.durationMs && a?.direction === b?.direction);
+
+/** Clips on a visual track that start right where the one before ends: the cuts a transition plays at. */
+function cutClips(track: Track): VisualClip[] {
+  if (track.kind !== "visual") return [];
+  const clips = [...track.clips].sort((a, b) => a.startMs - b.startMs);
+  return clips.filter((clip, index) => index > 0 && Math.abs(clipEndMs(clips[index - 1]!) - clip.startMs) <= 50);
+}
+
+/** Offers the transition just set on `clipId` for every other cut on its track. */
+export function offerTransitionForAll(clipId: string): void {
+  const composition = state().composition;
+  const location = composition ? findClip(composition, clipId) : null;
+  if (!location || location.track.kind !== "visual" || location.track.locked || !("layers" in location.clip)) return;
+  const transition = location.clip.transitionIn ?? null;
+  const clips = [...location.track.clips].sort((a, b) => a.startMs - b.startMs);
+  const others = cutClips(location.track).filter((clip) => clip.id !== clipId && !sameTransition(clip.transitionIn, transition));
+  if (others.length === 0) return;
+  const label = transition ? (TRANSITION_CATALOG[transition.type]?.label ?? transition.type) : null;
+  offer(
+    label ? `${label} transition set` : "Transition removed",
+    label ? `Use it on the other ${others.length} cut${others.length === 1 ? "" : "s"} too?` : `Remove the transitions on the other ${others.length} cut${others.length === 1 ? "" : "s"} too?`,
+    label ? "Apply to all" : "Remove all",
+    () => {
+      const ops: CompositionOpInput[] = others.map((clip) => {
+        if (!transition) return { op: "set-transition", clipId: clip.id, transition: null };
+        // A transition can't outlast the clips on either side of its cut: shorten it where they're short.
+        const index = clips.findIndex((candidate) => candidate.id === clip.id);
+        const room = Math.min(clip.durationMs, clips[index - 1]?.durationMs ?? clip.durationMs) * 0.9;
+        return { op: "set-transition", clipId: clip.id, transition: { ...transition, durationMs: Math.round(Math.max(100, Math.min(transition.durationMs, room))) } };
+      });
+      void run(label ? `${label} on every cut` : "Remove every transition", ops);
+    },
+  );
+}
+
+/**
+ * Offers a clip's (or its photo/video's) filter or colour adjustment for the
+ * other clips on the same track. The Crewcut ending card is left alone.
+ */
+export function offerLookForAll(target: { clipId: string; layerId?: string }, kind: "filter" | "adjust"): void {
+  const composition = state().composition;
+  const location = composition ? findClip(composition, target.clipId) : null;
+  if (!location || location.track.kind !== "visual" || location.track.locked || !("layers" in location.clip)) return;
+  const source = target.layerId ? findLayer(location.clip, target.layerId)?.layer : null;
+  if (target.layerId && !source) return;
+  const value = (source ?? location.clip)[kind] ?? null;
+  const ops: CompositionOpInput[] = [];
+  for (const clip of location.track.clips) {
+    if (clip.id === location.clip.id || isCrewcutEnding(clip)) continue;
+    if (target.layerId) {
+      // A photo or video's look goes to the other clips' photos and videos.
+      const solo = soloLayer(clip);
+      if (!solo || (solo.type !== "image" && solo.type !== "video")) continue;
+      if (JSON.stringify(solo[kind] ?? null) === JSON.stringify(value)) continue;
+      ops.push({ op: "update-layer", clipId: clip.id, layerId: solo.id, patch: { [kind]: value } });
+    } else {
+      if (JSON.stringify(clip[kind] ?? null) === JSON.stringify(value)) continue;
+      ops.push({ op: "update-clip", clipId: clip.id, patch: { [kind]: value } });
+    }
+  }
+  if (ops.length === 0) return;
+  const what = kind === "filter" ? (value ? "Filter" : "Filter removed") : value ? "Colour adjustment" : "Adjustments reset";
+  const noun = target.layerId ? "photo or video" : "clip";
+  offer(
+    kind === "filter" && value ? "Filter applied" : what === "Colour adjustment" ? "Colour adjusted" : what,
+    `${value ? "Use the same look on" : "Do the same for"} the other ${ops.length} ${noun}${ops.length === 1 ? "" : "s"} on this track?`,
+    "Apply to all",
+    () => void run(kind === "filter" ? "Same filter on every clip" : "Same colour on every clip", ops),
+  );
 }
 
 export function applyMotion(clipId: string, layerIds: string[], presetId: string, mode: "enter" | "exit" = "enter"): void {

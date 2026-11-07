@@ -8,7 +8,9 @@ import { useLoadDemo } from "@/components/crewcut/dashboard/use-videos";
 import { HOME_PATH } from "@/lib/chat-paths";
 import { cn } from "@/lib/utils";
 
-import { PRIMARY_NAV, SECONDARY_NAV, useThemeToggle } from "./nav-items";
+import { useCatalogAccess } from "@/components/crewcut/catalog/use-catalog-access";
+
+import { ADMIN_NAV, PRIMARY_NAV, SECONDARY_NAV, useThemeToggle } from "./nav-items";
 
 function NavButton({ to, label, icon: Icon, active }: { to: string; label: string; icon: typeof IconHome; active: boolean }) {
   return (
@@ -66,7 +68,8 @@ export function MobileNav() {
   const home = byPath(HOME_PATH);
   const projects = byPath("/projects");
   const templates = byPath("/templates");
-  const moreItems = [...PRIMARY_NAV.filter((item) => item !== home && item !== projects && item !== templates), ...SECONDARY_NAV];
+  const access = useCatalogAccess();
+  const moreItems = [...PRIMARY_NAV.filter((item) => item !== home && item !== projects && item !== templates), ...(access?.admin ? [ADMIN_NAV] : []), ...SECONDARY_NAV];
   const moreActive = moreItems.some((item) => item.match(pathname));
 
   return (

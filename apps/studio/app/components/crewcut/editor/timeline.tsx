@@ -65,7 +65,7 @@ import {
 } from "@/components/ds";
 import { cn } from "@/lib/utils";
 
-import { addTrack, clipKind, deleteSelection, duplicateSelection, newId, run, soloLayer, splitAtPlayhead, toggleTrack, trackSpecOf, trimToPlayhead } from "./commands";
+import { addTrack, clipKind, deleteSelection, duplicateSelection, newId, run, snapCutsToBeat, soloLayer, splitAtPlayhead, toggleTrack, trackSpecOf, trimToPlayhead } from "./commands";
 import { ClipMenu, LaneMenu, TrackMenu } from "./context-menus";
 import { dropFiles, dropPayload } from "./drop";
 import { MAX_ZOOM, MIN_ZOOM, useEditor } from "./editor-store";
@@ -1046,6 +1046,7 @@ function TimelineToolbar({ density, collapsed, onToggleCollapse }: { density: De
   const undoCount = useEditor((state) => state.undoStack.length);
   const redoCount = useEditor((state) => state.redoStack.length);
   const hasSelection = useEditor((state) => state.selectedClipIds.length > 0);
+  const hasMusic = useEditor((state) => Boolean(state.composition?.tracks.some((track) => track.kind === "audio" && track.role === "music" && track.clips.length > 0)));
   const durationMs = useEditor((state) => state.composition?.durationMs ?? 1);
   const editor = useEditor.getState;
   const zoomLog = Math.log(zoom);
@@ -1087,6 +1088,11 @@ function TimelineToolbar({ density, collapsed, onToggleCollapse }: { density: De
       <IconButton label="Add marker" shortcut="M" onClick={() => void run("Add marker", [{ op: "set-marker", atMs: Math.round(editor().playheadMs), label: "" }])}>
         <IconBookmark />
       </IconButton>
+      {hasMusic ? (
+        <IconButton label="Snap cuts to the music's beat" onClick={() => void snapCutsToBeat()}>
+          <IconWaveSine />
+        </IconButton>
+      ) : null}
       <div className="ml-auto flex shrink-0 items-center gap-0.5">
         <IconButton label={ripple ? "Close gaps: on. Deleting or trimming a clip pulls the next ones in" : "Close gaps: off"} active={ripple} onClick={() => editor().toggleRipple()}>
           <IconArrowsExchange />

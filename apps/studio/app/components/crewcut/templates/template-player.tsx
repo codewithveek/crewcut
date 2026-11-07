@@ -15,8 +15,11 @@ export default function TemplatePlayer({
   playing = true,
   controls = false,
   playerRef,
+  assetUrls,
 }: {
   composition: Composition;
+  /** Links for `asset:<id>` media (saved templates carry their own). */
+  assetUrls?: Record<string, string> | undefined;
   muted?: boolean;
   playing?: boolean;
   controls?: boolean;
@@ -42,7 +45,7 @@ export default function TemplatePlayer({
     if (muted) player.mute();
     else player.unmute();
   }, [muted]);
-  const inputProps = useMemo(() => ({ composition, assetUrls: {}, options: { burnCaptions: false } }), [composition]);
+  const inputProps = useMemo(() => ({ composition, assetUrls: assetUrls ?? {}, options: { burnCaptions: false } }), [composition, assetUrls]);
   return (
     <Player
       ref={ref}

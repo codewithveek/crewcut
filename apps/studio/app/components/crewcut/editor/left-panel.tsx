@@ -58,12 +58,14 @@ import { fillToCss } from "@crewcut/renderer";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { Button, ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger, EmptyState, SearchField, Segmented, Slider, useDebouncedValue } from "@/components/ds";
+import { Button, ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger, EmptyState, InfiniteSentinel, SearchField, Segmented, Slider, useDebouncedValue } from "@/components/ds";
 import { errorMessage } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
 import { addCaptionAt, addElementAt, addLibraryAudioAt, addMediaAt, applyFilter, applyMotion, applyTransition, currentSelection, generateCaptionsFromNarration, run, soloLayer } from "./commands";
 import { type LeftTab, useEditor } from "./editor-store";
+import { ProBadge } from "../catalog/pro-badge";
+import { StockBrowser } from "./stock-browser";
 import { TransitionThumb } from "./transition-thumb";
 import { ACCEPTED_MEDIA, type AssetDto, type DragPayload, type LibraryItemDto, endDrag, hasFiles, startDrag, uploadMedia, useAssets, useAudioLibrary, useVideoFrames } from "./media";
 
@@ -149,7 +151,8 @@ function MediaTile({ asset, onDeleted }: { asset: AssetDto; onDeleted: () => voi
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className="group flex min-w-0 flex-col gap-1" {...draggable({ type: "asset", asset })}>
+        {/* Off-screen tiles skip layout and paint, so long libraries stay smooth. */}
+        <div className="group flex min-w-0 flex-col gap-1 [contain-intrinsic-size:auto_140px] [content-visibility:auto]" {...draggable({ type: "asset", asset })}>
           <div role="button" tabIndex={0} onDoubleClick={add} onKeyDown={(event) => event.key === "Enter" && add()} className="relative aspect-[4/3] w-full cursor-grab overflow-hidden rounded-ds-sm bg-ds-surface-3 outline-none focus-visible:ring-2 focus-visible:ring-ds-accent" aria-label={`${asset.label}. Drag to the timeline, double-click or press + to add.`}>
             {poster ? <img src={poster} alt="" draggable={false} className="size-full object-cover" /> : <span className="pc-skeleton absolute inset-0 rounded-none" />}
             {asset.mediaType === "video" ? (
@@ -189,11 +192,28 @@ function MediaTile({ asset, onDeleted }: { asset: AssetDto; onDeleted: () => voi
 }
 
 export function MediaTab() {
+  const [source, setSource] = useState<"yours" | "stock">("yours");
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <PanelHeader title="Media">
+        <Segmented size="sm" ariaLabel="Media source" value={source} onChange={setSource} options={[{ value: "yours", label: "Yours" }, { value: "stock", label: "Stock photos" }]} />
+      </PanelHeader>
+      {source === "stock" ? <StockBrowser mode="panel" className="min-h-0 flex-1" bodyClassName="min-h-0 flex-1 overflow-y-auto px-3 pb-4" /> : <YourMedia />}
+    </div>
+  );
+}
+
+function YourMedia() {
   const videoId = useEditor((state) => state.videoId);
   const [filter, setFilter] = useState<"all" | "image" | "video">("all");
   const [search, setSearch] = useState("");
   const settledSearch = useDebouncedValue(search, 250);
-  const { assets: visible, total, loading, refetch, hasMore, loadMore, loadingMore } = useAssets(videoId, { mediaType: filter === "all" ? "visual" : filter, query: settledSearch });
+  const { assets: visible, loading, error, refetch, hasMore, loadMore, loadingMore, listKey } = useAssets(videoId, { mediaType: filter === "all" ? "visual" : filter, query: settledSearch });
+  // A new search or filter starts at the top of the list.
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (list.current) list.current.scrollTop = 0;
+  }, [listKey]);
   const [dropping, setDropping] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const { busy, upload } = useUploader(videoId, (done) => {
@@ -216,13 +236,11 @@ export function MediaTab() {
         void upload(event.dataTransfer.files);
       }}
     >
-      <PanelHeader title="Media">
-        <Segmented size="sm" ariaLabel="Media type" value={filter} onChange={setFilter} options={[{ value: "all", label: "All" }, { value: "image", label: "Images" }, { value: "video", label: "Videos" }]} />
-      </PanelHeader>
-      <div className="px-3 pb-2">
-        <SearchField size="sm" value={search} onChange={setSearch} label="Search media" placeholder="Search media" />
+      <div className="flex flex-col gap-2 px-3 pb-2">
+        <SearchField size="sm" value={search} onChange={setSearch} label="Search media" placeholder="Search your media" />
+        <Segmented size="sm" ariaLabel="Media type" className="w-full" value={filter} onChange={setFilter} options={[{ value: "all", label: "All" }, { value: "image", label: "Images" }, { value: "video", label: "Videos" }]} />
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+      <div ref={list} className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         <div className="grid grid-cols-2 gap-x-2 gap-y-3">
           <button
             type="button"
@@ -237,11 +255,7 @@ export function MediaTab() {
             <MediaTile key={asset.id} asset={asset} onDeleted={() => void refetch()} />
           ))}
         </div>
-        {hasMore ? (
-          <Button size="sm" variant="ghost" className="mt-3 w-full" disabled={loadingMore} onClick={loadMore}>
-            {loadingMore ? "Loading…" : `Show more (${total - visible.length} left)`}
-          </Button>
-        ) : null}
+        <InfiniteSentinel hasMore={hasMore} loading={loadingMore} onLoadMore={loadMore} count={visible.length} error={error} resetKey={listKey} className="mt-2" />
         {!loading && visible.length === 0 ? (
           <p className="mt-4 text-center text-xs text-ds-text-3">{settledSearch.trim() ? `Nothing matches “${settledSearch.trim()}”.` : "Drop photos or videos here, or press Import. Then drag them onto the timeline."}</p>
         ) : null}
@@ -283,14 +297,17 @@ function usePreviewPlayer() {
   return { playing, toggle };
 }
 
-function AudioRow({ id, label, meta, url, onAdd, payload, playing, onToggle, onDelete }: { id: string; label: string; meta: string; url: string; onAdd: () => void; payload: DragPayload; playing: boolean; onToggle: (id: string, url: string) => void; onDelete?: () => void }) {
+function AudioRow({ id, label, meta, url, onAdd, payload, playing, onToggle, onDelete, pro }: { id: string; label: string; meta: string; url: string; onAdd: () => void; payload: DragPayload; playing: boolean; onToggle: (id: string, url: string) => void; onDelete?: () => void; pro?: boolean }) {
   return (
     <div className="group flex h-12 items-center gap-2 rounded-ds-sm px-1.5 hover:bg-ds-surface-2" {...draggable(payload)}>
       <button type="button" onClick={() => onToggle(id, url)} aria-label={playing ? `Pause ${label}` : `Play ${label}`} className="pc-press flex size-8 shrink-0 items-center justify-center rounded-full bg-ds-surface-3 text-ds-text outline-none focus-visible:ring-2 focus-visible:ring-ds-accent">
         {playing ? <IconPlayerPause className="size-4" /> : <IconPlayerPlay className="size-4" />}
       </button>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-medium text-ds-text">{label}</p>
+        <p className="flex items-center gap-1.5 text-[13px] font-medium text-ds-text">
+          <span className="truncate">{label}</span>
+          {pro ? <ProBadge className="px-1.5 text-[10px]" /> : null}
+        </p>
         <p className="truncate text-[11px] text-ds-text-3">{meta}</p>
       </div>
       {onDelete ? (
@@ -407,7 +424,7 @@ export function AudioTab() {
   const videoId = useEditor((state) => state.videoId);
   const [section, setSection] = useState<"music" | "sfx" | "uploads" | "record">("music");
   const { items, loading } = useAudioLibrary();
-  const { assets: uploads, refetch, hasMore: moreUploads, loadMore: loadMoreUploads } = useAssets(videoId, { mediaType: "audio" });
+  const { assets: uploads, refetch, hasMore: moreUploads, loadMore: loadMoreUploads, loadingMore: loadingUploads, error: uploadsError, listKey: uploadsKey } = useAssets(videoId, { mediaType: "audio" });
   const { playing, toggle } = usePreviewPlayer();
   const input = useRef<HTMLInputElement>(null);
   const { busy, upload } = useUploader(videoId, () => void refetch());
@@ -451,11 +468,7 @@ export function AudioTab() {
                 }}
               />
             ))}
-            {moreUploads ? (
-              <Button size="sm" variant="ghost" className="mx-1 mt-1 w-[calc(100%-8px)]" onClick={loadMoreUploads}>
-                Show more
-              </Button>
-            ) : null}
+            <InfiniteSentinel hasMore={moreUploads} loading={loadingUploads} onLoadMore={loadMoreUploads} count={uploads.length} error={uploadsError} resetKey={uploadsKey} />
           </>
         ) : (
           <>
@@ -471,9 +484,10 @@ export function AudioTab() {
                 onToggle={toggle}
                 payload={{ type: "library", item }}
                 onAdd={() => void addLibraryAudioAt(item)}
+                pro={item.tier === "pro"}
               />
             ))}
-            <p className="px-2 pt-3 text-[11px] text-ds-text-3">Generated by Crewcut, royalty-free for any use.</p>
+            <p className="px-2 pt-3 text-[11px] text-ds-text-3">Royalty-free for any use. Pro tracks are free to try; exporting a video with them needs Crewcut Pro.</p>
           </>
         )}
       </div>

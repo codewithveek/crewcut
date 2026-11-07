@@ -6,6 +6,7 @@ import {
   IconPhoto,
   IconPlugConnected,
   IconSettings,
+  IconShieldCheck,
   IconTemplate,
 } from "@tabler/icons-react";
 import { useTheme } from "next-themes";
@@ -36,6 +37,9 @@ export const SECONDARY_NAV: readonly NavItem[] = [
   { to: "/settings", label: "Settings", title: "Settings", icon: IconSettings, match: (path) => path.startsWith("/settings") || path.startsWith("/team") },
 ];
 
+/** Shown only to catalog admins (see useCatalogAccess). */
+export const ADMIN_NAV: NavItem = { to: "/admin", label: "Admin", title: "Catalog admin", icon: IconShieldCheck, match: (path) => path.startsWith("/admin") };
+
 export function isEditorPath(pathname: string): boolean {
   return /^\/videos\/[^/]+\/edit/.test(pathname);
 }
@@ -50,6 +54,7 @@ export function isCrewcutPage(pathname: string): boolean {
     pathname.startsWith("/templates") ||
     pathname.startsWith("/design") ||
     pathname.startsWith("/connections") ||
+    pathname.startsWith("/admin") ||
     (pathname.startsWith("/videos/") && !isEditorPath(pathname))
   );
 }
