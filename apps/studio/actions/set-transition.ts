@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { TRANSITION_CATALOG, TRANSITION_TYPES, setTransition, transitionSchema } from "@crewcut/composition";
+import { TRANSITION_CATALOG, TRANSITION_TYPES, setTransition, transitionPatchSchema } from "@crewcut/composition";
 import { z } from "zod";
 
 import { runCompositionEdit } from "../server/lib/composition-action.js";
@@ -12,7 +12,7 @@ export default defineAction({
   schema: z.object({
     videoId: z.string(),
     clipId: z.string(),
-    transition: transitionSchema.partial().nullable(),
+    transition: transitionPatchSchema.nullable(),
     returnFull: z.boolean().default(false),
   }),
   run: async ({ videoId, returnFull, ...input }, ctx) =>

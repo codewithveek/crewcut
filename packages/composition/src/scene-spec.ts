@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { iconNameSchema, fillSchema, layerSchema, transitionSchema } from "./schema";
+import { iconNameSchema, fillSchema, layerSchema, transitionPatchSchema } from "./schema";
 
 /** Zod mirror of `SceneSpec` (recipes), for actions and model output. */
 export const sceneSpecSchema = z.discriminatedUnion("kind", [
@@ -55,7 +55,7 @@ export const composeSceneSchema = z.object({
   beatId: z.string().optional(),
   lineIds: z.array(z.string()).default([]),
   claimIds: z.array(z.string()).default([]),
-  transition: transitionSchema.partial().nullable().optional(),
+  transition: transitionPatchSchema.nullable().optional(),
   timing: z.enum(["narration", "manual"]).default("narration"),
   recipe: sceneSpecSchema.optional(),
   layers: z.array(z.lazy(() => layerSchema)).max(80).optional(),

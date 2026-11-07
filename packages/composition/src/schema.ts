@@ -470,6 +470,18 @@ export const transitionSchema = z.object({
 });
 export type Transition = z.infer<typeof transitionSchema>;
 
+/**
+ * A change to a transition: only the fields given. Not `transitionSchema.partial()` — in Zod 4
+ * that still fills defaults, so sending just a new length would also reset the direction.
+ */
+export const transitionPatchSchema = z.object({
+  type: transitionTypeSchema.optional(),
+  durationMs: z.number().min(0).max(3000).optional(),
+  direction: z.enum(["left", "right", "up", "down"]).optional(),
+  easing: easingSchema.optional(),
+});
+export type TransitionPatch = z.infer<typeof transitionPatchSchema>;
+
 const clipTimingShape = {
   id: idSchema,
   name: z.string().max(80).optional(),

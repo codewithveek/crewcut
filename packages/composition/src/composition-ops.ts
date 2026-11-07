@@ -43,7 +43,7 @@ import {
   updateClip,
   updateLayer,
 } from "./ops";
-import { type Composition, type LayerDraft, type LayerInput, animatablePropertySchema, easingSchema, envelopePointSchema, transitionSchema } from "./schema";
+import { type Composition, type LayerDraft, type LayerInput, animatablePropertySchema, easingSchema, envelopePointSchema, transitionPatchSchema } from "./schema";
 import { ASPECT_RATIOS } from "./units";
 
 /**
@@ -158,7 +158,7 @@ export const compositionOpSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("distribute-layers"), targets: z.array(target).min(3), axis: z.enum(["horizontal", "vertical"]) }),
   z.object({ op: z.literal("group-layers"), clipId: z.string(), layerIds: z.array(z.string()).min(2), name: z.string().nullish() }),
   z.object({ op: z.literal("apply-motion-preset"), clipId: z.string(), layerIds: z.array(z.string()).min(1), presetId: z.string(), mode: z.enum(["enter", "exit"]).nullish(), atMs: z.number().nullish(), durationMs: z.number().nullish(), staggerMs: z.number().nullish() }),
-  z.object({ op: z.literal("set-transition"), clipId: z.string(), transition: transitionSchema.partial().nullable() }),
+  z.object({ op: z.literal("set-transition"), clipId: z.string(), transition: transitionPatchSchema.nullable() }),
   z.object({ op: z.literal("set-marker"), id: z.string().nullish(), atMs: z.number().min(0), label: z.string().max(60).nullish(), color: z.string().nullish() }),
   z.object({ op: z.literal("remove-marker"), id: z.string() }),
   z.object({ op: z.literal("set-track-state"), trackId: z.string(), patch: z.object({ hidden: z.boolean().nullish(), locked: z.boolean().nullish(), muted: z.boolean().nullish(), volume: z.number().min(0).max(2).nullish(), name: z.string().max(60).nullish() }) }),
