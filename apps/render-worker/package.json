@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit -p .",
     "template-stills": "tsx --env-file-if-exists=../studio/.env src/template-stills.ts",
     "transition-stills": "tsx --env-file-if-exists=../studio/.env src/transition-stills.ts",
-    "landing-videos": "tsx --env-file-if-exists=../studio/.env src/landing-videos.ts"
+    "landing-videos": "tsx --env-file-if-exists=../studio/.env src/landing-videos.ts",
+    "og-images": "tsx --env-file-if-exists=../studio/.env src/og-images.ts"
   },
   "dependencies": {
     "@crewcut/composition": "workspace:*",

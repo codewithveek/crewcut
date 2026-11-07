@@ -4,6 +4,7 @@ import type { LinksFunction, MetaFunction } from "react-router";
 import landingCss from "../landing.css?url";
 import { Footer, Nav } from "../landing-page";
 import legalCss from "./legal.css?url";
+import { ogLegal, pageMeta } from "../seo";
 import { LEGAL, LEGAL_PAGES, LEGAL_UPDATED, type LegalSlug } from "./legal-info";
 
 export type LegalSection = { id: string; title: string; body: ReactNode };
@@ -25,15 +26,7 @@ export const legalLinks: LinksFunction = () => [
 
 export function legalMeta(slug: LegalSlug, description: string): MetaFunction {
   const page = LEGAL_PAGES.find((entry) => entry.slug === slug)!;
-  return () => [
-    { title: `${page.title} · Crewcut` },
-    { name: "description", content: description },
-    { property: "og:title", content: `${page.title} · Crewcut` },
-    { property: "og:description", content: description },
-    { property: "og:image", content: "/landing/og.png" },
-    { tagName: "link", rel: "canonical", href: `${LEGAL.site}${page.href}` },
-    { name: "theme-color", content: "#0D0D0F" },
-  ];
+  return () => pageMeta({ title: `${page.title} · Crewcut`, description, path: page.href, image: ogLegal(slug), type: "article" });
 }
 
 /** The shared layout for the four legal pages: the site's nav and footer around a readable document. */
