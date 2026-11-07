@@ -6,6 +6,7 @@ import {
   useAgentSettingsTabs,
 } from "@agent-native/toolkit/app/settings";
 
+import { useOperatorOnlySettingsPages } from "@/components/crewcut/settings-visibility";
 import { APP_TITLE } from "@/lib/app-config";
 
 import changelog from "../../CHANGELOG.md?raw";
@@ -19,6 +20,7 @@ export default function SettingsRoute() {
   const t = useT();
   const agentSettingsTabs = useAgentSettingsTabs({ appName: APP_TITLE, extensionTools: true });
   useSetPageTitle(t("settings.title"));
+  useOperatorOnlySettingsPages();
 
   return (
     <SettingsTabsPage
