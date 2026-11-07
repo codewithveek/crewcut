@@ -68,14 +68,14 @@ export function GalleryPage() {
       <a href="#main" className="lp-skip">
         Skip to content
       </a>
-      <Nav home="/" />
+      <Nav home="/" current="/gallery" />
       <main id="main">
         <section className="lp-gallery-head" aria-labelledby="gallery-title">
           <div className="lp-wrap">
             <h1 id="gallery-title" className="lp-gallery-title">
               Templates
             </h1>
-            <p className="lp-gallery-lede">Hand-designed videos with real photos, motion and music. Preview any of them here, then make one yours with your own words and photos.</p>
+            <p className="lp-gallery-lede">Drop in your photos and words. The motion and music are already done. Preview any template here, free, then make it yours.</p>
           </div>
         </section>
 

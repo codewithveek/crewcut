@@ -1,14 +1,17 @@
 import {
   IconAdjustmentsHorizontal,
   IconArrowRight,
+  IconArrowUpRight,
   IconArrowsLeftRight,
   IconAspectRatio,
   IconBadgeCc,
+  IconBrandGithub,
   IconBrandYoutube,
   IconCheck,
   IconDownload,
   IconHistory,
   IconKeyframes,
+  IconMail,
   IconMicrophone,
   IconMusic,
   IconScissors,
@@ -20,7 +23,7 @@ import { type ReactNode, useRef } from "react";
 
 import { CrewcutMark } from "@/components/crewcut/primitives";
 
-import { LEGAL_PAGES } from "./legal/legal-info";
+import { LEGAL, LEGAL_PAGES } from "./legal/legal-info";
 
 import { HeroDemo } from "./hero-demo";
 import { type EditorShot, LiveEditor } from "./live-editor";
@@ -45,15 +48,39 @@ export function LandingPage() {
         <EditorTour />
         <FinalCall />
       </main>
-      <Footer />
+      <Footer home="" />
     </div>
   );
 }
 
 // ── Nav ─────────────────────────────────────────────────────────────────────
 
-/** On the landing page the section links stay in-page; elsewhere (the gallery) they point back to it. */
-export function Nav({ home = "" }: { home?: string }) {
+const GITHUB_HREF = "https://github.com/codewithveek/crewcut";
+
+/** The site's sections. On the landing page they stay in-page; elsewhere they point back to it. */
+function navLinks(home: string): Array<{ label: string; href: string; page?: string }> {
+  return [
+    { label: "How it works", href: `${home}#crew` },
+    { label: "Fact-check", href: `${home}#receipts` },
+    { label: "Templates", href: "/gallery", page: "/gallery" },
+    { label: "Editor", href: `${home}#editor` },
+  ];
+}
+
+/**
+ * The site header. Wide screens show every link in the bar; narrow ones keep
+ * the logo and "Start free" in the bar and put the rest in a menu. The menu is
+ * a native popover, so it opens, closes on Escape and on a tap outside even
+ * before the page's scripts have loaded.
+ */
+export function Nav({ home = "", current }: { home?: string; current?: string }) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const links = navLinks(home);
+  // An in-page link scrolls but doesn't leave the page, so close the menu by hand.
+  const closeMenu = () => {
+    const menu = menuRef.current;
+    if (menu?.matches(":popover-open")) menu.hidePopover();
+  };
   return (
     <header className="lp-nav">
       <div className="lp-wrap lp-nav-row">
@@ -61,20 +88,44 @@ export function Nav({ home = "" }: { home?: string }) {
           <CrewcutMark motion="intro" hover className="size-8" />
           <span className="lp-wordmark">crewcut</span>
         </a>
-        <nav aria-label="Sections" className="lp-nav-links">
-          <a href={`${home}#crew`}>How it works</a>
-          <a href={`${home}#receipts`}>Fact-check</a>
-          <a href="/gallery">Templates</a>
-          <a href={`${home}#editor`}>Editor</a>
+        <nav aria-label="Main" className="lp-nav-links">
+          {links.map((link) => (
+            <a key={link.label} href={link.href} aria-current={link.page && link.page === current ? "page" : undefined}>
+              {link.label}
+            </a>
+          ))}
         </nav>
         <div className="lp-nav-actions">
-          <a href={SIGN_IN_HREF} className="lp-link-quiet">
+          <a href={SIGN_IN_HREF} className="lp-link-quiet lp-nav-signin">
             Sign in
           </a>
           <a href={START_HREF} className="lp-btn lp-btn-cut lp-btn-sm">
             Start free
           </a>
+          <button type="button" className="lp-menu-btn" popoverTarget="lp-menu" aria-controls="lp-menu" aria-label="Menu">
+            <span aria-hidden />
+            <span aria-hidden />
+          </button>
         </div>
+      </div>
+      <div ref={menuRef} id="lp-menu" popover="auto" className="lp-menu">
+        <nav aria-label="Menu" className="lp-menu-links">
+          {links.map((link, index) => (
+            <a key={link.label} href={link.href} onClick={closeMenu} style={{ "--i": index } as React.CSSProperties} aria-current={link.page && link.page === current ? "page" : undefined}>
+              {link.label}
+              <IconArrowRight className="size-5" aria-hidden />
+            </a>
+          ))}
+        </nav>
+        <div className="lp-menu-actions">
+          <a href={START_HREF} className="lp-btn lp-btn-cut">
+            Start free
+          </a>
+          <a href={SIGN_IN_HREF} className="lp-btn lp-btn-ghost">
+            Sign in
+          </a>
+        </div>
+        <p className="lp-menu-note">Free while in beta. No card needed.</p>
       </div>
     </header>
   );
@@ -325,12 +376,88 @@ export function FinalCall() {
   );
 }
 
-export function Footer() {
+/**
+ * The site footer: a statement and the support address, then link columns,
+ * then a bottom bar. The page ends the way Crewcut videos do, on the ending
+ * card, which plays once it scrolls into view.
+ */
+export function Footer({ home = "/" }: { home?: string }) {
   const endRef = useRef<HTMLDivElement>(null);
-  const seen = useInView(endRef, { once: true, rootMargin: "0px 0px -15% 0px" });
+  const seen = useInView(endRef, { once: true, rootMargin: "0px 0px -10% 0px" });
+  // "" keeps the section links in-page (on the landing page itself).
+  const anchor = home;
+  const columns: Array<{ title: string; links: Array<{ label: string; href: string; external?: boolean }> }> = [
+    {
+      title: "Product",
+      links: [
+        { label: "How it works", href: `${anchor}#crew` },
+        { label: "Fact-check", href: `${anchor}#receipts` },
+        { label: "Editor", href: `${anchor}#editor` },
+        { label: "Templates", href: "/gallery" },
+      ],
+    },
+    {
+      title: "Get started",
+      links: [
+        { label: "Start free", href: START_HREF },
+        { label: "Sign in", href: SIGN_IN_HREF },
+        { label: "Browse templates", href: "/gallery" },
+      ],
+    },
+    {
+      title: "Help",
+      links: [
+        { label: "Email support", href: `mailto:${LEGAL.email}` },
+        { label: "Source code", href: GITHUB_HREF, external: true },
+      ],
+    },
+    { title: "Legal", links: LEGAL_PAGES.map((page) => ({ label: page.short, href: page.href })) },
+  ];
   return (
     <footer className="lp-footer">
-      {/* The page ends the way Crewcut videos do: the ending card. */}
+      <div className="lp-wrap">
+        <div className="lp-footer-top">
+          <div className="lp-footer-brand">
+            <p className="lp-footer-statement">
+              The video editor for you <span>and your AI crew.</span>
+            </p>
+            <p className="lp-footer-blurb">Agents research, script, edit and voice. You approve each step and can take over the edit any time.</p>
+            <a href={`mailto:${LEGAL.email}`} className="lp-footer-mail">
+              <IconMail className="size-4" aria-hidden />
+              {LEGAL.email}
+            </a>
+          </div>
+          <div className="lp-footer-cols">
+            {columns.map((column) => (
+              <nav key={column.title} aria-labelledby={`footer-${column.title}`} className="lp-footer-col">
+                <h2 id={`footer-${column.title}`}>{column.title}</h2>
+                <ul>
+                  {column.links.map((link) => (
+                    <li key={link.label}>
+                      <a href={link.href} {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
+                        {link.label}
+                        {link.external ? <IconArrowUpRight className="lp-footer-ext" aria-label="(opens in a new tab)" /> : null}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            ))}
+          </div>
+        </div>
+        <div className="lp-footer-bar">
+          <p>© 2026 Crewcut. Free while in beta.</p>
+          <div className="lp-footer-social">
+            <a href={GITHUB_HREF} target="_blank" rel="noopener noreferrer" aria-label="Crewcut on GitHub (opens in a new tab)">
+              <IconBrandGithub aria-hidden />
+            </a>
+            <a href={`mailto:${LEGAL.email}`} aria-label={`Email ${LEGAL.email}`}>
+              <IconMail aria-hidden />
+            </a>
+          </div>
+        </div>
+      </div>
+      {/* The ending card, as at the end of every Crewcut video. */}
       <div ref={endRef} className="lp-ending" data-play={seen || undefined}>
         <CrewcutMark variant="glyph" motion={seen ? "intro" : "none"} className="lp-ending-mark" />
         <span className="lp-ending-word" aria-label="crewcut">
@@ -340,22 +467,6 @@ export function Footer() {
             </span>
           ))}
         </span>
-      </div>
-      <div className="lp-wrap lp-footer-row">
-        <p>Built with Agent-Native, Remotion, ElevenLabs and Pexels.</p>
-        <nav aria-label="Footer" className="lp-footer-links">
-          <a href="/gallery">Templates</a>
-          <a href={SIGN_IN_HREF}>Sign in</a>
-          <a href={START_HREF}>Start free</a>
-        </nav>
-        <nav aria-label="Legal" className="lp-footer-links">
-          {LEGAL_PAGES.map((page) => (
-            <a key={page.slug} href={page.href}>
-              {page.short}
-            </a>
-          ))}
-        </nav>
-        <p>© 2026 Crewcut</p>
       </div>
     </footer>
   );

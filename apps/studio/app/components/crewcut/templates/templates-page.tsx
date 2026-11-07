@@ -85,7 +85,7 @@ export function TemplatesPage() {
     <div className="mx-auto flex w-full min-w-0 max-w-6xl flex-col gap-5 px-4 pb-10 pt-5 sm:px-8 sm:pt-9">
       <header className="flex flex-col gap-1">
         <h1 className="ds-title text-ds-text sm:text-2xl">Templates</h1>
-        <p className="text-[13px] text-ds-text-2">Hand-designed videos with real photos, motion and music. Pick one, then swap in your own words and photos.</p>
+        <p className="text-[13px] text-ds-text-2">Pick one and drop in your photos and words. The motion and music are already done.</p>
       </header>
 
       <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center">
