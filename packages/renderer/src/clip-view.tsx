@@ -34,9 +34,11 @@ function ClipView({ clip, localMs, style, isBase }: { clip: VisualClip; localMs:
         {clip.layers.map((layer) => (
           <LayerView
             key={layer.id}
-            layer={layer}
+            // Held past its end as a transition's outgoing clip: layers that ran to the clip's
+            // end stay on screen (from the very first frame — at exactly the end they'd count as over).
+            layer={localMs >= clip.durationMs && layer.durationMs !== undefined && layer.startMs + layer.durationMs >= clip.durationMs - 1 ? { ...layer, durationMs: undefined } : layer}
             parentLocalMs={localMs}
-            parentDurationMs={localMs > clip.durationMs ? localMs + 1 : clip.durationMs}
+            parentDurationMs={localMs >= clip.durationMs ? localMs + 1 : clip.durationMs}
             parentStartFrame={Math.round((clip.startMs / 1000) * fps)}
             cameraOffset={cameraTransform ? { x: cameraTransform.offsetX, y: cameraTransform.offsetY } : { x: 0, y: 0 }}
           />
