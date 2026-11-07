@@ -8,6 +8,7 @@ import { topFive } from "./library/top-five";
 import type { TemplateCategory, TemplateDefinition } from "./types";
 
 export * from "./build";
+export * from "./data";
 export * from "./kit";
 export * from "./types";
 

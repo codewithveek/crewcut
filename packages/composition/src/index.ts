@@ -20,3 +20,4 @@ export * from "./elements";
 export * from "./templates";
 export * from "./ending";
 export * from "./transitions";
+export * from "./beats";

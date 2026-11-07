@@ -35,6 +35,32 @@ export const FPS_OPTIONS = [24, 25, 30, 50, 60] as const;
 export const DEFAULT_FPS = 30;
 export const DESIGN_SHORT_SIDE = 1080;
 
+/**
+ * Export sizes, named by the short side like most editors (a 9:16 "1080p"
+ * video is 1080×1920). Layouts are % of the frame and design px scale with the
+ * short side, so any size renders the same picture, just sharper or lighter.
+ */
+export const EXPORT_RESOLUTIONS = [
+  { id: "480p", shortSide: 480, label: "480p" },
+  { id: "720p", shortSide: 720, label: "720p" },
+  { id: "1080p", shortSide: 1080, label: "1080p" },
+  { id: "1440p", shortSide: 1440, label: "2K" },
+  { id: "2160p", shortSide: 2160, label: "4K" },
+] as const;
+export type ExportResolution = (typeof EXPORT_RESOLUTIONS)[number]["id"];
+export const EXPORT_RESOLUTION_IDS = EXPORT_RESOLUTIONS.map((entry) => entry.id) as [ExportResolution, ...ExportResolution[]];
+export const DEFAULT_EXPORT_RESOLUTION: ExportResolution = "1080p";
+/** Longest side an export may have (H.264 players reliably decode up to 4096 px). */
+export const MAX_EXPORT_SIDE = 4096;
+
+/** The frame size of an export: short side from the resolution, long side capped, both even (H.264 needs even sizes). */
+export function exportSize(width: number, height: number, resolution: ExportResolution): { width: number; height: number } {
+  const target = EXPORT_RESOLUTIONS.find((entry) => entry.id === resolution)?.shortSide ?? DESIGN_SHORT_SIDE;
+  const scale = Math.min(target / Math.min(width, height), MAX_EXPORT_SIDE / Math.max(width, height));
+  const even = (value: number) => Math.max(2, Math.round((value * scale) / 2) * 2);
+  return { width: even(width), height: even(height) };
+}
+
 export function designScale(width: number, height: number): number {
   return Math.min(width, height) / DESIGN_SHORT_SIDE;
 }

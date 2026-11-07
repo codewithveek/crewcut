@@ -18,8 +18,10 @@ export interface StockPhoto {
   photographerUrl: string;
   alt: string;
   avgColor: string;
-  /** Small preview for galleries (~350–940 px). */
+  /** Preview for galleries and template previews (~940 px wide). */
   previewUrl: string;
+  /** Small thumbnail for dense grids (~350 px tall). Missing on picks saved before it existed. */
+  thumbUrl?: string;
   /** Large file for projects and renders (~1880 px). */
   fullUrl: string;
 }
@@ -73,6 +75,12 @@ export function createStockClient(options: StockClientOptions) {
       const data = await call<{ photos: PexelsPhoto[]; total_results: number }>(`/v1/search?${params}`);
       return { photos: data.photos.map(toStockPhoto), total: data.total_results };
     },
+    /** Pexels' hand-picked photos, for browsing before anything is searched. */
+    async curatedPhotos(search: { perPage?: number; page?: number } = {}): Promise<{ photos: StockPhoto[]; total: number }> {
+      const params = new URLSearchParams({ per_page: String(Math.min(Math.max(search.perPage ?? 15, 1), 80)), page: String(Math.max(search.page ?? 1, 1)) });
+      const data = await call<{ photos: PexelsPhoto[]; total_results: number }>(`/v1/curated?${params}`);
+      return { photos: data.photos.map(toStockPhoto), total: data.total_results };
+    },
     async getPhoto(id: number): Promise<StockPhoto> {
       return toStockPhoto(await call<PexelsPhoto>(`/v1/photos/${id}`));
     },
@@ -93,6 +101,7 @@ function toStockPhoto(photo: PexelsPhoto): StockPhoto {
     alt: photo.alt ?? "",
     avgColor: photo.avg_color ?? "#808080",
     previewUrl: photo.src.large,
+    thumbUrl: photo.src.medium,
     fullUrl: photo.src.large2x,
   };
 }
