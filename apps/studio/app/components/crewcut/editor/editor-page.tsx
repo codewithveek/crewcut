@@ -607,7 +607,8 @@ function TopBar({ onExport, onPublish, onInspector, compact, short }: { onExport
             <DropdownMenuItem icon={<IconTemplate />} onSelect={() => setTemplateOpen(true)}>
               Save as template
             </DropdownMenuItem>
-            <DropdownMenuItem icon={<IconGitBranch />} onSelect={() => navigate(`/videos/${videoId}`)}>
+            {/* Only where the bar's own Pipeline button is hidden (narrower than lg). */}
+            <DropdownMenuItem icon={<IconGitBranch />} className="lg:hidden" onSelect={() => navigate(`/videos/${videoId}`)}>
               Pipeline
             </DropdownMenuItem>
           </DropdownMenuContent>
