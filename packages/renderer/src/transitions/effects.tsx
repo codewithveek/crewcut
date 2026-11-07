@@ -528,6 +528,50 @@ const motion: Partial<Record<TransitionType, Effect>> = {
       middle: <Shadowed rects={rects} blur={36 * c.unit} opacity={0.5 * (1 - seg(c.t, 0.85, 1))} />,
     };
   },
+  "step-scroll": (c) => {
+    // Matched frame by frame to a reference recording (measured from the buttons' edges, which
+    // scale with their card): a vertical stack of cards scrolls by one card on one critically
+    // damped spring (response ~0.4 s, no overshoot, no blur) that drives position AND scale
+    // together. Cards above the active one sit at 0.85× and ~55% opacity, so a card moving up into
+    // that stack shrinks smoothly as it goes, and in "back" the card returning from it grows the
+    // same way. Cards below keep their size and come in faint. Scale anchors at the card's bottom
+    // edge so the gap to the next card holds. The leaving clip fades out over the last stretch
+    // because it ends with the transition.
+    const full = { top: 0, bottom: c.height };
+    const a = c.exitBox ?? full;
+    const b = c.enterBox ?? full;
+    const gap = 0.06 * c.height;
+    const up = c.direction !== "down";
+    // Up: B waits below A and A ends above B's resting place. Down mirrors it.
+    const enterFrom = up ? a.bottom + gap - b.top : a.top - gap - b.bottom;
+    const exitTo = up ? b.top - gap - a.bottom : b.bottom + gap - a.top;
+    const seconds = Math.max(0.05, c.durationMs / 1000);
+    const p = settle(c.t, c.durationMs, 1, Math.min(1.2, 0.4 / seconds));
+    const stacked = 0.85;
+    const dimAbove = 0.55;
+    const dimBelow = 0.25;
+    const leave = 1 - smooth(0.7, 1, c.t);
+    const exitScale = up ? mix(1, stacked, p) : 1;
+    const enterScale = up ? 1 : mix(stacked, 1, p);
+    const exitOpacity = (up ? mix(1, dimAbove, p) : mix(1, dimBelow, p)) * leave;
+    const enterOpacity = up ? mix(dimBelow, 1, p) : mix(dimAbove, 1, p);
+    return {
+      exit: {
+        style: {
+          transform: `translateY(${px(exitTo * p)}) scale(${exitScale.toFixed(4)})`,
+          transformOrigin: `50% ${px(a.bottom)}`,
+          opacity: exitOpacity,
+        },
+      },
+      enter: {
+        style: {
+          transform: `translateY(${px(enterFrom * (1 - p))}) scale(${enterScale.toFixed(4)})`,
+          transformOrigin: `50% ${px(b.bottom)}`,
+          opacity: enterOpacity,
+        },
+      },
+    };
+  },
 
 
   "falling-boxes": (c) => {

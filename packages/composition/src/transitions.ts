@@ -78,6 +78,7 @@ export const TRANSITION_CATALOG: Record<TransitionType, TransitionInfo> = {
   fracture: { label: "Fracture", group: "motion", description: "A quick move that splits the frame into staggered bands.", durationMs: 500, directions: ALL, stillAt: 0.45 },
   "split-bounce": { label: "Split and bounce", group: "motion", description: "Panels of the next clip drop in and bounce.", durationMs: 850, directions: ["down", "up"], stillAt: 0.35, ownTiming: true },
   "frame-split": { label: "Frame split", group: "motion", description: "Three panels slide in from opposite directions.", durationMs: 750, directions: NONE, stillAt: 0.45 },
+  "step-scroll": { label: "Step scroll", group: "motion", description: "Scrolls a stack by one card on one smooth spring: the card moving up into the stack shrinks and dims as it goes; stepping back, it grows as it returns. Moves by the card's own height for elements.", durationMs: 550, directions: ["up", "down"], stillAt: 0.3, ownTiming: true },
   "falling-boxes": { label: "Falling boxes", group: "motion", description: "The next clip falls into place as a grid of boxes.", durationMs: 1000, directions: NONE, stillAt: 0.4, ownTiming: true },
 
   static: { label: "Static", group: "glitch", description: "A short burst of digital static.", durationMs: 450, directions: NONE, stillAt: 0.45 },
@@ -178,6 +179,8 @@ export const TRANSITION_PRESETS: ReadonlyArray<TransitionPreset> = [
   preset("split-bounce", "split-bounce", undefined, "down"),
   preset("frame-split", "frame-split"),
   preset("falling-boxes", "falling-boxes"),
+  preset("step-scroll", "step-scroll", "Step scroll", "up", "Scrolls up to the next card, like a step-by-step form."),
+  preset("step-back", "step-scroll", "Step back", "down", "Scrolls back down to the previous card."),
 
   preset("static", "static"),
   preset("digital-static", "digital-static"),

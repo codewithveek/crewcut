@@ -439,6 +439,7 @@ export const TRANSITION_TYPES = [
   "split-bounce",
   "frame-split",
   "falling-boxes",
+  "step-scroll",
   // Glitch
   "static",
   "digital-static",
