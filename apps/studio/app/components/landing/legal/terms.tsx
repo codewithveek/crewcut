@@ -92,14 +92,16 @@ export const termsDoc: LegalDoc = {
         <>
           <p>
             {LEGAL.product} is currently offered free of charge. We may offer paid plans in the future. Before you buy one, we will show you the
-            price, what it includes, how often you will be billed and the payment provider, and you will have to agree to those details. Any
-            plan-specific terms we show you then form part of this agreement.
+            price, what it includes and how often you will be billed, and you will have to agree to those details. Any plan-specific terms we
+            show you then form part of this agreement.
           </p>
           <H3>If you buy a paid plan</H3>
           <ul>
             <li>
-              <strong>Billing:</strong> paid plans are charged in advance for each billing period, through the payment provider named at checkout.
-              We don&rsquo;t store your full card details.
+              <strong>Billing:</strong> paid plans are charged in advance for each billing period. Payments are processed by Bachs Technologies
+              Limited (&ldquo;Bachs&rdquo;), a payments company in {LEGAL.country}, using the methods its checkout offers, such as cards, bank
+              transfer or mobile money. We are the seller: your contract for a paid plan is with us, and you bring questions, refunds and
+              complaints to us, not to Bachs. We never receive or store your full card details.
             </li>
             <li>
               <strong>Renewal:</strong> subscriptions renew automatically at the end of each period until you cancel. We will remind you before an

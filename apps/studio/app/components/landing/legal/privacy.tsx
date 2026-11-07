@@ -91,6 +91,11 @@ export const privacyDoc: LegalDoc = {
               with AES-256-GCM. We use it only to make the requests you ask for.
             </li>
             <li>
+              <strong>Billing details (paid plans only):</strong> if you buy a paid plan, your name, email address and billing country, the plan
+              you chose, and a record of each payment (amount, currency, date and status). You enter your payment details on the checkout of
+              our payment provider, Bachs. We never receive or store your full card number.
+            </li>
+            <li>
               <strong>Teams and sharing:</strong> the email addresses of people you invite to a team or share an item with.
             </li>
             <li>
@@ -191,6 +196,11 @@ export const privacyDoc: LegalDoc = {
                 "Know which links and campaigns bring people to Crewcut",
                 "Attribution cookies and the sign-up attribution fields",
                 "Consent in the EU and EEA; legitimate interests elsewhere (you can opt out)",
+              ],
+              [
+                "Take payment for paid plans, and keep billing and tax records",
+                "Billing details",
+                "Performing our contract; legal obligation for tax and accounting records",
               ],
               [
                 "Answer your messages and privacy requests",
@@ -366,6 +376,14 @@ export const privacyDoc: LegalDoc = {
                 "Stock photo and video search, and the stock images on our pages",
                 "Your search words, sent from our servers. Stock images in the app and on our home page load straight from Pexels, so your browser sends it your IP address.",
               ],
+              [
+                "Bachs Technologies Limited (Nigeria)",
+                <>
+                  Processes payments for paid plans. For fraud prevention and financial-crime checks it acts as an independent controller under
+                  its own <Ext href="https://bachs.io/privacy">privacy policy</Ext>
+                </>,
+                "Your name, email, billing details, the payment details you enter at checkout, and payment records",
+              ],
               ["Our email provider", "Receives and stores email you send us", "Your email address and your messages"],
             ]}
           />
@@ -442,6 +460,7 @@ export const privacyDoc: LegalDoc = {
               ["Detailed AI crew run records", "30 days"],
               ["Your ratings of the crew's work, and run totals", "As long as your account exists"],
               ["YouTube data", "As described in section 6"],
+              ["Billing and payment records", "As long as tax and accounting laws require, usually six years after the payment"],
               ["Support messages", "Until the issue is resolved, then up to 2 years in case it comes up again"],
               ["Records of privacy requests", "Up to 3 years, to show we handled them"],
             ]}
