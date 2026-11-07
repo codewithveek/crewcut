@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import type { Palette, Transition } from "@crewcut/composition";
 import { easedSegmentProgress } from "@crewcut/motion";
 
-import { type LayerSpec, type TransitionFrame, transitionFrame } from "./effects";
+import { type ContentBox, type LayerSpec, type TransitionFrame, transitionFrame } from "./effects";
 import { SvgFilter, clamp01, filterActive } from "./kit";
 
 /** Eased progress and normalised speed at raw progress `t`. */
@@ -35,6 +35,31 @@ export interface TransitionStageProps {
   fontFamily: string;
   /** url()-safe prefix for SVG filter ids; unique per stage on the page. */
   idPrefix: string;
+  /** What each clip draws (defaults to the whole frame). */
+  exitBox?: ContentBox;
+  enterBox?: ContentBox;
+  /** The clips don't fill the frame: transition graphics stay inside their boxes. */
+  transparent?: boolean;
+}
+
+/**
+ * Where a transition's graphics may draw when the clips are elements: the two
+ * boxes together, padded. Shapes and glitches get a rounded clip; light gets a
+ * feathered ellipse so a burn reads as a flare on the element, not a box.
+ */
+function containment(width: number, height: number, a: ContentBox | undefined, b: ContentBox | undefined): { clip: CSSProperties; feather: CSSProperties } | null {
+  if (!a && !b) return null;
+  const boxes = [a, b].filter((box): box is ContentBox => Boolean(box));
+  const pad = 0.05 * Math.min(width, height);
+  const left = Math.max(0, Math.min(...boxes.map((box) => box.left)) - pad);
+  const top = Math.max(0, Math.min(...boxes.map((box) => box.top)) - pad);
+  const right = Math.min(width, Math.max(...boxes.map((box) => box.right)) + pad);
+  const bottom = Math.min(height, Math.max(...boxes.map((box) => box.bottom)) + pad);
+  if (right <= left || bottom <= top) return null;
+  const radius = Math.min(right - left, bottom - top) * 0.08;
+  const clipPath = `inset(${top.toFixed(1)}px ${(width - right).toFixed(1)}px ${(height - bottom).toFixed(1)}px ${left.toFixed(1)}px round ${radius.toFixed(1)}px)`;
+  const mask = `radial-gradient(ellipse ${(((right - left) / 2) * 1.25).toFixed(1)}px ${(((bottom - top) / 2) * 1.25).toFixed(1)}px at ${((left + right) / 2).toFixed(1)}px ${((top + bottom) / 2).toFixed(1)}px, #000 45%, transparent 100%)`;
+  return { clip: { clipPath }, feather: { maskImage: mask, WebkitMaskImage: mask } };
 }
 
 const layerBase: CSSProperties = { position: "absolute", inset: 0 };
@@ -62,13 +87,17 @@ export function TransitionStage(props: TransitionStageProps) {
   const active = Boolean(transition && transition.type !== "cut" && transition.durationMs > 0 && exit != null && exitKey);
   if (!active || !transition) {
     return (
-      <div style={isolate}>
+      <>
         {[
-          <div key={enterKey} style={layerBase}>
-            {enter}
+          <div key="track" style={isolate}>
+            {[
+              <div key={enterKey} style={layerBase}>
+                {enter}
+              </div>,
+            ]}
           </div>,
         ]}
-      </div>
+      </>
     );
   }
   const t = clamp01(props.t ?? 0);
@@ -89,43 +118,53 @@ export function TransitionStage(props: TransitionStageProps) {
     frame,
     fontFamily,
     id,
+    ...(props.exitBox ? { exitBox: props.exitBox } : {}),
+    ...(props.enterBox ? { enterBox: props.enterBox } : {}),
+    ...(props.transparent ? { transparent: true } : {}),
   });
+  const contain = props.transparent ? containment(width, height, props.exitBox, props.enterBox) : null;
   const exitFilter = filterActive(frameSpec.exit.filter) && !frameSpec.exit.hidden ? `${id}-fx` : null;
   const enterFilter = filterActive(frameSpec.enter.filter) && !frameSpec.enter.hidden ? `${id}-fn` : null;
   const exitOnTop = frameSpec.top === "exit";
   return (
-    <div style={isolate}>
+    <>
       {[
-        <div key={exitKey} style={layerStyle(frameSpec.exit, exitFilter, exitOnTop ? 3 : 1)}>
-          {exit}
+        <div key="track" style={isolate}>
+          {[
+            <div key={exitKey} style={layerStyle(frameSpec.exit, exitFilter, exitOnTop ? 3 : 1)}>
+              {exit}
+            </div>,
+            <div key={enterKey} style={layerStyle(frameSpec.enter, enterFilter, exitOnTop ? 1 : 3)}>
+              {enter}
+            </div>,
+            exitFilter || enterFilter ? (
+              <svg key="defs" width={0} height={0} style={{ position: "absolute" }} aria-hidden>
+                <defs>
+                  {exitFilter && frameSpec.exit.filter ? <SvgFilter id={exitFilter} spec={frameSpec.exit.filter} /> : null}
+                  {enterFilter && frameSpec.enter.filter ? <SvgFilter id={enterFilter} spec={frameSpec.enter.filter} /> : null}
+                </defs>
+              </svg>
+            ) : null,
+            frameSpec.middle ? (
+              <div key="middle" style={{ ...layerBase, zIndex: 2, pointerEvents: "none", ...contain?.clip }}>
+                {frameSpec.middle}
+              </div>
+            ) : null,
+            frameSpec.overlay ? (
+              <div key="overlay" style={{ ...layerBase, zIndex: 4, pointerEvents: "none", ...contain?.clip }}>
+                {frameSpec.overlay}
+              </div>
+            ) : null,
+          ]}
         </div>,
-        <div key={enterKey} style={layerStyle(frameSpec.enter, enterFilter, exitOnTop ? 1 : 3)}>
-          {enter}
-        </div>,
-        exitFilter || enterFilter ? (
-          <svg key="defs" width={0} height={0} style={{ position: "absolute" }} aria-hidden>
-            <defs>
-              {exitFilter && frameSpec.exit.filter ? <SvgFilter id={exitFilter} spec={frameSpec.exit.filter} /> : null}
-              {enterFilter && frameSpec.enter.filter ? <SvgFilter id={enterFilter} spec={frameSpec.enter.filter} /> : null}
-            </defs>
-          </svg>
-        ) : null,
-        frameSpec.middle ? (
-          <div key="middle" style={{ ...layerBase, zIndex: 2, pointerEvents: "none" }}>
-            {frameSpec.middle}
-          </div>
-        ) : null,
-        frameSpec.overlay ? (
-          <div key="overlay" style={{ ...layerBase, zIndex: 4, pointerEvents: "none" }}>
-            {frameSpec.overlay}
-          </div>
-        ) : null,
+        // Light sits just outside the track's isolated group so screen blending lightens what is
+        // really underneath (the shot below an element) instead of painting on transparency.
         frameSpec.glow ? (
-          <div key="glow" style={{ ...layerBase, zIndex: 5, pointerEvents: "none", mixBlendMode: "screen" }}>
+          <div key="glow" style={{ ...layerBase, pointerEvents: "none", mixBlendMode: "screen", ...contain?.feather }}>
             {frameSpec.glow}
           </div>
         ) : null,
       ]}
-    </div>
+    </>
   );
 }

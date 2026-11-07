@@ -69,6 +69,26 @@ export interface TransitionContext {
   fontFamily: string;
   /** Unique, url()-safe prefix for SVG ids. */
   id: string;
+  /** What each clip actually draws (px): the whole frame for full shots, the element's box otherwise. */
+  exitBox?: ContentBox;
+  enterBox?: ContentBox;
+  /**
+   * The clips don't fill the frame (elements and text on an overlay track): there is no
+   * picture to smear behind them, so effects drop zoom ghosts and edge blur.
+   */
+  transparent?: boolean;
+}
+
+export interface ContentBox {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/** Zoom-blurs the frame's edges, but only behind a full-frame shot: on an element it would blur the shot underneath. */
+function edgeBlur(c: TransitionContext, amount: number, strength: number) {
+  return c.transparent ? null : <EdgeBlur amount={amount} strength={strength} />;
 }
 
 export interface LayerSpec {
@@ -162,11 +182,11 @@ const featherAt = (scale: number, smallest: number) => (scale >= 1 ? 0 : clamp01
 function zoomJump(c: TransitionContext, outward: boolean, peak = 1.55): TransitionFrame {
   const { k, m, after } = halves(c);
   const blur = c.speed * 9 * c.unit;
-  const overlay = <EdgeBlur amount={22 * c.unit} strength={c.speed * 1.1} />;
+  const overlay = edgeBlur(c, 22 * c.unit, c.speed * 1.1);
   if (!outward) {
     // In: A grows; B arrives a little small with feathered edges and grows to fit while A's smear keeps zooming behind it.
     return {
-      exit: { style: { transform: `scale(${Math.pow(peak, after ? 1 + m : k)})`, filter: blurCss(after ? blur * 1.8 + 4 * c.unit : blur) } },
+      exit: { style: { transform: `scale(${Math.pow(peak, after ? 1 + m : k)})`, filter: blurCss(after ? blur * 1.8 + 4 * c.unit : blur) }, hidden: Boolean(after && c.transparent) },
       enter: { style: { transform: `scale(${Math.pow(peak, m - 1)})`, filter: blurCss(blur), ...feather(featherAt(Math.pow(peak, m - 1), 1 / peak)) }, hidden: !after },
       top: after ? "enter" : "exit",
       overlay,
@@ -175,7 +195,7 @@ function zoomJump(c: TransitionContext, outward: boolean, peak = 1.55): Transiti
   // Out: A shrinks (edges feathered) over B's blurred close-up; then B pulls back to fit.
   return {
     exit: { style: { transform: `scale(${Math.pow(peak, -k)})`, filter: blurCss(blur), ...feather(featherAt(Math.pow(peak, -k), 1 / peak)) }, hidden: after },
-    enter: { style: { transform: `scale(${Math.pow(peak, after ? 1 - m : 2 - k)})`, filter: blurCss(after ? blur : blur * 1.8 + 4 * c.unit) } },
+    enter: { style: { transform: `scale(${Math.pow(peak, after ? 1 - m : 2 - k)})`, filter: blurCss(after ? blur : blur * 1.8 + 4 * c.unit) }, hidden: Boolean(!after && c.transparent) },
     top: after ? "enter" : "exit",
     overlay,
   };
@@ -197,10 +217,10 @@ function bounceZoom(c: TransitionContext, from: { a: number; b: number }, landin
   const blurB = Math.min(18, rate(scaleB, m) * 3.2) * c.unit;
   const under = from.a < 1 ? 1.15 : from.a;
   return {
-    exit: { style: { transform: `scale(${after ? under : scaleA(k)})`, filter: blurCss(after ? 14 * c.unit : blurA), ...(after ? {} : feather(featherAt(scaleA(k), from.a))) } },
-    enter: { style: { transform: `scale(${after ? scaleB(m) : landing})`, filter: blurCss(after ? blurB : 14 * c.unit), ...(after ? feather(featherAt(scaleB(m), landing)) : {}) }, hidden: !after && from.a >= 1 },
+    exit: { style: { transform: `scale(${after ? under : scaleA(k)})`, filter: blurCss(after ? 14 * c.unit : blurA), ...(after ? {} : feather(featherAt(scaleA(k), from.a))) }, hidden: Boolean(after && c.transparent) },
+    enter: { style: { transform: `scale(${after ? scaleB(m) : landing})`, filter: blurCss(after ? blurB : 14 * c.unit), ...(after ? feather(featherAt(scaleB(m), landing)) : {}) }, hidden: !after && (from.a >= 1 || Boolean(c.transparent)) },
     top: after ? "enter" : "exit",
-    overlay: <EdgeBlur amount={18 * c.unit} strength={after ? clamp01(blurB / (8 * c.unit)) : ease.in(k)} />,
+    overlay: edgeBlur(c, 18 * c.unit, after ? clamp01(blurB / (8 * c.unit)) : ease.in(k)),
   };
 }
 
@@ -215,7 +235,7 @@ const zoom: Partial<Record<TransitionType, Effect>> = {
       after,
       { style: { transform: `scale(${1 + 0.15 * k})`, filter: filters(blurCss(blur), glow) } },
       { style: { transform: `scale(${1.38 - 0.38 * ease.out(m)})`, filter: filters(blurCss(blur), glow) } },
-      { overlay: <EdgeBlur amount={16 * c.unit} strength={c.speed} /> },
+      { overlay: edgeBlur(c, 16 * c.unit, c.speed) },
     );
   },
   "zoom-bounce": (c) => bounceZoom(c, { a: 1.8, b: 0.55 }, 0.55),
@@ -248,10 +268,10 @@ const zoom: Partial<Record<TransitionType, Effect>> = {
     const angleB = sign * 50 * (m - 1);
     const blur = c.speed * 12 * c.unit;
     return {
-      exit: { style: { transform: `rotate(${angleA}deg) scale(${Math.max(after ? peak : Math.pow(peak, k), coverScale(angleA, c.width, c.height))})`, filter: blurCss(after ? blur * 1.6 : blur) } },
+      exit: { style: { transform: `rotate(${angleA}deg) scale(${Math.max(after ? peak : Math.pow(peak, k), coverScale(angleA, c.width, c.height))})`, filter: blurCss(after ? blur * 1.6 : blur) }, hidden: Boolean(after && c.transparent) },
       enter: { style: { transform: `rotate(${angleB}deg) scale(${Math.pow(peak, m - 1)})`, filter: blurCss(blur), ...feather(Math.min(1, featherAt(Math.pow(peak, m - 1), 1 / peak) + Math.abs(angleB) / 60)) }, hidden: !after },
       top: after ? "enter" : "exit",
-      overlay: <EdgeBlur amount={20 * c.unit} strength={c.speed} />,
+      overlay: edgeBlur(c, 20 * c.unit, c.speed),
     };
   },
   "zoom-distort": (c) => {
@@ -295,7 +315,7 @@ const spin: Partial<Record<TransitionType, Effect>> = {
     const angle = sign * 360 * (after ? c.e - 1 : c.e);
     const blur = c.speed * 12 * c.unit;
     const swell = 1 + 0.12 * bell(c.e);
-    return cutAt(after, { style: { transform: rotated(c, angle, swell), filter: blurCss(blur) } }, { style: { transform: rotated(c, angle, swell), filter: blurCss(blur) } }, { overlay: <EdgeBlur amount={18 * c.unit} strength={c.speed} /> });
+    return cutAt(after, { style: { transform: rotated(c, angle, swell), filter: blurCss(blur) } }, { style: { transform: rotated(c, angle, swell), filter: blurCss(blur) } }, { overlay: edgeBlur(c, 18 * c.unit, c.speed) });
   },
   twist: (c) => {
     const { k, m, after } = halves(c);
@@ -344,7 +364,7 @@ const spin: Partial<Record<TransitionType, Effect>> = {
     const pose = (x: number) => `perspective(${px(depth)}) translateY(${pct(-38 * x)}) rotateX(${(62 * x).toFixed(2)}deg) rotateZ(${(sign * 24 * x).toFixed(2)}deg) scale(${(1 + 0.22 * Math.abs(x)).toFixed(4)})`;
     return {
       exit: { style: { transform: pose(k), filter: filters(blur, `brightness(${(1 - 0.25 * k).toFixed(3)})`) } },
-      enter: { style: { transform: pose(m - 1), filter: filters(after ? blur : blurCss(12 * c.unit), `brightness(${(0.75 + 0.25 * m).toFixed(3)})`) } },
+      enter: { style: { transform: pose(m - 1), filter: filters(after ? blur : blurCss(12 * c.unit), `brightness(${(0.75 + 0.25 * m).toFixed(3)})`) }, hidden: Boolean(!after && c.transparent) },
       top: after ? "enter" : "exit",
     };
   },
@@ -508,6 +528,8 @@ const motion: Partial<Record<TransitionType, Effect>> = {
       middle: <Shadowed rects={rects} blur={36 * c.unit} opacity={0.5 * (1 - seg(c.t, 0.85, 1))} />,
     };
   },
+
+
   "falling-boxes": (c) => {
     const portrait = c.height > c.width;
     const cols = portrait ? 4 : 6;
