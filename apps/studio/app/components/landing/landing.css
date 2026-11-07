@@ -1504,7 +1504,8 @@
 }
 .lp-footer-links {
   display: flex;
-  gap: 22px;
+  flex-wrap: wrap;
+  gap: 10px 22px;
 }
 .lp-footer-links a {
   color: var(--lp-on-ink);

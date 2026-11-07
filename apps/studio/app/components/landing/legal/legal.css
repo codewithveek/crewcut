@@ -1,0 +1,329 @@
+/*
+ * Legal pages: the landing's ink nav and footer around a quiet paper reading
+ * surface. One column of text at a comfortable measure, a sticky contents
+ * list beside it on wide screens. No motion beyond link colour.
+ */
+
+.lp-legal {
+  --lg-paper: #fbfaf7;
+  --lg-text: #17171a;
+  --lg-text-2: #50525a;
+  --lg-line: rgb(13 13 15 / 0.1);
+  --lg-soft: #f2f0ea;
+  --lg-link: #b5360b; /* the cut orange, deepened for 4.5:1 on paper */
+}
+
+.lp-legal main {
+  background: var(--lg-paper);
+  color: var(--lg-text);
+}
+
+.lg-wrap {
+  width: min(1120px, 100% - 32px);
+  margin-inline: auto;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.lg-head {
+  padding: 40px 0 32px;
+  border-bottom: 1px solid var(--lg-line);
+}
+.lg-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+.lg-docs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--lg-line);
+  border-radius: 999px;
+  color: var(--lg-text-2);
+  font-size: 14px;
+  font-weight: 500;
+}
+.lg-docs a:hover {
+  color: var(--lg-text);
+  border-color: rgb(13 13 15 / 0.25);
+}
+.lg-docs a[aria-current="page"] {
+  background: var(--lp-ink);
+  border-color: var(--lp-ink);
+  color: var(--lp-on-ink);
+}
+.lg-title {
+  margin: 0;
+  font-size: clamp(34px, 5vw, 52px);
+  line-height: 1.05;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+.lg-meta {
+  margin: 14px 0 0;
+  color: var(--lg-text-2);
+  font-family: var(--lp-mono);
+  font-size: 13px;
+}
+.lg-intro {
+  max-width: 68ch;
+  margin-top: 18px;
+  color: var(--lg-text-2);
+  font-size: 17px;
+  line-height: 1.6;
+}
+.lg-intro p {
+  margin: 0;
+}
+.lg-intro p + p {
+  margin-top: 10px;
+}
+
+/* ── Body: contents + document ──────────────────────────────────────────── */
+
+.lg-body {
+  display: grid;
+  gap: 32px;
+  padding: 32px 0 80px;
+}
+@media (min-width: 960px) {
+  .lg-body {
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: 56px;
+    padding-top: 48px;
+  }
+}
+
+.lg-toc {
+  font-size: 14px;
+}
+.lg-toc-title {
+  margin: 0 0 10px;
+  color: var(--lg-text-2);
+  font-family: var(--lp-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.lg-toc ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+.lg-toc a {
+  display: block;
+  padding: 5px 0;
+  color: var(--lg-text-2);
+  line-height: 1.35;
+}
+.lg-toc a:hover {
+  color: var(--lg-link);
+}
+/* Phones: the contents list folds into a bordered box above the text. */
+@media (max-width: 959px) {
+  .lg-toc {
+    padding: 16px;
+    border: 1px solid var(--lg-line);
+    border-radius: 14px;
+    background: var(--lg-soft);
+  }
+}
+@media (min-width: 960px) {
+  .lg-toc {
+    position: sticky;
+    top: 88px;
+    align-self: start;
+    max-height: calc(100dvh - 112px);
+    overflow-y: auto;
+  }
+}
+
+.lg-num {
+  color: var(--lg-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── The document ───────────────────────────────────────────────────────── */
+
+.lg-doc {
+  min-width: 0;
+  max-width: 72ch;
+  font-size: 16.5px;
+  line-height: 1.7;
+}
+.lg-doc a {
+  color: var(--lg-link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.lg-doc a:hover {
+  text-decoration-thickness: 2px;
+}
+.lg-doc p,
+.lg-doc ul,
+.lg-doc ol {
+  margin: 0 0 14px;
+}
+.lg-doc ul,
+.lg-doc ol {
+  padding-left: 1.3em;
+}
+.lg-doc ul {
+  list-style: disc;
+}
+.lg-doc ol {
+  list-style: decimal;
+}
+.lg-doc li::marker {
+  color: var(--lg-text-2);
+}
+.lg-doc li + li {
+  margin-top: 6px;
+}
+.lg-doc strong {
+  font-weight: 620;
+}
+
+.lg-section {
+  scroll-margin-top: 88px;
+  padding-top: 8px;
+}
+.lg-section + .lg-section {
+  margin-top: 36px;
+  padding-top: 36px;
+  border-top: 1px solid var(--lg-line);
+}
+.lg-section h2 {
+  margin: 0 0 14px;
+  font-size: 23px;
+  line-height: 1.25;
+  font-weight: 640;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+.lg-section h3 {
+  margin: 24px 0 8px;
+  font-size: 17px;
+  line-height: 1.35;
+  font-weight: 640;
+}
+
+.lg-summary {
+  margin-bottom: 40px;
+  padding: 22px 24px;
+  border-radius: 16px;
+  background: var(--lg-soft);
+  border: 1px solid var(--lg-line);
+}
+.lg-summary h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 640;
+}
+.lg-summary ul {
+  margin-bottom: 12px;
+}
+.lg-summary-note {
+  margin: 0 !important;
+  color: var(--lg-text-2);
+  font-size: 14px;
+}
+
+.lg-callout {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid rgb(201 60 13 / 0.28);
+  border-radius: 12px;
+  background: rgb(255 91 46 / 0.07);
+}
+.lg-callout p:last-child {
+  margin-bottom: 0;
+}
+
+/* Tables scroll inside their own box on narrow screens; the page never does. */
+.lg-table {
+  margin: 0 0 18px;
+  overflow-x: auto;
+  border: 1px solid var(--lg-line);
+  border-radius: 12px;
+}
+.lg-table:focus-visible {
+  outline: 2px solid var(--lp-cut);
+  outline-offset: 2px;
+}
+.lg-table table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+.lg-table caption {
+  padding: 12px 14px 0;
+  text-align: left;
+  color: var(--lg-text-2);
+  font-size: 13px;
+}
+.lg-table th,
+.lg-table td {
+  padding: 10px 14px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--lg-line);
+}
+.lg-table tbody tr:last-child th,
+.lg-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.lg-table thead th {
+  color: var(--lg-text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.lg-table tbody th {
+  font-weight: 600;
+}
+.lg-table code,
+.lg-doc code {
+  font-family: var(--lp-mono);
+  font-size: 0.88em;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgb(13 13 15 / 0.06);
+  overflow-wrap: anywhere;
+}
+
+.lg-contact {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--lg-line);
+  color: var(--lg-text-2);
+}
+
+.lp-legal :focus-visible {
+  outline-color: var(--lg-link);
+}
+
+@media print {
+  .lp-legal .lp-nav,
+  .lp-legal .lp-footer,
+  .lg-docs,
+  .lg-toc {
+    display: none;
+  }
+  .lg-body {
+    display: block;
+  }
+  .lg-doc {
+    max-width: none;
+  }
+}

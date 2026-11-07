@@ -20,6 +20,8 @@ import { type ReactNode, useRef } from "react";
 
 import { CrewcutMark } from "@/components/crewcut/primitives";
 
+import { LEGAL_PAGES } from "./legal/legal-info";
+
 import { HeroDemo } from "./hero-demo";
 import { type EditorShot, LiveEditor } from "./live-editor";
 import { TemplatesShowcase } from "./templates-showcase";
@@ -345,6 +347,13 @@ export function Footer() {
           <a href="/gallery">Templates</a>
           <a href={SIGN_IN_HREF}>Sign in</a>
           <a href={START_HREF}>Start free</a>
+        </nav>
+        <nav aria-label="Legal" className="lp-footer-links">
+          {LEGAL_PAGES.map((page) => (
+            <a key={page.slug} href={page.href}>
+              {page.short}
+            </a>
+          ))}
         </nav>
         <p>© 2026 Crewcut</p>
       </div>
