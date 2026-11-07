@@ -34,6 +34,7 @@ import {
   threadIdFromPath,
 } from "@/lib/chat-paths";
 import { TAB_ID } from "@/lib/tab-id";
+import { ConsentPrivacyLink } from "@/components/landing/legal/consent-privacy-link";
 import { isLandingPath } from "@/components/landing/landing-paths";
 
 import { i18nCatalog } from "./i18n";
@@ -186,6 +187,7 @@ export default function Root() {
     return (
       <AppToolkitProvider>
         <AppProviders queryClient={queryClient} isPublicPath i18n={{ catalog: i18nCatalog }}>
+          <ConsentPrivacyLink />
           <Outlet />
         </AppProviders>
       </AppToolkitProvider>
@@ -202,6 +204,7 @@ export default function Root() {
         i18n={{ catalog: i18nCatalog }}
       >
         <DbSyncSetup />
+        <ConsentPrivacyLink />
         <AppContent />
       </AppProviders>
     </AppToolkitProvider>
