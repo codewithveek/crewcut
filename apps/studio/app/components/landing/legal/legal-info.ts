@@ -7,9 +7,9 @@ export const LEGAL = {
   product: "Crewcut",
   operator: "Victory Lucky",
   country: "Nigeria",
-  email: "support@getcrewcut.site",
-  site: "https://getcrewcut.site",
-  host: "getcrewcut.site",
+  email: "support@getcrewcut.app",
+  site: "https://getcrewcut.app",
+  host: "getcrewcut.app",
   minimumAge: 16,
 } as const;
 

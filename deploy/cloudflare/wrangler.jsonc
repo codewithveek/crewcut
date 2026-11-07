@@ -7,8 +7,8 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
-  // getcrewcut.site serves the app; the workers.dev address keeps working too.
-  "routes": [{ "pattern": "getcrewcut.site", "custom_domain": true }],
+  // getcrewcut.app serves the app; the workers.dev address keeps working too.
+  "routes": [{ "pattern": "getcrewcut.app", "custom_domain": true }],
   "workers_dev": true,
   "containers": [
     {
@@ -25,8 +25,8 @@
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CrewcutApp"] }],
   "vars": {
-    "APP_URL": "https://getcrewcut.site",
-    "BETTER_AUTH_URL": "https://getcrewcut.site",
-    "YOUTUBE_REDIRECT_URI": "https://getcrewcut.site/api/connections/youtube/callback"
+    "APP_URL": "https://getcrewcut.app",
+    "BETTER_AUTH_URL": "https://getcrewcut.app",
+    "YOUTUBE_REDIRECT_URI": "https://getcrewcut.app/api/connections/youtube/callback"
   }
 }
