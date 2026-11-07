@@ -70,7 +70,7 @@ export function RatioMenu({ compact }: { compact?: boolean }) {
         <DropdownMenuLabel>Aspect ratio</DropdownMenuLabel>
         {ASPECT_RATIOS.map((option) => (
           <DropdownMenuItem key={option} onSelect={() => option !== ratio && setFormat(option)} icon={<RatioGlyph ratio={option} className={option === ratio ? "text-ds-accent" : ""} />}>
-            <span className={cn("w-10 font-medium tabular", option === ratio && "text-ds-accent")}>{option}</span>
+            <span className={cn("w-10 font-medium tabular pr-1", option === ratio && "text-ds-accent")}>{option}</span>
             <span className="text-ds-text-3">{ASPECT_RATIO_INFO[option].use}</span>
           </DropdownMenuItem>
         ))}
