@@ -639,7 +639,7 @@ export function LoopButton({ className }: { className?: string }) {
   );
 }
 
-/** `short` drops the hours (videos are minutes long), for narrow rows. */
+/** `short` drops the milliseconds or frames (hh:mm:ss), for narrow rows. */
 export function Timecode({ className, showTotal = true, short = false }: { className?: string; showTotal?: boolean; short?: boolean }) {
   const playheadMs = useEditor((state) => state.playheadMs);
   const composition = useEditor((state) => state.composition);
@@ -647,7 +647,7 @@ export function Timecode({ className, showTotal = true, short = false }: { class
   if (!composition) return null;
   return (
     <button type="button" onClick={() => useEditor.getState().toggleTimecodeMode()} title="Switch between milliseconds and frames" className={cn("whitespace-nowrap font-mono text-xs tabular text-ds-text outline-none hover:text-ds-accent", className)}>
-      {short ? formatTimecode(playheadMs, { fps: composition.fps, mode }).slice(3) : formatTimecode(playheadMs, { fps: composition.fps, mode })}
+      {short ? formatTimecode(playheadMs, { fps: composition.fps, mode }).slice(0, 8) : formatTimecode(playheadMs, { fps: composition.fps, mode })}
       {showTotal ? <span className="text-ds-text-3"> / {formatTimecode(composition.durationMs, { fps: composition.fps, mode })}</span> : null}
     </button>
   );
