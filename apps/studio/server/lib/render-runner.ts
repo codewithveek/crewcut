@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 
-import { type Composition, iterateLayers } from "@crewcut/composition";
+import { type Composition, type ExportResolution, iterateLayers } from "@crewcut/composition";
 import { runWithRequestContext } from "@agent-native/core/server";
 import { eq, inArray } from "drizzle-orm";
 
@@ -45,6 +45,8 @@ export interface QueueRenderInput {
   compositionVersion: number;
   reducedMotion: boolean;
   burnCaptions: boolean;
+  /** Output size; the project's own size when left out. */
+  resolution?: ExportResolution;
 }
 
 export async function queueRender(input: QueueRenderInput): Promise<{ renderId: string; mode: RenderMode }> {
@@ -63,7 +65,7 @@ export async function queueRender(input: QueueRenderInput): Promise<{ renderId: 
         return { id: asset.id, fileName: asset.fileName, ...(url && /^https?:/.test(url) ? { url } : {}) };
       });
     })(),
-    options: { reducedMotion: input.reducedMotion, burnCaptions: input.burnCaptions },
+    options: { reducedMotion: input.reducedMotion, burnCaptions: input.burnCaptions, ...(input.resolution ? { resolution: input.resolution } : {}) },
     outputFileName: `${renderId}.mp4`,
   };
   await db.insert(schema.renderJobs).values({

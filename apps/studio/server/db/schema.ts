@@ -158,6 +158,75 @@ export const storedFiles = table("stored_files", {
   createdAt: text("created_at").notNull().default(now()),
 });
 
+// ── Content catalog ─────────────────────────────────────────────────────────
+
+/** A group of catalog items (templates, music, sounds) shown together, Free or Pro. */
+export const catalogPacks = table("catalog_packs", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  /** free | pro */
+  tier: text("tier").notNull().default("free"),
+  /** draft | published */
+  status: text("status").notNull().default("draft"),
+  sort: integer("sort").notNull().default(0),
+  createdBy: text("created_by").notNull().default(""),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+  ...ownableColumns(),
+});
+
+/**
+ * A template, music track or sound. scope "catalog" items are published by
+ * admins for everyone (in a pack); scope "workspace" items are people's own
+ * saved templates, seen by their workspace. Published content lives in
+ * immutable versions; `draft` holds unpublished edits.
+ */
+export const catalogItems = table("catalog_items", {
+  id: text("id").primaryKey(),
+  /** catalog | workspace */
+  scope: text("scope").notNull().default("catalog"),
+  packId: text("pack_id"),
+  /** template | music | sound */
+  kind: text("kind").notNull(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  category: text("category").notNull().default(""),
+  /** JSON string[] */
+  tags: text("tags").notNull().default("[]"),
+  /** draft | published | archived */
+  status: text("status").notNull().default("draft"),
+  sort: integer("sort").notNull().default(0),
+  /** The published version people get (0 = never published). */
+  currentVersion: integer("current_version").notNull().default(0),
+  /** JSON payload being prepared, published as the next version. */
+  draft: text("draft").notNull().default("{}"),
+  createdBy: text("created_by").notNull().default(""),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+  ...ownableColumns(),
+});
+
+/** Published content, never changed once written: projects made from it keep working. */
+export const catalogItemVersions = table("catalog_item_versions", {
+  id: text("id").primaryKey(),
+  itemId: text("item_id").notNull(),
+  version: integer("version").notNull(),
+  payload: text("payload").notNull(),
+  publishedBy: text("published_by").notNull().default(""),
+  publishedAt: text("published_at").notNull().default(now()),
+});
+
+/** Free or Pro, per workspace (an organisation id, or "user:<email>" for a personal workspace). */
+export const workspacePlans = table("workspace_plans", {
+  workspace: text("workspace").primaryKey(),
+  plan: text("plan").notNull().default("free"),
+  source: text("source").notNull().default("manual"),
+  note: text("note").notNull().default(""),
+  updatedBy: text("updated_by").notNull().default(""),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
 export const renderJobs = table("render_jobs", {
   id: text("id").primaryKey(),
   videoId: text("video_id").notNull(),

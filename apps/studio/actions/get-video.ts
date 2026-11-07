@@ -1,10 +1,12 @@
 import { defineAction } from "@agent-native/core/action";
+import { DEFAULT_EXPORT_RESOLUTION, type ExportResolution, exportSize } from "@crewcut/composition";
 import { STAGE_LABELS } from "@crewcut/contracts";
 import { pipelineProgress } from "@crewcut/pipeline";
 import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
+import { parseJsonLoose } from "../server/lib/json.js";
 import { summarizeComposition } from "../server/lib/pipeline-ops.js";
 import {
   latestAudit,
@@ -67,10 +69,20 @@ export default defineAction({
       qa,
       composition: compositionEntry ? { version: compositionEntry.version, label: compositionEntry.label, summary: summarizeComposition(compositionEntry.composition) } : null,
       sources: sources.map((source) => ({ id: source.id, kind: source.kind, title: source.title, url: source.url, publisher: source.publisher, length: source.content.length, retrievedAt: source.retrievedAt, redactions: source.redactions })),
-      renders: renders.map((render) => ({ id: render.id, status: render.status, progress: render.progress, stage: render.stage, ratio: render.ratio, compositionVersion: render.compositionVersion, outputFile: render.outputFile, outputBytes: render.outputBytes, error: render.error, createdAt: render.createdAt })),
+      renders: renders.map((render) => ({ id: render.id, status: render.status, progress: render.progress, stage: render.stage, ratio: render.ratio, ...renderSize(render.payload), compositionVersion: render.compositionVersion, outputFile: render.outputFile, outputBytes: render.outputBytes, error: render.error, createdAt: render.createdAt })),
       publishJobs: publishes.map((job) => ({ ...job, copy: JSON.parse(job.copy) as unknown, warnings: JSON.parse(job.warnings) as string[] })),
       approvals,
       insights: insights.map((row) => ({ window: row.window, ...(JSON.parse(row.body) as Record<string, unknown>) })),
     };
   },
 });
+
+/** The resolution and pixel size an export was made at (exports from before resolutions existed are the project's own size). */
+function renderSize(payload: string): { resolution: ExportResolution; width: number | null; height: number | null } {
+  const job = parseJsonLoose<{ composition?: { width?: number; height?: number }; options?: { resolution?: ExportResolution } }>(payload, {});
+  const resolution = job.options?.resolution ?? DEFAULT_EXPORT_RESOLUTION;
+  const width = job.composition?.width;
+  const height = job.composition?.height;
+  if (!width || !height) return { resolution, width: null, height: null };
+  return { resolution, ...(job.options?.resolution ? exportSize(width, height, resolution) : { width, height }) };
+}

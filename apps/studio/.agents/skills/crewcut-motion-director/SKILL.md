@@ -26,6 +26,8 @@ Write an art direction brief before composing (the person can edit it like the s
 
 `compose-video` with one scene per beat. Each scene: `lineIds`, `claimIds`, and either freeform `layers`, a `recipe` starting point (headline, title, big-number, cards, code, list, flow, quote, chart, image, end), or both. Omit `scenes` for a deterministic draft you then refine.
 
+Photos: use the person's media first (`list-assets`). For anything else, `search-stock-photos` (free Pexels photos; pass the video's orientation), then `import-stock-photo` with the chosen id and the videoId, and use `asset:<assetId>` as the image layer's `src`. Stock photos carry the photographer's credit into the Proof report. Never invent image URLs.
+
 Units: `x`/`y`/`width`/`height` are % of the frame (anchor point at x,y); `size`, `offsetX/Y`, `blur`, radii are design px against a 1080 px short side; keyframe times are ms from the layer's start. Text supports `*accent*` spans and `\n` line breaks.
 
 ## 3. Motion rules (Emil Kowalski / Apple)

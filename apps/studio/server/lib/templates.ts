@@ -103,7 +103,7 @@ export async function stockPicks(template: TemplateDefinition, ratio: AspectRati
 }
 
 /** Downloads a stock photo into the video's assets, with the credit the Pexels terms ask for. Returns `asset:<id>`. */
-export async function importStockPhoto(photo: StockPhoto, owner: { videoId: string; ownerEmail: string; orgId: string | null }): Promise<string> {
+export async function importStockPhoto(photo: StockPhoto, owner: { videoId: string | null; ownerEmail: string; orgId: string | null }): Promise<string> {
   const response = await fetch(photo.fullUrl);
   if (!response.ok) throw new Error(`Couldn't download the stock photo (${response.status})`);
   const bytes = new Uint8Array(await response.arrayBuffer());

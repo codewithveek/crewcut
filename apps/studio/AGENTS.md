@@ -1,6 +1,6 @@
 # Crewcut — Agent Guide
 
-Crewcut is an agent-native video studio. Agents research, script, fact-check, animate, voice, publish and learn from analytics; a person sees and approves every stage. Home is `/home` (create a project, the agents prompt, recent work); `/projects` lists every video (search, filters, rename, delete); `/templates` is the template gallery (list-templates / use-template: hand-designed videos with text and photo slots, per-ratio layouts, stock photos and generated music); `/assets` is the person's media library (uploads usable in any project); `/design` is a development-only design-system reference (not in the navigation; redirects home in production). Each video has a pipeline board at `/videos/<id>`, an editor at `/videos/<id>/edit` and a Proof report at `/videos/<id>/proof`. Accounts live at `/connections`.
+Crewcut is an agent-native video studio. Agents research, script, fact-check, animate, voice, publish and learn from analytics; a person sees and approves every stage. Home is `/home` (create a project, the agents prompt, recent work); `/projects` lists every video (search, filters, rename, delete); `/templates` is the template gallery (list-templates / use-template: hand-designed videos with text and photo slots, per-ratio layouts, stock photos and generated music, plus templates the workspace saved and catalog templates in Free/Pro packs); `/admin` is the catalog admin area (admins only: packs, templates, music, sounds, workspace plans); `/assets` is the person's media library (uploads usable in any project); `/design` is a development-only design-system reference (not in the navigation; redirects home in production). Each video has a pipeline board at `/videos/<id>`, an editor at `/videos/<id>/edit` and a Proof report at `/videos/<id>/proof`. Accounts live at `/connections`.
 
 ## Core rules
 
@@ -23,6 +23,10 @@ trend (approve: person picks an idea) → research (notify) → script (approve)
 
 - Projects: `create-blank-video` (empty composition in any of the 8 formats, edited by hand — no pipeline), `rename-video`, `list-videos` (`withCompositions` for thumbnails) · people-only: `delete-video`
 - Media library: `list-assets`, `rename-asset`, `delete-asset` (refuses while a video still uses the asset)
+- Templates: `list-templates`, `use-template`, `save-as-template` (a video becomes a workspace template; pass the layers people can change as slots, or `templateId` to add another format) · people-only: `delete-template`
+- Catalog (admins): `list-catalog`, `save-catalog-pack` (publishing a pack is people-only), `update-catalog-item`, `publish-video-as-template` (unpublished until a person publishes it) · people-only: `set-catalog-item-status`, `restore-catalog-version`, `set-workspace-plan`. Everyone: `get-catalog-access`. Pro items (tier "pro") can be used and edited by anyone; `render-video` refuses to export Pro content unless the workspace has Pro, so say "this one's Pro" before using one.
+- Beat sync: `get-music-tempo` (a music asset's known BPM). The editor's "Snap cuts to the beat" does the rest; there's no separate action.
+- Stock photos: `search-stock-photos` (free Pexels photos, curated when the search is empty), `import-stock-photo` (saves one into a video's media, or the library, with the photographer's credit; returns an asset id)
 - Pipeline: `start-pipeline`, `get-video`, `send-back`, `get-proof-report` · people-only: `approve-stage`, `seed-demo`
 - Research: `find-trends`, `add-source`, `read-source`, `build-dossier`
 - Script: `write-script`, `edit-line`, `rewrite-hook`

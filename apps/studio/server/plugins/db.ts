@@ -99,6 +99,32 @@ export default runMigrations(
           remote_id TEXT, mime TEXT NOT NULL, bytes INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT now())`,
       ].join(";\n"),
     },
+    {
+      // The content catalog (templates, music, sounds in Free/Pro packs) and people's own saved templates.
+      version: 4,
+      name: "crewcut-catalog",
+      sql: [
+        `CREATE TABLE IF NOT EXISTS catalog_packs (
+          id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', tier TEXT NOT NULL DEFAULT 'free',
+          status TEXT NOT NULL DEFAULT 'draft', sort INTEGER NOT NULL DEFAULT 0, created_by TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL DEFAULT now(), updated_at TEXT NOT NULL DEFAULT now(), ${OWNABLE})`,
+        `CREATE TABLE IF NOT EXISTS catalog_items (
+          id TEXT PRIMARY KEY, scope TEXT NOT NULL DEFAULT 'catalog', pack_id TEXT, kind TEXT NOT NULL, name TEXT NOT NULL,
+          description TEXT NOT NULL DEFAULT '', category TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '[]',
+          status TEXT NOT NULL DEFAULT 'draft', sort INTEGER NOT NULL DEFAULT 0, current_version INTEGER NOT NULL DEFAULT 0,
+          draft TEXT NOT NULL DEFAULT '{}', created_by TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT now(),
+          updated_at TEXT NOT NULL DEFAULT now(), ${OWNABLE})`,
+        `CREATE TABLE IF NOT EXISTS catalog_item_versions (
+          id TEXT PRIMARY KEY, item_id TEXT NOT NULL, version INTEGER NOT NULL, payload TEXT NOT NULL,
+          published_by TEXT NOT NULL DEFAULT '', published_at TEXT NOT NULL DEFAULT now())`,
+        `CREATE TABLE IF NOT EXISTS workspace_plans (
+          workspace TEXT PRIMARY KEY, plan TEXT NOT NULL DEFAULT 'free', source TEXT NOT NULL DEFAULT 'manual',
+          note TEXT NOT NULL DEFAULT '', updated_by TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT now())`,
+        "CREATE INDEX IF NOT EXISTS catalog_items_scope_idx ON catalog_items (scope, kind, status)",
+        "CREATE INDEX IF NOT EXISTS catalog_items_pack_idx ON catalog_items (pack_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS catalog_item_versions_idx ON catalog_item_versions (item_id, version)",
+      ].join(";\n"),
+    },
   ],
   { table: "crewcut_migrations" },
 );

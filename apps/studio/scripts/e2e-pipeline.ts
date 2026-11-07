@@ -166,10 +166,13 @@ async function main(): Promise<void> {
   // 11. Templates: search the library, start a project with the person's words.
   await checkTemplates();
 
-  // 12. Search and paging run in the database, with counts per filter.
+  // 12. Saved templates, the catalog and Pro.
+  await checkCatalog();
+
+  // 13. Search and paging run in the database, with counts per filter.
   await checkSearchAndPaging();
 
-  // 13. Remote file storage (R2/S3/Builder) through a fake provider: one index, any backend.
+  // 14. Remote file storage (R2/S3/Builder) through a fake provider: one index, any backend.
   await checkRemoteStorage();
   console.log(`\nAll ${passed} checks passed.`);
 }
@@ -190,6 +193,83 @@ async function checkTemplates(): Promise<void> {
   check(music.length > 0 && existsSync(path.join(process.env.CREWCUT_STORAGE_DIR ?? "", "assets", "lib-template-product-drop.mp3")), "a fresh server copies the bundled template music into storage (nothing regenerated)");
   await expectFailure(call("use-template", { templateId: "golden-hour", ratio: "9:16", values: { headline: "x" } }, human), /no slot "headline"/, "an unknown slot id is refused (no silent typos)");
   await expectFailure(call("generate-template-music", {}, agent), /needs a person/, "the agent can't spend the music allowance");
+}
+
+/** "Save as template", workspace privacy, the catalog's people-only steps and the Pro export rule. */
+async function checkCatalog(): Promise<void> {
+  const { getDb, schema } = await import("../server/db/index.ts");
+  const { eq } = await import("drizzle-orm");
+  const { writeFileSync, mkdirSync } = await import("node:fs");
+  const db = getDb();
+  const other: Ctx = { caller: "frontend", userEmail: "someone-else@crewcut.test", orgId: null };
+  // The e2e person is the catalog admin; someone-else is not.
+  process.env.CREWCUT_ADMIN_EMAILS = human.userEmail;
+  type Layered = { composition: { tracks: Array<{ kind: string; clips: Array<{ id: string; layers?: Array<{ id: string; slot?: string; type: string; text?: string; src?: string }> }> }> } };
+  const layersOf = (body: Layered) => body.composition.tracks.flatMap((track) => (track.kind === "visual" ? track.clips.flatMap((clip) => (clip.layers ?? []).map((layer) => ({ clipId: clip.id, ...layer }))) : []));
+
+  // A template-made video with one of the person's own photos in it.
+  const source = await call<{ videoId: string }>("use-template", { templateId: "product-drop", ratio: "1:1", values: { product: "ORBIT ONE" } }, human);
+  const assets = path.join(process.env.CREWCUT_STORAGE_DIR ?? "", "assets");
+  mkdirSync(assets, { recursive: true });
+  writeFileSync(path.join(assets, "ast_e2e_photo.png"), Buffer.from("89504e470d0a1a0a0000000d4948445200000001000000010806000000", "hex"));
+  await db.insert(schema.assets).values({ id: "ast_e2e_photo", videoId: source.videoId, kind: "image", label: "My product shot", fileName: "ast_e2e_photo.png", mime: "image/png", bytes: 30, licence: "{}", ownerEmail: human.userEmail, orgId: null });
+  const before = layersOf(await call<Layered>("get-composition", { videoId: source.videoId }, human));
+  const photo = before.find((layer) => layer.type === "image" && layer.slot?.startsWith("photo"));
+  const product = before.find((layer) => layer.slot === "product");
+  if (!photo || !product) throw new Error("✘ product-drop has a photo and a product slot");
+  await call("edit-composition", { videoId: source.videoId, label: "My photo", ops: [{ op: "update-layer", clipId: photo.clipId, layerId: photo.id, patch: { src: "asset:ast_e2e_photo" } }] }, human);
+
+  const saved = await call<{ templateId: string; slots: number }>("save-as-template", { videoId: source.videoId, name: "Orbit promo", category: "promo", slots: [{ clipId: photo.clipId, layerId: photo.id, label: "Product photo" }, { clipId: product.clipId, layerId: product.id, label: "Product name" }] }, agent);
+  check(saved.slots === 2, "a video saves as a template with the chosen slots");
+  type Listing = { templates: Array<{ id: string; source: string; tier: string; slots: Array<{ id: string }>; canDelete: boolean }>; yours: number };
+  const mine = await call<Listing>("list-templates", { source: "yours" }, human);
+  check(mine.templates.some((template) => template.id === saved.templateId && template.source === "workspace" && template.canDelete), "the saved template is listed under Yours, removable by its owner");
+  const theirs = await call<Listing>("list-templates", {}, other);
+  check(!theirs.templates.some((template) => template.id === saved.templateId) && theirs.yours === 0, "someone outside the workspace never sees it");
+  await expectFailure(call("use-template", { templateId: saved.templateId, ratio: "1:1" }, other), /No template/, "and can't use it by id");
+
+  // The template keeps working after the video it came from is deleted.
+  await call("delete-video", { videoId: source.videoId }, human);
+  const made = await call<{ videoId: string }>("use-template", { templateId: saved.templateId, ratio: "1:1", values: { "product-name": "ORBIT TWO" } }, human);
+  const copied = layersOf(await call<Layered>("get-composition", { videoId: made.videoId }, human));
+  const copiedPhoto = copied.find((layer) => layer.slot === "product-photo");
+  const [photoRow] = copiedPhoto?.src?.startsWith("asset:") ? await db.select().from(schema.assets).where(eq(schema.assets.id, copiedPhoto.src.slice(6))) : [];
+  check(copied.some((layer) => layer.slot === "product-name" && layer.text === "ORBIT TWO"), "using it puts the person's words in its slots");
+  check(Boolean(photoRow?.fileName.startsWith("tpl-")) && existsSync(path.join(assets, photoRow?.fileName ?? "missing")) && photoRow?.videoId === made.videoId, "its photo survives the source video's deletion (a shared template file, a new asset row)");
+
+  await expectFailure(call("delete-template", { templateId: saved.templateId }, agent), /needs a person|signed-in app UI/, "the agent can't remove a template");
+  await expectFailure(call("delete-template", { templateId: saved.templateId }, other), /only remove templates you saved/, "nor can someone else");
+  await call("delete-template", { templateId: saved.templateId }, human);
+  const after = await call<Listing>("list-templates", { source: "yours" }, human);
+  check(!after.templates.some((template) => template.id === saved.templateId), "its owner can remove it from the gallery");
+  const madeAfter = await call<Layered>("get-composition", { videoId: made.videoId }, human);
+  check(layersOf(madeAfter).some((layer) => layer.text === "ORBIT TWO"), "videos already made from it are untouched");
+
+  // Catalog: a Pro pack, a template published into it, and the export rule.
+  const pack = await call<{ packId: string }>("save-catalog-pack", { name: "E2E Pro", tier: "pro" }, agent);
+  await expectFailure(call("save-catalog-pack", { packId: pack.packId, status: "published" }, agent), /needs a person/, "the agent can't publish a pack");
+  await call("save-catalog-pack", { packId: pack.packId, status: "published" }, human);
+  const draft = await call<{ itemId: string }>("publish-video-as-template", { videoId: made.videoId, packId: pack.packId, name: "Orbit Pro", slots: [{ clipId: copiedPhoto?.clipId ?? "", layerId: copiedPhoto?.id ?? "", label: "Product photo" }] }, agent);
+  const hidden = await call<Listing>("list-templates", {}, other);
+  check(!hidden.templates.some((template) => template.id === draft.itemId), "a catalog template stays out of the gallery until it's published");
+  await expectFailure(call("set-catalog-item-status", { itemId: draft.itemId, status: "published" }, agent), /needs a person|signed-in app UI/, "the agent can't publish catalog content");
+  await call("set-catalog-item-status", { itemId: draft.itemId, status: "published" }, human);
+  const listed = await call<Listing>("list-templates", {}, other);
+  check(listed.templates.some((template) => template.id === draft.itemId && template.tier === "pro"), "once published, everyone sees it with its Pro tier");
+  const pro = await call<{ videoId: string; tier: string }>("use-template", { templateId: draft.itemId, ratio: "1:1" }, other);
+  check(pro.tier === "pro", "anyone can start from a Pro template");
+  await expectFailure(call("render-video", { videoId: pro.videoId }, other), /uses Pro content \(Orbit Pro template\)/, "exporting Pro content needs Pro, and the message names it once");
+  await expectFailure(call("set-workspace-plan", { workspace: other.userEmail, plan: "pro" }, agent), /needs a person|signed-in app UI/, "the agent can't hand out Pro");
+  await call("set-workspace-plan", { workspace: other.userEmail, plan: "pro" }, human);
+  const rendered = await call<{ renderId: string }>("render-video", { videoId: pro.videoId }, other);
+  check(Boolean(rendered.renderId), "with Pro, the same export goes ahead");
+  const access = await call<{ plan: string }>("get-catalog-access", {}, other);
+  check(access.plan === "pro", "the workspace's plan reads back as Pro");
+
+  // Only listed admins manage the catalog.
+  await expectFailure(call("list-catalog", {}, other), /Only Crewcut admins/, "people who aren't admins can't open the catalog");
+  await expectFailure(call("save-catalog-pack", { name: "Sneaky" }, other), /Only Crewcut admins/, "or change it");
+  delete process.env.CREWCUT_ADMIN_EMAILS;
 }
 
 async function checkSearchAndPaging(): Promise<void> {

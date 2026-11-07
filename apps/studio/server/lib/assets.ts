@@ -144,7 +144,8 @@ export async function assetsUsedElsewhere(assetIds: readonly string[], videoId: 
 }
 
 export async function deleteAssetFile(row: AssetRow): Promise<void> {
-  // Built-in library files are shared between asset rows; only uploads are removed.
-  if (row.fileName.startsWith("lib-")) return;
+  // Shared files (built-in library "lib-", template "tpl-" and catalog "cat-" media) back many
+  // asset rows across projects and templates; only a project's own uploads are removed.
+  if (/^(lib|tpl|cat)-/.test(row.fileName)) return;
   await removeFile("assets", row.fileName);
 }
