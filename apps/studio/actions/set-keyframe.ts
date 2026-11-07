@@ -3,6 +3,7 @@ import { animatablePropertySchema, easingSchema, removeKeyframe, setKeyframe } f
 import { z } from "zod";
 
 import { runCompositionEdit } from "../server/lib/composition-action.js";
+import { UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description:
@@ -25,7 +26,7 @@ export default defineAction({
       `${remove ? "Remove keyframe" : "Keyframe"} ${input.property} on ${input.layerId} @ ${Math.round(input.atMs)} ms`,
       (c) => {
         if (remove) return removeKeyframe(c, input);
-        if (value === undefined) throw new Error("Pass a value (or remove: true).");
+        if (value === undefined) throw new UserError("Pass a value (or remove: true).");
         return setKeyframe(c, { ...input, value, ...(easing ? { easing } : {}) });
       },
       { returnFull },

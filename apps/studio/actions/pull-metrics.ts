@@ -9,6 +9,7 @@ import { toJson } from "../server/lib/json.js";
 import { loadVideo } from "../server/lib/store.js";
 import { newId } from "../server/lib/storage.js";
 import { youtubeClientFor, youtubeConnectionFor } from "../server/lib/youtube.js";
+import { UserError } from "../server/lib/errors.js";
 
 const WINDOW_DAYS = { "48h": 2, "7d": 7, "28d": 28 } as const;
 
@@ -31,9 +32,9 @@ export default defineAction({
         .where(and(eq(schema.publishJobs.videoId, videoId), eq(schema.publishJobs.status, "published")))
         .orderBy(desc(schema.publishJobs.createdAt))
         .limit(1);
-      if (!post?.platformPostId) throw new Error("This video hasn't been published yet.");
+      if (!post?.platformPostId) throw new UserError("This video hasn't been published yet.");
       const connection = await youtubeConnectionFor(video.row.ownerEmail);
-      if (!connection) throw new Error("Reconnect YouTube to read analytics.");
+      if (!connection) throw new UserError("Reconnect YouTube to read analytics.");
       const published = new Date(post.approvedAt ?? post.createdAt);
       const end = new Date(Math.min(Date.now(), published.getTime() + WINDOW_DAYS[window] * 86_400_000));
       metrics = await youtubeClientFor(connection).metrics(post.platformPostId, {

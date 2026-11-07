@@ -7,6 +7,7 @@ import { getDb, schema } from "../server/db/index.js";
 import { identity } from "../server/lib/identity.js";
 import { getProject, listProjects } from "../server/lib/store.js";
 import { newId } from "../server/lib/storage.js";
+import { UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description:
@@ -20,7 +21,7 @@ export default defineAction({
   run: async ({ projectId, scope, text, evidence }, ctx) => {
     const who = identity(ctx);
     const project = projectId ? await getProject(projectId) : (await listProjects(ctx))[0];
-    if (!project) throw new Error("No project yet.");
+    if (!project) throw new UserError("No project yet.");
     const db = getDb();
     if (text && scope) {
       await db.insert(schema.learnings).values({ id: newId("lrn"), projectId: project.id, scope, text, evidence, ownerEmail: who.email, orgId: who.orgId });

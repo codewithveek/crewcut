@@ -4,6 +4,7 @@ import { scriptSchema } from "@crewcut/contracts";
 import { z } from "zod";
 
 import { latestAudit, latestScript, loadDossier, loadVideo, saveAudit, saveScript } from "../server/lib/store.js";
+import { UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description: "Edit one script line (text, cited facts, emphasis or on-screen text). Saves a new script version and re-audits the claims.",
@@ -18,10 +19,10 @@ export default defineAction({
   run: async (args, ctx) => {
     const video = await loadVideo(args.videoId, ctx, "editor");
     const current = await latestScript(args.videoId);
-    if (!current) throw new Error("No script yet.");
+    if (!current) throw new UserError("No script yet.");
     const script = structuredClone(current.script);
     const line = script.beats.flatMap((beat) => beat.lines).find((candidate) => candidate.id === args.lineId);
-    if (!line) throw new Error(`No line ${args.lineId}`);
+    if (!line) throw new UserError(`No line ${args.lineId}`);
     if (args.text !== undefined) {
       line.text = args.text;
       delete line.say;

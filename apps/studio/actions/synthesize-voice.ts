@@ -13,6 +13,7 @@ import { latestComposition, latestScript, loadVideo, saveComposition } from "../
 import { putFile } from "../server/lib/blob-store.js";
 import { newId } from "../server/lib/storage.js";
 import { lineAudioFor } from "../server/lib/voice-ops.js";
+import { UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description:
@@ -21,7 +22,7 @@ export default defineAction({
   run: async ({ videoId, voiceId, speed }, ctx) => {
     const video = await loadVideo(videoId, ctx, "editor");
     const [scriptEntry, compositionEntry] = await Promise.all([latestScript(videoId), latestComposition(videoId)]);
-    if (!scriptEntry || !compositionEntry) throw new Error("Write the script and create the draft video first.");
+    if (!scriptEntry || !compositionEntry) throw new UserError("Write the script and create the draft video first.");
     await beginStage(video, "voice");
     const credentialCtx = accessContext(video.who);
     const apiKey = await resolveCredential("ELEVENLABS_API_KEY", credentialCtx);

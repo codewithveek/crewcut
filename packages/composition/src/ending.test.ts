@@ -31,7 +31,8 @@ describe("Crewcut ending", () => {
   it("is added once and removed cleanly", () => {
     const base = buildTemplate(template, { id: "vid_end", ratio: "16:9" });
     const twice = withCrewcutEnding(withCrewcutEnding(base));
-    expect(twice.tracks.flatMap((track) => track.clips).filter((clip) => "recipe" in clip && isCrewcutEnding(clip))).toHaveLength(1);
+    const clips = twice.tracks.flatMap((track) => track.clips as readonly object[] as ReadonlyArray<{ recipe?: string }>);
+    expect(clips.filter((clip) => isCrewcutEnding(clip))).toHaveLength(1);
     const removed = withoutCrewcutEnding(twice);
     expect(hasCrewcutEnding(removed)).toBe(false);
     expect(removed.durationMs).toBe(base.durationMs);

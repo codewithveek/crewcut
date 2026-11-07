@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getDb, schema } from "../server/db/index.js";
 import { asUntrustedData } from "../server/lib/content-safety.js";
 import { loadVideo } from "../server/lib/store.js";
+import { UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description:
@@ -26,7 +27,7 @@ export default defineAction({
       .from(schema.sources)
       .where(and(eq(schema.sources.id, args.sourceId), eq(schema.sources.videoId, args.videoId)))
       .limit(1);
-    if (!source) throw new Error(`No source ${args.sourceId} on this video`);
+    if (!source) throw new UserError(`No source ${args.sourceId} on this video`);
     if (args.query) {
       const terms = keywords(args.query);
       const paragraphs = source.content.split(/\n{2,}/);

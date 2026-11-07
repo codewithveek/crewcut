@@ -7,6 +7,7 @@ import { requireHuman } from "../server/lib/identity.js";
 import { nowIso } from "../server/lib/json.js";
 import { runAuditAndQa } from "../server/lib/pipeline-ops.js";
 import { latestScript, loadVideo, recordApproval, saveStages, updateVideo } from "../server/lib/store.js";
+import { UserError } from "../server/lib/errors.js";
 
 /**
  * Human-only: hidden from the agent, MCP and A2A, and re-checked at run time,
@@ -28,11 +29,11 @@ export default defineAction({
     const video = await loadVideo(args.videoId, ctx, "editor");
     if (args.stage === "trend") {
       const idea = video.ideas.find((candidate) => candidate.id === args.ideaId);
-      if (!idea) throw new Error("Pick one of the ideas to approve the trend stage.");
+      if (!idea) throw new UserError("Pick one of the ideas to approve the trend stage.");
       await updateVideo(video.row.id, { pickedIdeaId: idea.id, title: idea.title });
     }
     if (args.stage === "publish") {
-      throw new Error("Publishing is approved per post: use the Publish button on the post.");
+      throw new UserError("Publishing is approved per post: use the Publish button on the post.");
     }
     video.stages = approveStage(video.stages, args.stage, { now: nowIso(), actor: { kind: "human", id: who.email }, ...(args.note ? { note: args.note } : {}) });
     await saveStages(video.row.id, video.stages);

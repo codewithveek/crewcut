@@ -3,6 +3,7 @@ import { MOTION_PRESETS, TRANSITION_PRESETS, applyMotionPreset, setTransition } 
 import { z } from "zod";
 
 import { runCompositionEdit } from "../server/lib/composition-action.js";
+import { UserError } from "../server/lib/errors.js";
 
 const PRESET_IDS = [...MOTION_PRESETS.map((preset) => preset.id), ...TRANSITION_PRESETS.map((preset) => `transition:${preset.id}`)];
 
@@ -28,7 +29,7 @@ export default defineAction({
       (c) => {
         if (input.presetId.startsWith("transition:")) {
           const preset = TRANSITION_PRESETS.find((candidate) => `transition:${candidate.id}` === input.presetId);
-          if (!preset) throw new Error("Unknown transition preset");
+          if (!preset) throw new UserError("Unknown transition preset");
           return setTransition(c, {
             clipId: input.clipId,
             transition: {
@@ -38,7 +39,7 @@ export default defineAction({
             },
           });
         }
-        if (input.layerIds.length === 0) throw new Error("Pick at least one layer.");
+        if (input.layerIds.length === 0) throw new UserError("Pick at least one layer.");
         return applyMotionPreset(c, {
           clipId: input.clipId,
           layerIds: input.layerIds,

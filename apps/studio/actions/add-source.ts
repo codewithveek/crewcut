@@ -6,6 +6,7 @@ import { getDb, schema } from "../server/db/index.js";
 import { asUntrustedData, htmlToText, redactSecrets } from "../server/lib/content-safety.js";
 import { loadVideo } from "../server/lib/store.js";
 import { newId, sha256 } from "../server/lib/storage.js";
+import { UserError } from "../server/lib/errors.js";
 
 const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_CHARS = 120_000;
@@ -30,9 +31,9 @@ export default defineAction({
     if (args.url) {
       kind = "url";
       const response = await ssrfSafeFetch(args.url, { headers: { "user-agent": "Crewcut research (+https://github.com/codewithveek)", accept: "text/html,text/plain,application/json" }, signal: AbortSignal.timeout(15_000) });
-      if (!response.ok) throw new Error(`Couldn't fetch ${args.url}: HTTP ${response.status}`);
+      if (!response.ok) throw new UserError(`Couldn't fetch ${args.url}: HTTP ${response.status}`);
       const length = Number(response.headers.get("content-length") ?? 0);
-      if (length > MAX_BYTES) throw new Error("That page is too large to use as a source (2 MB limit).");
+      if (length > MAX_BYTES) throw new UserError("That page is too large to use as a source (2 MB limit).");
       const raw = (await response.text()).slice(0, MAX_BYTES);
       const type = response.headers.get("content-type") ?? "";
       if (type.includes("html")) {
@@ -45,7 +46,7 @@ export default defineAction({
       title ||= new URL(args.url).hostname;
     }
     content = content.slice(0, MAX_CHARS);
-    if (content.trim().length < 20) throw new Error("The source has no readable text.");
+    if (content.trim().length < 20) throw new UserError("The source has no readable text.");
     const redacted = redactSecrets(content);
     const id = newId("src");
     await getDb().insert(schema.sources).values({

@@ -18,6 +18,8 @@ const HUMAN_CALLERS: ReadonlySet<string> = new Set(["frontend", "cli"]);
 
 export class ForbiddenError extends Error {
   override readonly name = "ForbiddenError";
+  /** Shown to the person as-is (a 4xx), not as a generic server error. */
+  readonly statusCode = 403;
 }
 
 export function identity(ctx: ActionRunContext | undefined): Identity {

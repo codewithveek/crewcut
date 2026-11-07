@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { requireHuman } from "../server/lib/identity.js";
 import { generateTemplateMusic } from "../server/lib/templates.js";
+import { UserError } from "../server/lib/errors.js";
 
 /**
  * People-only: spends the workspace's ElevenLabs music allowance. Generates
@@ -18,7 +19,7 @@ export default defineAction({
   run: async ({ templateId, force }, ctx) => {
     requireHuman(ctx, "Generating template music");
     const targets = templateId ? [getTemplate(templateId)].filter((entry) => entry !== null) : [...TEMPLATES];
-    if (targets.length === 0) throw new Error(`No template "${templateId}"`);
+    if (targets.length === 0) throw new UserError(`No template "${templateId}"`);
     const results: Array<{ templateId: string; generated: boolean; bytes: number; durationMs: number; error?: string }> = [];
     // One at a time: generation is slow and the plan's allowance is shared.
     for (const template of targets) {

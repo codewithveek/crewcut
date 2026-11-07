@@ -6,6 +6,7 @@ import { getDb, schema } from "../server/db/index.js";
 import { identity } from "../server/lib/identity.js";
 import { nowIso } from "../server/lib/json.js";
 import { youtubeClientFor } from "../server/lib/youtube.js";
+import { UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description: "Check a connection's health by refreshing its token and reading the channel.",
@@ -19,7 +20,7 @@ export default defineAction({
       .from(schema.connections)
       .where(and(eq(schema.connections.id, connectionId), eq(schema.connections.ownerEmail, who.email)))
       .limit(1);
-    if (!row) throw new Error("No such connection.");
+    if (!row) throw new UserError("No such connection.");
     try {
       const channel = await youtubeClientFor(row).channel();
       await db.update(schema.connections).set({ status: "healthy", statusDetail: channel.handle ?? "", accountName: channel.title, lastUsedAt: nowIso() }).where(eq(schema.connections.id, connectionId));

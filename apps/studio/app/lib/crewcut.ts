@@ -41,9 +41,21 @@ export function prefillAgent(context: Record<string, unknown>, message = ""): vo
   sendToAgentChat({ message, context: JSON.stringify(context), submit: false, openSidebar: true } as Parameters<typeof sendToAgentChat>[0]);
 }
 
+/**
+ * Milliseconds for the timestamps the app stores: ISO strings, SQLite-style
+ * "2026-11-07 05:37:56" (UTC) and Postgres-style "2026-11-07 05:37:56.548+00".
+ */
+export function parseTimestamp(value: string): number {
+  let text = value.trim().replace(" ", "T");
+  if (/[+-]\d\d$/.test(text)) text += ":00";
+  else if (/[+-]\d\d\d\d$/.test(text)) text = text.replace(/([+-]\d\d)(\d\d)$/, "$1:$2");
+  else if (!/(Z|[+-]\d\d:\d\d)$/i.test(text)) text += "Z";
+  return new Date(text).getTime();
+}
+
 export function formatAgo(iso: string | null | undefined): string {
   if (!iso) return "";
-  const time = new Date(iso.includes("T") ? iso : `${iso.replace(" ", "T")}Z`).getTime();
+  const time = parseTimestamp(iso);
   if (Number.isNaN(time)) return "";
   const seconds = Math.max(0, Math.round((Date.now() - time) / 1000));
   if (seconds < 60) return "just now";

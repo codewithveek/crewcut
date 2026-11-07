@@ -1,6 +1,7 @@
 import { defineAction } from "@agent-native/core/action";
 import { writeAppStateForCurrentTab } from "@agent-native/core/application-state";
 import { z } from "zod";
+import { UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description:
@@ -14,7 +15,7 @@ export default defineAction({
   http: false,
   run: async (args) => {
     if (!args.view && !args.path) {
-      throw new Error("At least --view or --path is required.");
+      throw new UserError("At least --view or --path is required.");
     }
     const nav: Record<string, string> = {};
     if (args.view) nav.view = args.view;

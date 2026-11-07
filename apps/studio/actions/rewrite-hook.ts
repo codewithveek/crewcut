@@ -3,6 +3,7 @@ import { countWords } from "@crewcut/contracts";
 import { z } from "zod";
 
 import { latestScript, loadVideo, saveScript } from "../server/lib/store.js";
+import { UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description:
@@ -12,10 +13,10 @@ export default defineAction({
     const video = await loadVideo(videoId, ctx, "editor");
     const current = await latestScript(videoId);
     const hook = current?.script.beats[0]?.lines[0];
-    if (!current || !hook) throw new Error("No script yet.");
+    if (!current || !hook) throw new UserError("No script yet.");
     const script = structuredClone(current.script);
     const line = script.beats[0]?.lines[0];
-    if (!line) throw new Error("The script has no hook line.");
+    if (!line) throw new UserError("The script has no hook line.");
     line.text = text;
     line.emphasis = emphasis;
     delete line.say;

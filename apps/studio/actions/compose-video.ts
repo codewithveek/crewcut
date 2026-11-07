@@ -17,6 +17,7 @@ import { z } from "zod";
 import { beginStage, finishStage, summarizeComposition } from "../server/lib/pipeline-ops.js";
 import { getProject, latestComposition, latestScript, loadDossier, loadVideo, recentFingerprints, saveComposition } from "../server/lib/store.js";
 import { lineAudioFor } from "../server/lib/voice-ops.js";
+import { UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description: `Motion director: compose the video as freeform layers. First write an art direction brief (mood, palette, type pairing, layout grid, motion signature, transition set, pacing) — fresh for every video unless the person asked for a preset or consistency. Then give one scene per beat: freeform \`layers\` (text, shape, image, video, code, chart, icon, group, camera with keyframes), and/or a \`recipe\` as a starting point. Motion rules: springs first (critically damped, response 0.35–0.5 s); enter from scale 0.9–0.95 with opacity, never 0; ease-out for entrances, ease-in-out for moves; stagger 40–80 ms; blur ≤ 20 px; video entrances 400–700 ms. Omit scenes to get a deterministic first draft from the script that you can then edit.`,
@@ -32,7 +33,7 @@ export default defineAction({
     const video = await loadVideo(args.videoId, ctx, "editor");
     await beginStage(video, "motion");
     const scriptEntry = await latestScript(args.videoId);
-    if (!scriptEntry) throw new Error("Write the script before composing.");
+    if (!scriptEntry) throw new UserError("Write the script before composing.");
     const [dossier, previous, recent, project] = await Promise.all([
       loadDossier(args.videoId),
       latestComposition(args.videoId),

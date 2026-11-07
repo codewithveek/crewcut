@@ -10,6 +10,7 @@ import { beginStage, finishStage } from "../server/lib/pipeline-ops.js";
 import { loadDossier, loadVideo } from "../server/lib/store.js";
 import { newId } from "../server/lib/storage.js";
 import { youtubeConnectionFor } from "../server/lib/youtube.js";
+import { UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description:
@@ -25,7 +26,7 @@ export default defineAction({
   run: async (args, ctx) => {
     const video = await loadVideo(args.videoId, ctx, "editor");
     const spec = PLATFORM_SPECS[args.platform];
-    if (!spec.supported) throw new Error(`${spec.label} publishing isn't wired in this build yet (${spec.auditNote}).`);
+    if (!spec.supported) throw new UserError(`${spec.label} publishing isn't wired in this build yet (${spec.auditNote}).`);
     const db = getDb();
     const [render] = await db
       .select()
@@ -33,7 +34,7 @@ export default defineAction({
       .where(and(eq(schema.renderJobs.videoId, args.videoId), args.renderId ? eq(schema.renderJobs.id, args.renderId) : eq(schema.renderJobs.status, "done")))
       .orderBy(desc(schema.renderJobs.createdAt))
       .limit(1);
-    if (!render || render.status !== "done") throw new Error("Export the video first; publishing uploads the exported file.");
+    if (!render || render.status !== "done") throw new UserError("Export the video first; publishing uploads the exported file.");
     await beginStage(video, "publish");
     const dossier = await loadDossier(args.videoId);
     const sources = dossier?.sources.filter((source) => source.url).map((source) => ({ title: source.title, url: source.url as string })) ?? [];

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "../server/db/index.js";
 import { loadVideo } from "../server/lib/store.js";
 import { fileUrl, promoteToRemote } from "../server/lib/blob-store.js";
+import { UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description: "A short-lived signed link (15 minutes) to a finished render, for preview or download.",
@@ -17,7 +18,7 @@ export default defineAction({
       .from(schema.renderJobs)
       .where(and(eq(schema.renderJobs.id, renderId), eq(schema.renderJobs.videoId, videoId)))
       .limit(1);
-    if (!render?.outputFile || render.status !== "done") throw new Error("That export isn't finished yet.");
+    if (!render?.outputFile || render.status !== "done") throw new UserError("That export isn't finished yet.");
     await promoteToRemote("renders", render.outputFile, "video/mp4", render.ownerEmail).catch(() => undefined);
     const url = await fileUrl("renders", render.outputFile);
     const local = url.startsWith("/api/media/");

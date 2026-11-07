@@ -2,6 +2,7 @@ import { defineAction } from "@agent-native/core/action";
 import { z } from "zod";
 
 import { runCompositionEdit } from "../server/lib/composition-action.js";
+import { UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description: "Set the music bed from an uploaded asset (or remove it). It spans the video, fades in and out, and ducks under the voice.",
@@ -15,7 +16,7 @@ export default defineAction({
     runCompositionEdit(ctx, videoId, assetId ? `Music: ${label}` : "Remove music", (composition) => {
       const draft = structuredClone(composition);
       const track = draft.tracks.find((candidate) => candidate.kind === "audio" && candidate.role === "music");
-      if (!track || track.kind !== "audio") throw new Error("This video has no music track.");
+      if (!track || track.kind !== "audio") throw new UserError("This video has no music track.");
       track.clips = assetId
         ? [
             {

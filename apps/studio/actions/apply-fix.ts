@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { runAuditAndQa } from "../server/lib/pipeline-ops.js";
 import { latestAudit, latestScript, loadDossier, loadVideo, recordApproval, saveScript } from "../server/lib/store.js";
+import { UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description:
@@ -16,13 +17,13 @@ export default defineAction({
   run: async ({ videoId, claimId, fixIndex }, ctx) => {
     const video = await loadVideo(videoId, ctx, "editor");
     const [scriptEntry, dossier, audit] = await Promise.all([latestScript(videoId), loadDossier(videoId), latestAudit(videoId)]);
-    if (!scriptEntry || !dossier || !audit) throw new Error("Fact-check the script first.");
+    if (!scriptEntry || !dossier || !audit) throw new UserError("Fact-check the script first.");
     const result = audit.results.find((candidate) => candidate.claimId === claimId);
-    if (!result) throw new Error(`No claim ${claimId} in the latest audit`);
+    if (!result) throw new UserError(`No claim ${claimId} in the latest audit`);
     const fixes = suggestFixes(result, scriptEntry.script, dossier);
     if (fixIndex === undefined) return { claimId, text: result.text, verdict: result.verdict, fixes: fixes.map((fix, index) => ({ index, kind: fix.kind, label: fix.label })) };
     const fix = fixes[fixIndex];
-    if (!fix) throw new Error(`No fix #${fixIndex}; there are ${fixes.length}.`);
+    if (!fix) throw new UserError(`No fix #${fixIndex}; there are ${fixes.length}.`);
     const fixed = applyFix(scriptEntry.script, fix);
     const version = await saveScript(video, fixed, `Fix ${result.lineId}: ${fix.label}`);
     await recordApproval(video, { stage: "qa", decision: "approved", reason: `Applied fix: ${fix.label}`, subject: `${claimId} → script v${version}` });

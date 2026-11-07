@@ -11,6 +11,7 @@ import { localCopy } from "../server/lib/blob-store.js";
 import { fileVideoSource, youtubeClientFor, youtubeConnectionFor } from "../server/lib/youtube.js";
 import { approveStage } from "@crewcut/pipeline";
 import { runWithRequestContext } from "@agent-native/core/server";
+import { UserError } from "../server/lib/errors.js";
 
 /**
  * Publishing always needs a person: hidden from the agent, gated by approval,
@@ -27,13 +28,13 @@ export default defineAction({
     const who = requireHuman(ctx, "Publishing");
     const db = getDb();
     const [job] = await db.select().from(schema.publishJobs).where(eq(schema.publishJobs.id, publishJobId)).limit(1);
-    if (!job) throw new Error("No such post.");
+    if (!job) throw new UserError("No such post.");
     const video = await loadVideo(job.videoId, ctx, "editor");
-    if (job.status !== "awaiting_approval" && job.status !== "failed") throw new Error(`This post is ${job.status}.`);
+    if (job.status !== "awaiting_approval" && job.status !== "failed") throw new UserError(`This post is ${job.status}.`);
     const connection = await youtubeConnectionFor(video.row.ownerEmail);
-    if (!connection) throw new Error("Connect YouTube in Settings → Connections first.");
+    if (!connection) throw new UserError("Connect YouTube in Settings → Connections first.");
     const [render] = await db.select().from(schema.renderJobs).where(eq(schema.renderJobs.id, job.renderJobId)).limit(1);
-    if (!render?.outputFile) throw new Error("The exported file for this post is missing. Export the video again.");
+    if (!render?.outputFile) throw new UserError("The exported file for this post is missing. Export the video again.");
 
     const finalPrivacy = privacy ?? (job.privacy as "private" | "unlisted" | "public");
     await db.update(schema.publishJobs).set({ status: "uploading", privacy: finalPrivacy, approvedBy: who.email, approvedAt: nowIso(), error: null }).where(eq(schema.publishJobs.id, job.id));

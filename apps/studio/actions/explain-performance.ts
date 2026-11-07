@@ -9,6 +9,7 @@ import { nowIso, parseJsonStrict, toJson } from "../server/lib/json.js";
 import { finishStage } from "../server/lib/pipeline-ops.js";
 import { compositionAt, latestComposition, loadVideo } from "../server/lib/store.js";
 import { newId } from "../server/lib/storage.js";
+import { UserError } from "../server/lib/errors.js";
 
 const WINDOW_LABEL = { "48h": "first 48 hours", "7d": "first week", "28d": "first 28 days" } as const;
 
@@ -25,13 +26,13 @@ export default defineAction({
       .where(and(eq(schema.metricSnapshots.videoId, videoId), eq(schema.metricSnapshots.window, window)))
       .orderBy(desc(schema.metricSnapshots.capturedAt))
       .limit(1);
-    if (!snapshot) throw new Error(`Pull ${window} metrics first.`);
+    if (!snapshot) throw new UserError(`Pull ${window} metrics first.`);
     const metrics = parseJsonStrict(metricsSchema, snapshot.metrics, "metrics");
     // Explain against what was actually published: the render's composition version.
     const [post] = await db.select().from(schema.publishJobs).where(eq(schema.publishJobs.videoId, videoId)).orderBy(desc(schema.publishJobs.createdAt)).limit(1);
     const [render] = post ? await db.select().from(schema.renderJobs).where(eq(schema.renderJobs.id, post.renderJobId)).limit(1) : [];
     const composition = (render ? await compositionAt(videoId, render.compositionVersion) : null) ?? (await latestComposition(videoId))?.composition;
-    if (!composition) throw new Error("This video has nothing to map the results onto yet.");
+    if (!composition) throw new UserError("This video has nothing to map the results onto yet.");
 
     const insights = explainPerformance({ videoId, composition, metrics, window });
     await db.delete(schema.insights).where(and(eq(schema.insights.videoId, videoId), eq(schema.insights.window, window)));

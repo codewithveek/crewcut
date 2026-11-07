@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { requireHuman } from "../server/lib/identity.js";
 import { appOrigin, oauthStateSecret, youtubeOAuthClient } from "../server/lib/vault.js";
+import { UserError } from "../server/lib/errors.js";
 
 /** Origins allowed for the OAuth redirect: the configured app URL, or loopback in development. */
 function allowedOrigin(origin: string | undefined): string {
@@ -13,7 +14,7 @@ function allowedOrigin(origin: string | undefined): string {
   const url = new URL(origin);
   const loopback = url.hostname === "localhost" || url.hostname === "127.0.0.1";
   if (origin === configured || (loopback && process.env.NODE_ENV !== "production")) return url.origin;
-  throw new Error("That origin isn't allowed for OAuth redirects.");
+  throw new UserError("That origin isn't allowed for OAuth redirects.");
 }
 
 export default defineAction({

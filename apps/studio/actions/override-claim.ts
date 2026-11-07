@@ -6,6 +6,7 @@ import { requireHuman } from "../server/lib/identity.js";
 import { finishStage } from "../server/lib/pipeline-ops.js";
 import { latestAudit, loadVideo, recordApproval, saveAudit } from "../server/lib/store.js";
 import { findApprovalBlockers } from "@crewcut/claim-audit";
+import { UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description: "Override an unsupported claim with a written reason (people only). The reason is logged in the Proof report.",
@@ -17,7 +18,7 @@ export default defineAction({
     const who = requireHuman(ctx, "Overriding a claim");
     const video = await loadVideo(videoId, ctx, "editor");
     const audit = await latestAudit(videoId);
-    if (!audit) throw new Error("No audit to override.");
+    if (!audit) throw new UserError("No audit to override.");
     const next = overrideClaim(audit, { claimId, reason, by: who.email });
     await saveAudit(video, next);
     await recordApproval(video, { stage: "qa", decision: "override", reason, subject: claimId, actor: who });
