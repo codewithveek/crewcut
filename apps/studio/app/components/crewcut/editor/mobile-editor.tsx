@@ -46,7 +46,7 @@ import { EditorAssistant, askEditorAgent } from "./assistant";
 import { EditableTitle } from "./editor-page";
 import { Inspector } from "./inspector";
 import { LeftTabContent, VoiceRecorder } from "./left-panel";
-import { FullscreenControls, PreviewStage, Timecode, useFullscreen } from "./preview";
+import { FullscreenControls, LoopButton, PreviewStage, SpeedMenu, Timecode, useFullscreen } from "./preview";
 import { type MobileLaneKit, Timeline } from "./timeline";
 
 /**
@@ -338,17 +338,19 @@ export function MobileEditor({ onExport }: { onExport: () => void }) {
       </div>
 
       <div className="flex h-12 shrink-0 items-center gap-1 px-2">
-        <button type="button" aria-label="Play or pause" onClick={() => useEditor.getState().setPlaying(!useEditor.getState().playing)} className="pc-press flex size-10 items-center justify-center rounded-full">
+        <button type="button" aria-label="Play or pause" onClick={() => useEditor.getState().setPlaying(!useEditor.getState().playing)} className="pc-press flex size-10 shrink-0 items-center justify-center rounded-full">
           <PlayGlyph />
         </button>
-        <button type="button" aria-label="Undo" disabled={undoCount < 2} onClick={() => void useEditor.getState().undo()} className="pc-press flex size-10 items-center justify-center rounded-full text-ds-text-2 disabled:opacity-30">
+        <button type="button" aria-label="Undo" disabled={undoCount < 2} onClick={() => void useEditor.getState().undo()} className="pc-press flex size-10 shrink-0 items-center justify-center rounded-full text-ds-text-2 disabled:opacity-30">
           <IconArrowBackUp className="size-5" />
         </button>
-        <Timecode className="mx-auto text-[12px]" />
-        <button type="button" aria-label="Redo" disabled={redoCount === 0} onClick={() => void useEditor.getState().redo()} className="pc-press flex size-10 items-center justify-center rounded-full text-ds-text-2 disabled:opacity-30">
+        <Timecode className="mx-auto min-w-0 truncate text-[12px]" showTotal={false} short />
+        <SpeedMenu compact className="h-10 min-w-10 shrink-0 justify-center" />
+        <LoopButton className="size-10 shrink-0" />
+        <button type="button" aria-label="Redo" disabled={redoCount === 0} onClick={() => void useEditor.getState().redo()} className="pc-press flex size-10 shrink-0 items-center justify-center rounded-full text-ds-text-2 disabled:opacity-30">
           <IconArrowForwardUp className="size-5" />
         </button>
-        <button type="button" aria-label="Full screen" onClick={() => void enter()} className="pc-press flex size-10 items-center justify-center rounded-full text-ds-text-2">
+        <button type="button" aria-label="Full screen" onClick={() => void enter()} className="pc-press flex size-10 shrink-0 items-center justify-center rounded-full text-ds-text-2">
           <IconArrowsMaximize className="size-5" />
         </button>
       </div>

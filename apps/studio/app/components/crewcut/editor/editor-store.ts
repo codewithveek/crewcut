@@ -14,6 +14,27 @@ import { create } from "zustand";
 
 import { errorMessage } from "@/lib/crewcut";
 
+export const PLAYBACK_RATES: readonly number[] = [0.25, 0.5, 1, 1.5, 2];
+
+/** Per-browser editor preferences. Storage can be missing or blocked (private windows), so every access is guarded. */
+const PREFERENCE_KEY = "crewcut:editor-preferences";
+function readPreference<T>(name: string, fallback: T, valid: (value: unknown) => boolean): T {
+  try {
+    const value = (JSON.parse(window.localStorage.getItem(PREFERENCE_KEY) ?? "{}") as Record<string, unknown>)[name];
+    return valid(value) ? (value as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writePreference(name: string, value: unknown) {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(PREFERENCE_KEY) ?? "{}") as Record<string, unknown>;
+    window.localStorage.setItem(PREFERENCE_KEY, JSON.stringify({ ...stored, [name]: value }));
+  } catch {
+    // Not remembered; the setting still applies for this visit.
+  }
+}
+
 export type TimecodeMode = "ms" | "frames";
 
 export interface LayerRef {
@@ -47,6 +68,9 @@ interface EditorState {
   redoStack: number[];
   playheadMs: number;
   playing: boolean;
+  /** Preview speed and loop (the export is unaffected); remembered in this browser. */
+  playbackRate: number;
+  loopPlayback: boolean;
   /** Pixels per second on the timeline. */
   zoom: number;
   inMs: number | null;
@@ -72,6 +96,8 @@ interface EditorState {
   setPlayhead(ms: number): void;
   stepFrames(frames: number): void;
   setPlaying(playing: boolean): void;
+  setPlaybackRate(rate: number): void;
+  setLoopPlayback(on: boolean): void;
   setZoom(pxPerSecond: number): void;
   setInOut(edge: "in" | "out", ms: number | null): void;
   toggleTimecodeMode(): void;
@@ -148,6 +174,8 @@ export const useEditor = create<EditorState>((set, get) => {
     redoStack: [],
     playheadMs: 0,
     playing: false,
+    playbackRate: 1,
+    loopPlayback: false,
     zoom: 80,
     inMs: null,
     outMs: null,
@@ -177,6 +205,8 @@ export const useEditor = create<EditorState>((set, get) => {
         versions,
         undoStack: state.videoId === videoId && state.undoStack.length ? state.undoStack : [version],
         redoStack: state.videoId === videoId ? state.redoStack : [],
+        playbackRate: readPreference("playbackRate", state.playbackRate, (value) => typeof value === "number" && PLAYBACK_RATES.includes(value)),
+        loopPlayback: readPreference("loopPlayback", state.loopPlayback, (value) => typeof value === "boolean"),
         playheadMs: state.videoId === videoId ? Math.min(state.playheadMs, composition.durationMs) : 0,
         selectedClipIds: state.videoId === videoId ? state.selectedClipIds : [],
         selectedLayer: state.videoId === videoId ? state.selectedLayer : null,
@@ -194,6 +224,14 @@ export const useEditor = create<EditorState>((set, get) => {
       get().setPlayhead(frameToMs(frame, composition.fps));
     },
     setPlaying: (playing) => set({ playing }),
+    setPlaybackRate: (rate) => {
+      writePreference("playbackRate", rate);
+      set({ playbackRate: rate });
+    },
+    setLoopPlayback: (on) => {
+      writePreference("loopPlayback", on);
+      set({ loopPlayback: on });
+    },
     setZoom: (pxPerSecond) => set({ zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pxPerSecond)) }),
     setInOut: (edge, ms) => set(edge === "in" ? { inMs: ms } : { outMs: ms }),
     toggleTimecodeMode: () => set((state) => ({ timecodeMode: state.timecodeMode === "ms" ? "frames" : "ms" })),

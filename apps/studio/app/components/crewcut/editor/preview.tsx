@@ -18,11 +18,13 @@ import {
   IconArrowsMaximize,
   IconArrowsMinimize,
   IconBadgeCc,
+  IconCheck,
   IconChevronDown,
   IconPlayerPause,
   IconPlayerPlay,
   IconPlayerSkipBack,
   IconPlayerSkipForward,
+  IconRepeat,
 } from "@tabler/icons-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -34,7 +36,7 @@ import { cn } from "@/lib/utils";
 import { currentSelection, describeSelection, replaceLayerMedia, setFormat, transformOps } from "./commands";
 import { LayerMenu } from "./context-menus";
 import { dropFiles, dropPayload } from "./drop";
-import { useEditor } from "./editor-store";
+import { PLAYBACK_RATES, useEditor } from "./editor-store";
 import { dragPayload, hasFiles, isCrewcutDrag, uploadMedia } from "./media";
 
 /**
@@ -398,12 +400,18 @@ export function PreviewStage({ className, interactive = true, playerRefOut }: { 
   const playheadMs = useEditor((state) => state.playheadMs);
   const playing = useEditor((state) => state.playing);
   const burnCaptions = useEditor((state) => state.burnCaptions);
+  const playbackRate = useEditor((state) => state.playbackRate);
+  const loopRange = useLoopRange();
+  const loopRangeRef = useRef(loopRange);
+  loopRangeRef.current = loopRange;
+  const loopWhole = useEditor((state) => state.loopPlayback) && !loopRange;
   const playerRef = useRef<PlayerRef>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
   const [dropping, setDropping] = useState(false);
   const fromPlayer = useRef(false);
+  const loopSeek = useRef(false);
 
   useEffect(() => {
     void loadCrewcutFonts();
@@ -429,19 +437,39 @@ export function PreviewStage({ className, interactive = true, playerRefOut }: { 
     const player = playerRef.current;
     if (!player) return;
     const onFrame = (event: { detail: { frame: number } }) => {
+      // Looping a range: past its end, jump back to its start.
+      const range = loopRangeRef.current;
+      if (range && player.isPlaying() && event.detail.frame >= msToFrame(range.endMs, fps)) {
+        // Seeking while playing makes the player pause and resume by itself; that pause isn't the person's.
+        loopSeek.current = true;
+        player.seekTo(msToFrame(range.startMs, fps));
+        return;
+      }
       fromPlayer.current = true;
       useEditor.getState().setPlayhead(frameToMs(event.detail.frame, fps));
     };
-    const onPause = () => useEditor.getState().setPlaying(false);
-    const onPlay = () => useEditor.getState().setPlaying(true);
+    const onPause = () => {
+      if (!loopSeek.current) useEditor.getState().setPlaying(false);
+    };
+    const onEnded = () => {
+      // A range that runs to the very end: the player stops there, so restart the range.
+      const range = loopRangeRef.current;
+      if (!range) return onPause();
+      player.seekTo(msToFrame(range.startMs, fps));
+      player.play();
+    };
+    const onPlay = () => {
+      loopSeek.current = false;
+      useEditor.getState().setPlaying(true);
+    };
     player.addEventListener("frameupdate", onFrame);
     player.addEventListener("pause", onPause);
-    player.addEventListener("ended", onPause);
+    player.addEventListener("ended", onEnded);
     player.addEventListener("play", onPlay);
     return () => {
       player.removeEventListener("frameupdate", onFrame);
       player.removeEventListener("pause", onPause);
-      player.removeEventListener("ended", onPause);
+      player.removeEventListener("ended", onEnded);
       player.removeEventListener("play", onPlay);
     };
   }, [fps, box.width > 0]);
@@ -460,7 +488,13 @@ export function PreviewStage({ className, interactive = true, playerRefOut }: { 
   useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
-    if (playing && !player.isPlaying()) player.play();
+    if (playing && !player.isPlaying()) {
+      // Looping a range: start inside it.
+      const range = loopRangeRef.current;
+      const frame = player.getCurrentFrame();
+      if (range && (frame < msToFrame(range.startMs, fps) || frame >= msToFrame(range.endMs, fps) - 1)) player.seekTo(msToFrame(range.startMs, fps));
+      player.play();
+    }
     if (!playing && player.isPlaying()) player.pause();
   }, [playing]);
 
@@ -524,6 +558,8 @@ export function PreviewStage({ className, interactive = true, playerRefOut }: { 
             compositionHeight={composition.height}
             style={{ width: "100%", height: "100%" }}
             initialFrame={msToFrame(playheadMs, composition.fps)}
+            playbackRate={playbackRate}
+            loop={loopWhole}
             controls={false}
             clickToPlay={false}
             acknowledgeRemotionLicense
@@ -538,14 +574,80 @@ export function PreviewStage({ className, interactive = true, playerRefOut }: { 
 
 // ── Transport ───────────────────────────────────────────────────────────────
 
-export function Timecode({ className, showTotal = true }: { className?: string; showTotal?: boolean }) {
+/**
+ * What loop repeats when it's on: the in/out range if one is marked, else the
+ * selected clips, else the whole video (null, the player's own loop).
+ */
+export function useLoopRange(): { startMs: number; endMs: number; label: string } | null {
+  const loop = useEditor((state) => state.loopPlayback);
+  const composition = useEditor((state) => state.composition);
+  const inMs = useEditor((state) => state.inMs);
+  const outMs = useEditor((state) => state.outMs);
+  const selectedClipIds = useEditor((state) => state.selectedClipIds);
+  return useMemo(() => {
+    if (!loop || !composition) return null;
+    if (inMs !== null || outMs !== null) {
+      const startMs = inMs ?? 0;
+      const endMs = outMs ?? composition.durationMs;
+      return endMs - startMs >= 100 ? { startMs, endMs, label: "the in–out range" } : null;
+    }
+    const clips = selectedClipIds.map((id) => findClip(composition, id)?.clip).filter((clip) => clip !== undefined);
+    if (!clips.length) return null;
+    const startMs = Math.min(...clips.map((clip) => clip.startMs));
+    const endMs = Math.min(composition.durationMs, Math.max(...clips.map((clip) => clip.startMs + clip.durationMs)));
+    return endMs - startMs >= 100 ? { startMs, endMs, label: clips.length === 1 ? "the selected clip" : "the selected clips" } : null;
+  }, [loop, composition, inMs, outMs, selectedClipIds]);
+}
+
+const formatRate = (rate: number) => `${rate}×`;
+
+export function SpeedMenu({ className, compact }: { className?: string; compact?: boolean }) {
+  const rate = useEditor((state) => state.playbackRate);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Preview speed ${formatRate(rate)}`}
+          title="Preview speed (the export is unaffected)"
+          className={cn("pc-press flex h-8 shrink-0 items-center gap-1 rounded-ds-sm px-2 text-xs font-medium tabular outline-none hover:bg-ds-surface-3 hover:text-ds-text focus-visible:ring-2 focus-visible:ring-ds-accent", rate === 1 ? "text-ds-text-2" : "text-ds-accent", className)}
+        >
+          {formatRate(rate)}
+          {compact ? null : <IconChevronDown className="size-3.5" />}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-[150px]">
+        <DropdownMenuLabel>Preview speed</DropdownMenuLabel>
+        {PLAYBACK_RATES.map((option) => (
+          <DropdownMenuItem key={option} onSelect={() => useEditor.getState().setPlaybackRate(option)} icon={option === rate ? <IconCheck className="text-ds-accent" /> : <span />}>
+            <span className={cn("font-medium tabular", option === rate && "text-ds-accent")}>{option === 1 ? "1× Normal" : formatRate(option)}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+export function LoopButton({ className }: { className?: string }) {
+  const loop = useEditor((state) => state.loopPlayback);
+  const range = useLoopRange();
+  const label = loop ? `Loop on: repeats ${range ? range.label : "the whole video"}` : "Loop";
+  return (
+    <IconButton label={label} active={loop} className={className} onClick={() => useEditor.getState().setLoopPlayback(!loop)}>
+      <IconRepeat />
+    </IconButton>
+  );
+}
+
+/** `short` drops the hours (videos are minutes long), for narrow rows. */
+export function Timecode({ className, showTotal = true, short = false }: { className?: string; showTotal?: boolean; short?: boolean }) {
   const playheadMs = useEditor((state) => state.playheadMs);
   const composition = useEditor((state) => state.composition);
   const mode = useEditor((state) => state.timecodeMode);
   if (!composition) return null;
   return (
     <button type="button" onClick={() => useEditor.getState().toggleTimecodeMode()} title="Switch between milliseconds and frames" className={cn("whitespace-nowrap font-mono text-xs tabular text-ds-text outline-none hover:text-ds-accent", className)}>
-      {formatTimecode(playheadMs, { fps: composition.fps, mode })}
+      {short ? formatTimecode(playheadMs, { fps: composition.fps, mode }).slice(3) : formatTimecode(playheadMs, { fps: composition.fps, mode })}
       {showTotal ? <span className="text-ds-text-3"> / {formatTimecode(composition.durationMs, { fps: composition.fps, mode })}</span> : null}
     </button>
   );
@@ -638,7 +740,8 @@ export function FullscreenControls({ onExit }: { onExit: () => void }) {
         <span className="font-mono text-sm tabular">
           {formatTimecode(playheadMs, { fps: composition.fps }).slice(3, 8)} <span className="text-white/60">/ {formatTimecode(composition.durationMs, { fps: composition.fps }).slice(3, 8)}</span>
         </span>
-        <button type="button" aria-label="Exit full screen" onClick={onExit} className="pc-press ml-auto flex size-11 items-center justify-center rounded-full bg-white/15 backdrop-blur">
+        <SpeedMenu className="ml-auto text-white hover:bg-white/15 hover:text-white" />
+        <button type="button" aria-label="Exit full screen" onClick={onExit} className="pc-press flex size-11 items-center justify-center rounded-full bg-white/15 backdrop-blur">
           <IconArrowsMinimize className="size-5" />
         </button>
       </div>
@@ -684,6 +787,8 @@ export function PreviewPanel({ className, dense }: { className?: string; dense?:
           </IconButton>
         </div>
         <div className="flex flex-1 items-center justify-end gap-1">
+          <SpeedMenu />
+          <LoopButton />
           {hasCaptions ? (
             <IconButton label={burnCaptions ? "Hide captions" : "Show captions"} active={burnCaptions} onClick={() => useEditor.getState().setBurnCaptions(!burnCaptions)}>
               <IconBadgeCc />
