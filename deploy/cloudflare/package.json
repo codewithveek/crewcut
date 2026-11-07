@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "npm ci --no-audit --no-fund",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail"
   },
