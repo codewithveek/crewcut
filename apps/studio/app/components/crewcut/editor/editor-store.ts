@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { create } from "zustand";
 
 import { errorMessage } from "@/lib/crewcut";
+import { TAB_ID } from "@/lib/tab-id";
 
 export const PLAYBACK_RATES: readonly number[] = [0.25, 0.5, 1, 1.5, 2];
 
@@ -139,7 +140,41 @@ interface CompositionResponse {
   versions: VersionEntry[];
 }
 
+/**
+ * Editor writes carry this tab's id as their request source, so this tab's
+ * database sync ignores the change events of its own edits (it already has the
+ * result) instead of re-reading the whole composition after every edit.
+ * Other tabs and the agent's edits still sync as before.
+ */
+function editorWrite<T>(action: string, args: Record<string, unknown>): Promise<T> {
+  return callAction(action as never, args as never, { headers: { "X-Request-Source": TAB_ID } } as never) as Promise<T>;
+}
+
+/** A link this tab already has stays in use while it's valid, so media doesn't reload because a re-read signed it again. */
+function keepValidUrls(current: Record<string, string>, incoming: Record<string, string>): Record<string, string> {
+  const soon = Date.now() + 2 * 60_000;
+  const merged = { ...incoming };
+  for (const [id, url] of Object.entries(current)) {
+    if (!(id in incoming)) continue;
+    const expires = Number(/[?&]exp=(\d+)/.exec(url)?.[1] ?? Number.POSITIVE_INFINITY);
+    if (expires > soon) merged[id] = url;
+  }
+  return merged;
+}
+
+const REFRESH_AFTER_SAVE_MS = 1200;
+
 export const useEditor = create<EditorState>((set, get) => {
+  let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  /** One re-read (history list, new media links) after a burst of edits, not one per edit. */
+  function refreshSoon(): void {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+      refreshTimer = null;
+      void get().refresh();
+    }, REFRESH_AFTER_SAVE_MS);
+  }
+
   async function save(label: string, run: () => Promise<{ version: number; composition?: Composition }>, previous: Composition): Promise<boolean> {
     set((state) => ({ saving: state.saving + 1 }));
     try {
@@ -151,7 +186,7 @@ export const useEditor = create<EditorState>((set, get) => {
         redoStack: [],
         lastSavedAt: Date.now(),
       }));
-      void get().refresh();
+      refreshSoon();
       return true;
     } catch (error) {
       set({ composition: previous });
@@ -293,7 +328,7 @@ export const useEditor = create<EditorState>((set, get) => {
         return false;
       }
       set({ composition: next });
-      return save(label, async () => (await callAction("edit-composition" as never, { videoId, label, ops, returnFull: true } as never)) as { version: number; composition?: Composition }, base);
+      return save(label, () => editorWrite<{ version: number; composition?: Composition }>("edit-composition", { videoId, label, ops, returnFull: true }), base);
     },
 
     commit: async (action, args, optimistic) => {
@@ -308,14 +343,14 @@ export const useEditor = create<EditorState>((set, get) => {
           return false;
         }
       }
-      return save(action, async () => (await callAction(action as never, { videoId, ...args, returnFull: true } as never)) as { version: number; composition?: Composition }, previous);
+      return save(action, () => editorWrite<{ version: number; composition?: Composition }>(action, { videoId, ...args, returnFull: true }), previous);
     },
 
     restore: async (version, direction = "jump") => {
       const { videoId } = get();
       set((state) => ({ saving: state.saving + 1 }));
       try {
-        const result = (await callAction("restore-composition-version" as never, { videoId, version, returnFull: true } as never)) as { version: number; composition?: Composition };
+        const result = await editorWrite<{ version: number; composition?: Composition }>("restore-composition-version", { videoId, version, returnFull: true });
         set((state) => ({
           version: result.version,
           ...(result.composition ? { composition: result.composition } : {}),
@@ -355,9 +390,9 @@ export const useEditor = create<EditorState>((set, get) => {
         if (!result.composition) return;
         // Adopt newer server versions (e.g. the agent edited while we watched), never mid-drag.
         if (result.version >= get().version && get().saving === 0 && !get().previewBase) {
-          set({ composition: result.composition, version: result.version, assetUrls: result.assetUrls, versions: result.versions });
+          set((state) => ({ composition: result.composition, version: result.version, assetUrls: keepValidUrls(state.assetUrls, result.assetUrls), versions: result.versions }));
         } else {
-          set((state) => ({ versions: result.versions, assetUrls: { ...state.assetUrls, ...result.assetUrls } }));
+          set((state) => ({ versions: result.versions, assetUrls: keepValidUrls(state.assetUrls, { ...state.assetUrls, ...result.assetUrls }) }));
         }
       } catch {
         // Offline or transient: keep the local state.

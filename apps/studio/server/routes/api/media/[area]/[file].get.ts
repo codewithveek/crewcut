@@ -34,7 +34,8 @@ export default defineEventHandler(async (event) => {
   const headers: Record<string, string> = {
     "content-type": type,
     "accept-ranges": "bytes",
-    "cache-control": "private, max-age=600",
+    // A file name never points at different bytes; cache until the link expires.
+    "cache-control": `private, max-age=${Math.max(0, Math.floor((Number(query.exp) - Date.now()) / 1000))}, immutable`,
     "x-content-type-options": "nosniff",
     ...(query.download ? { "content-disposition": `attachment; filename="${file}"` } : {}),
   };

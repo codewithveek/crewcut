@@ -58,7 +58,10 @@ function mediaSecret(): string {
 const MEDIA_TTL_MS = 15 * 60 * 1000;
 
 export function signMediaUrl(area: "assets" | "renders", fileName: string, ttlMs = MEDIA_TTL_MS): string {
-  const expires = Date.now() + ttlMs;
+  // Expiry rounded up to the next window: the same file gets the same URL for
+  // the whole window, so browsers reuse their cached copy instead of
+  // downloading it again after every read (links live ttl to 2×ttl).
+  const expires = Math.ceil((Date.now() + ttlMs) / ttlMs) * ttlMs;
   const signature = createHmac("sha256", mediaSecret()).update(`${area}/${fileName}:${expires}`).digest("base64url");
   return `/api/media/${area}/${encodeURIComponent(fileName)}?exp=${expires}&sig=${signature}`;
 }

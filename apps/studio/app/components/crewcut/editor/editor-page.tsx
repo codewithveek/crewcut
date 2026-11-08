@@ -295,6 +295,16 @@ function usePublishSelection() {
   }, [videoId, selectedClipIds, selectedLayer, playheadMs, playing, inMs, outMs, version]);
 }
 
+/**
+ * Its own component: the selection hook follows the playhead, which moves
+ * every frame during playback. Inside EditorPage it re-rendered the whole
+ * editor (panels, timeline, chat) 30-60 times a second.
+ */
+function SelectionSync() {
+  usePublishSelection();
+  return null;
+}
+
 // ── Top bar ─────────────────────────────────────────────────────────────────
 
 function SaveStatus() {
@@ -664,8 +674,6 @@ export function EditorPage({ videoId }: { videoId: string }) {
     );
   }, [params]);
   useEditorKeys();
-  usePublishSelection();
-
   useEffect(() => {
     const payload = query.data as CompositionPayload | undefined;
     if (!payload?.composition) return;
@@ -757,6 +765,7 @@ export function EditorPage({ videoId }: { videoId: string }) {
   const tablet = layout === "tablet";
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col bg-ds-bg">
+      <SelectionSync />
       <TopBar onExport={openExport} onPublish={openPublish} {...(tablet ? { onInspector: () => setInspectorOpen(true) } : {})} compact={tablet} short={timeline.compact} />
       <div className={cn("flex min-h-0 flex-1", timeline.compact ? "gap-1.5 px-1.5" : "gap-2 px-2")}>
         <div className="relative flex min-h-0">
