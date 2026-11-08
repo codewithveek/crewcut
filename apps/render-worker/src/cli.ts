@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
 
@@ -6,7 +6,7 @@ import { type AspectRatio, parseComposition } from "@crewcut/composition";
 import { composeFromScript, demoDossier, demoScript } from "@crewcut/pipeline";
 import { RemotionRenderBackend, renderFrame } from "@crewcut/renderer/node";
 
-import { startAssetServer } from "./asset-server";
+import { assetUrlMap, startAssetServer } from "./asset-server";
 
 /**
  * One-off renders, no database needed:
@@ -51,10 +51,22 @@ async function main(): Promise<void> {
   const assetRoot = path.join(storageRoot, "assets");
   const bundleDir = path.join(storageRoot, ".remotion-bundle");
   const server = await startAssetServer(assetRoot);
+  // `asset:<id>` references resolve to the matching file in the asset store (`<id>.<ext>`).
+  const referenced = new Set([...JSON.stringify(composition).matchAll(/"asset:([A-Za-z0-9_-]+)"/g)].map((match) => match[1] as string));
+  const files = referenced.size ? await readdir(assetRoot).catch(() => [] as string[]) : [];
+  const missing = [...referenced].filter((id) => !files.some((file) => file.startsWith(`${id}.`)));
+  if (missing.length) console.warn(`⚠ ${missing.length} referenced asset(s) not found in ${assetRoot} (they will render blank or silent): ${missing.slice(0, 5).join(", ")}${missing.length > 5 ? "…" : ""}. Pass --assets <storage dir>.`);
+  const assetUrls = assetUrlMap(
+    server.baseUrl,
+    [...referenced].flatMap((id) => {
+      const fileName = files.find((file) => file.startsWith(`${id}.`));
+      return fileName ? [{ id, fileName }] : [];
+    }),
+  );
   try {
     const outputPath = path.resolve(values.out ?? `storage/renders/${composition.id}-${composition.ratio.replace(":", "x")}.${values.still ? "png" : "mp4"}`);
     if (values.still) {
-      await renderFrame({ composition, assetUrls: {}, atMs: Number(values.still), outputPath, browserExecutable, bundleDir });
+      await renderFrame({ composition, assetUrls, atMs: Number(values.still), outputPath, browserExecutable, bundleDir });
       console.log(`Still → ${outputPath}`);
       return;
     }
@@ -62,7 +74,7 @@ async function main(): Promise<void> {
     let lastLogged = -1;
     const result = await new RemotionRenderBackend({ outDir: bundleDir }).render({
       composition,
-      assetUrls: {},
+      assetUrls,
       options: { reducedMotion: values["reduced-motion"], burnCaptions: !values["no-captions"] },
       outputPath,
       browserExecutable,
