@@ -10,7 +10,9 @@
     "template-stills": "tsx --env-file-if-exists=../studio/.env src/template-stills.ts",
     "transition-stills": "tsx --env-file-if-exists=../studio/.env src/transition-stills.ts",
     "landing-videos": "tsx --env-file-if-exists=../studio/.env src/landing-videos.ts",
-    "og-images": "tsx --env-file-if-exists=../studio/.env src/og-images.ts"
+    "og-images": "tsx --env-file-if-exists=../studio/.env src/og-images.ts",
+    "composition-stills": "tsx --env-file-if-exists=../studio/.env src/composition-stills.ts",
+    "films": "tsx --env-file-if-exists=../studio/.env src/films/main.ts"
   },
   "dependencies": {
     "@crewcut/composition": "workspace:*",
