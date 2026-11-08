@@ -6,7 +6,7 @@ import { z } from "zod";
 import { getDb, schema } from "../server/db/index.js";
 import { requireHuman } from "../server/lib/identity.js";
 import { nowIso, toJson } from "../server/lib/json.js";
-import { loadVideo, recordApproval, saveStages, updateVideo } from "../server/lib/store.js";
+import { loadVideo, recordApproval, requireOwner, saveStages, updateVideo } from "../server/lib/store.js";
 import { localCopy } from "../server/lib/blob-store.js";
 import { fileVideoSource, youtubeClientFor, youtubeConnectionFor } from "../server/lib/youtube.js";
 import { approveStage } from "@crewcut/pipeline";
@@ -30,6 +30,7 @@ export default defineAction({
     const [job] = await db.select().from(schema.publishJobs).where(eq(schema.publishJobs.id, publishJobId)).limit(1);
     if (!job) throw new UserError("No such post.");
     const video = await loadVideo(job.videoId, ctx, "editor");
+    requireOwner(video, "Publishing to the channel");
     if (job.status !== "awaiting_approval" && job.status !== "failed") throw new UserError(`This post is ${job.status}.`);
     const connection = await youtubeConnectionFor(video.row.ownerEmail);
     if (!connection) throw new UserError("Connect YouTube in Settings → Connections first.");

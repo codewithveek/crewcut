@@ -7,7 +7,7 @@ import { z } from "zod";
 import { getDb, schema } from "../server/db/index.js";
 import { identity } from "../server/lib/identity.js";
 import { nowIso, toJson } from "../server/lib/json.js";
-import { ensureDefaultProject, ownership } from "../server/lib/store.js";
+import { ensureDefaultProject, ownership, requireProjectAccess } from "../server/lib/store.js";
 import { newId } from "../server/lib/storage.js";
 
 export default defineAction({
@@ -22,7 +22,7 @@ export default defineAction({
   }),
   run: async (args, ctx) => {
     const who = identity(ctx);
-    const project = args.projectId ? { id: args.projectId } : await ensureDefaultProject(who);
+    const project = args.projectId ? await requireProjectAccess(args.projectId, ctx) : await ensureDefaultProject(who);
     const id = newId("vid");
     const stages = startStage(initialStageStates(), "trend", { now: nowIso(), actor: { kind: who.kind === "human" ? "human" : "agent", id: who.actorId } });
     await getDb().insert(schema.videos).values({

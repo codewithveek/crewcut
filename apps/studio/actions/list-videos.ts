@@ -2,7 +2,7 @@ import { defineAction } from "@agent-native/core/action";
 import type { Composition } from "@crewcut/composition";
 import { stageStatesSchema } from "@crewcut/contracts";
 import { pipelineProgress } from "@crewcut/pipeline";
-import { inArray } from "drizzle-orm";
+import { and, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
@@ -10,7 +10,7 @@ import { parseJson } from "../server/lib/json.js";
 import { referencedAssetIds } from "../server/lib/render-runner.js";
 import { resolveFileUrls } from "../server/lib/blob-store.js";
 import { pageArgs } from "../server/lib/search.js";
-import { latestComposition, listProjects, searchVideos } from "../server/lib/store.js";
+import { latestCompositions, listProjects, searchVideos } from "../server/lib/store.js";
 
 /** GET args arrive as strings; accept real booleans too (agent and CLI calls). */
 const flag = z
@@ -34,19 +34,18 @@ export default defineAction({
   run: async ({ withCompositions, query, filter, sort, limit, offset }, ctx) => {
     const page = pageArgs(limit, offset, { limit: 24, max: 100 });
     const [{ rows: videos, total, counts }, projects] = await Promise.all([searchVideos(ctx, { ...(query ? { query } : {}), filter, sort, ...page }), listProjects(ctx)]);
-    const latest = new Map<string, Composition>();
-    if (withCompositions) {
-      await Promise.all(
-        videos
-          .filter((video) => video.compositionVersion > 0)
-          .map(async (video) => {
-            const entry = await latestComposition(video.id);
-            if (entry) latest.set(video.id, entry.composition);
-          }),
-      );
-    }
+    // One query for every card's composition (was one query per video).
+    const latest: Map<string, Composition> = withCompositions ? await latestCompositions(videos) : new Map();
     const assetIds = [...new Set([...latest.values()].flatMap(referencedAssetIds))];
-    const assets = assetIds.length ? await getDb().select().from(schema.assets).where(inArray(schema.assets.id, assetIds)) : [];
+    // Only the listed videos' files and their owners' libraries: an id typed into a composition never reveals someone else's file.
+    const owners = [...new Set(videos.map((video) => video.ownerEmail))];
+    const A = schema.assets;
+    const assets = assetIds.length
+      ? await getDb()
+          .select()
+          .from(A)
+          .where(and(inArray(A.id, assetIds), or(inArray(A.videoId, [...latest.keys()]), inArray(A.ownerEmail, owners))))
+      : [];
     const urls = await resolveFileUrls("assets", assets.map((asset) => asset.fileName));
     const assetUrls = Object.fromEntries(assets.map((asset) => [asset.id, urls.get(asset.fileName) ?? ""]));
     return {

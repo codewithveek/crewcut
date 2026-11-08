@@ -2,7 +2,7 @@ import { defineAction } from "@agent-native/core/action";
 import { DEFAULT_EXPORT_RESOLUTION, type ExportResolution, exportSize } from "@crewcut/composition";
 import { STAGE_LABELS } from "@crewcut/contracts";
 import { pipelineProgress } from "@crewcut/pipeline";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
@@ -29,17 +29,32 @@ export default defineAction({
   http: { method: "GET" },
   readOnly: true,
   run: async ({ videoId, include }, ctx) => {
-    const video = await loadVideo(videoId, ctx);
     const want = (part: string) => !include || include.includes(part as never);
     const db = getDb();
-    const [dossier, scriptEntry, audit, qa, compositionEntry, sources, renders, publishes, approvals, insights] = await Promise.all([
+    const R = schema.renderJobs;
+    // The access check runs alongside the reads (one round trip, not two in a
+    // row); nothing is returned unless it passes.
+    const [video, dossier, scriptEntry, audit, qa, compositionEntry, sources, renders, publishes, approvals, insights] = await Promise.all([
+      loadVideo(videoId, ctx),
       want("dossier") ? loadDossier(videoId) : null,
       want("script") ? latestScript(videoId) : null,
       want("audit") ? latestAudit(videoId) : null,
       want("qa") ? latestQa(videoId) : null,
       want("composition") ? latestComposition(videoId) : null,
       want("sources") ? listSources(videoId) : [],
-      want("renders") ? db.select().from(schema.renderJobs).where(eq(schema.renderJobs.videoId, videoId)).orderBy(desc(schema.renderJobs.createdAt)).limit(10) : [],
+      want("renders")
+        ? db
+            .select({
+              id: R.id, status: R.status, progress: R.progress, stage: R.stage, ratio: R.ratio, compositionVersion: R.compositionVersion,
+              outputFile: R.outputFile, outputBytes: R.outputBytes, error: R.error, createdAt: R.createdAt,
+              // Only the export size from the job payload, which also holds the whole composition.
+              payload: sql<string>`json_build_object('composition', json_build_object('width', (${R.payload})::json->'composition'->'width', 'height', (${R.payload})::json->'composition'->'height'), 'options', (${R.payload})::json->'options')::text`,
+            })
+            .from(R)
+            .where(eq(R.videoId, videoId))
+            .orderBy(desc(R.createdAt))
+            .limit(10)
+        : [],
       want("publish") ? db.select().from(schema.publishJobs).where(eq(schema.publishJobs.videoId, videoId)).orderBy(desc(schema.publishJobs.createdAt)) : [],
       want("approvals") ? listApprovals(videoId) : [],
       want("insights") ? db.select().from(schema.insights).where(eq(schema.insights.videoId, videoId)).orderBy(desc(schema.insights.createdAt)).limit(20) : [],

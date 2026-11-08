@@ -16,9 +16,11 @@ export default defineAction({
   http: { method: "GET" },
   readOnly: true,
   run: async ({ videoId }, ctx) => {
-    const video = await loadVideo(videoId, ctx);
     const db = getDb();
-    const [audit, dossier, scriptEntry, compositionEntry, approvals, sources, assets, publishes, renders, scriptVersions] = await Promise.all([
+    const R = schema.renderJobs;
+    // The access check runs alongside the reads; nothing is returned unless it passes.
+    const [video, audit, dossier, scriptEntry, compositionEntry, approvals, sources, assets, publishes, renders, scriptVersions, compositionVersions] = await Promise.all([
+      loadVideo(videoId, ctx),
       latestAudit(videoId),
       loadDossier(videoId),
       latestScript(videoId),
@@ -27,13 +29,10 @@ export default defineAction({
       listSources(videoId),
       db.select().from(schema.assets).where(eq(schema.assets.videoId, videoId)),
       db.select().from(schema.publishJobs).where(eq(schema.publishJobs.videoId, videoId)).orderBy(desc(schema.publishJobs.createdAt)),
-      db.select().from(schema.renderJobs).where(eq(schema.renderJobs.videoId, videoId)).orderBy(desc(schema.renderJobs.createdAt)),
+      db.select({ id: R.id, status: R.status, compositionVersion: R.compositionVersion, ratio: R.ratio, createdAt: R.createdAt }).from(R).where(eq(R.videoId, videoId)).orderBy(desc(R.createdAt)),
       db.select({ version: schema.scripts.version, authorKind: schema.scripts.authorKind, author: schema.scripts.author, note: schema.scripts.note, createdAt: schema.scripts.createdAt }).from(schema.scripts).where(eq(schema.scripts.videoId, videoId)).orderBy(schema.scripts.version),
+      db.select({ authorKind: schema.compositions.authorKind }).from(schema.compositions).where(eq(schema.compositions.videoId, videoId)),
     ]);
-    const compositionVersions = await db
-      .select({ authorKind: schema.compositions.authorKind })
-      .from(schema.compositions)
-      .where(eq(schema.compositions.videoId, videoId));
     const sourceById = new Map(sources.map((source) => [source.id, source]));
     const factById = new Map((dossier?.facts ?? []).map((fact) => [fact.id, fact]));
     const humanEdits = compositionVersions.filter((entry) => entry.authorKind === "human").length;

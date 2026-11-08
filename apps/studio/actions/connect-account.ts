@@ -22,7 +22,8 @@ export default defineAction({
   schema: z.object({
     provider: z.enum(["youtube"]),
     origin: z.string().url().optional(),
-    returnTo: z.string().regex(/^\/(?!\/)/).default("/connections"),
+    // A same-site path only: browsers read "/\host" like "//host".
+    returnTo: z.string().regex(/^\/(?![/\\])[^\\]*$/).default("/connections"),
   }),
   agentTool: false,
   uiOnly: true,

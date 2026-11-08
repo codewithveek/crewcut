@@ -173,17 +173,16 @@ export function ensureBuiltinCatalog(): Promise<void> {
       .insert(schema.catalogPacks)
       .values({ id: BUILTIN_PACK_ID, name: "Built-in", description: "Crewcut's own designs, free for everyone.", tier: "free", status: "published", sort: 0, createdBy: "crewcut", ownerEmail: "crewcut@system", visibility: "public" })
       .onConflictDoNothing();
-    for (const [index, template] of TEMPLATES.entries()) {
-      const id = `cat_builtin_${template.id}`;
-      await db
-        .insert(schema.catalogItems)
-        .values({ id, scope: "catalog", packId: BUILTIN_PACK_ID, kind: "template", name: template.name, description: template.description, category: template.category, tags: toJson(template.tags), status: "published", sort: index, currentVersion: 1, createdBy: "crewcut", ownerEmail: "crewcut@system", visibility: "public" })
-        .onConflictDoNothing();
-      await db
-        .insert(schema.catalogItemVersions)
-        .values({ id: `${id}_v1`, itemId: id, version: 1, payload: toJson({ type: "builtin", templateId: template.id }), publishedBy: "crewcut" })
-        .onConflictDoNothing();
-    }
+    // One multi-row insert per table (was two round trips per template on every boot).
+    const items = TEMPLATES.map((template, index) => ({ template, index, id: `cat_builtin_${template.id}` }));
+    await db
+      .insert(schema.catalogItems)
+      .values(items.map(({ template, index, id }) => ({ id, scope: "catalog", packId: BUILTIN_PACK_ID, kind: "template", name: template.name, description: template.description, category: template.category, tags: toJson(template.tags), status: "published", sort: index, currentVersion: 1, createdBy: "crewcut", ownerEmail: "crewcut@system", visibility: "public" as const })))
+      .onConflictDoNothing();
+    await db
+      .insert(schema.catalogItemVersions)
+      .values(items.map(({ template, id }) => ({ id: `${id}_v1`, itemId: id, version: 1, payload: toJson({ type: "builtin", templateId: template.id }), publishedBy: "crewcut" })))
+      .onConflictDoNothing();
   })().catch((error: unknown) => {
     seeding = null;
     throw error;
@@ -202,7 +201,7 @@ export interface ResolvedItem {
 }
 
 /** Published catalog items in published packs, plus the person's workspace templates, with their current payloads. */
-export async function visibleItems(who: { email: string; orgId: string | null } | null, kinds: readonly CatalogKind[]): Promise<ResolvedItem[]> {
+export async function visibleItems(who: { email: string; orgId: string | null } | null, kinds: readonly CatalogKind[], onlyItemId?: string): Promise<ResolvedItem[]> {
   await ensureBuiltinCatalog();
   const db = getDb();
   const own = who ? (who.orgId ? eq(schema.catalogItems.orgId, who.orgId) : and(eq(schema.catalogItems.ownerEmail, who.email), sql`${schema.catalogItems.orgId} is null`)) : sql`false`;
@@ -214,6 +213,7 @@ export async function visibleItems(who: { email: string; orgId: string | null } 
     .where(
       and(
         inArray(schema.catalogItems.kind, [...kinds]),
+        onlyItemId ? eq(schema.catalogItems.id, onlyItemId) : undefined,
         eq(schema.catalogItems.status, "published"),
         or(and(eq(schema.catalogItems.scope, "catalog"), eq(schema.catalogPacks.status, "published")), and(eq(schema.catalogItems.scope, "workspace"), own)),
       ),
@@ -230,8 +230,9 @@ export async function visibleItems(who: { email: string; orgId: string | null } 
 
 /** One item a person may use (published catalog item or their workspace's template). */
 export async function usableItem(who: { email: string; orgId: string | null }, itemId: string): Promise<ResolvedItem | null> {
-  const items = await visibleItems(who, ["template", "music", "sound"]);
-  return items.find((entry) => entry.item.id === itemId) ?? null;
+  // Same visibility rules as the full list, for just this one item (not every template's payload).
+  const [entry] = await visibleItems(who, ["template", "music", "sound"], itemId);
+  return entry ?? null;
 }
 
 /** Catalog id of a built-in template, for links that still use the code id ("golden-hour"). */
@@ -301,11 +302,20 @@ export async function variantFromVideo(ctx: ActionRunContext | undefined, input:
   const { composition, slots } = markTemplateSlots(latest.composition, input.slots);
   if (slots.length === 0) throw new UserError("Choose at least one text, photo or video that people can change.");
   const ids = compositionAssetIds(composition);
-  const rows = ids.length ? await getDb().select().from(schema.assets).where(inArray(schema.assets.id, ids)) : [];
+  // Only this video's files and its owner's library: an asset id typed into a
+  // composition must never copy someone else's file into a template.
+  const A = schema.assets;
+  const rows = ids.length
+    ? await getDb()
+        .select()
+        .from(A)
+        .where(and(inArray(A.id, ids), or(eq(A.videoId, video.row.id), eq(A.ownerEmail, video.row.ownerEmail))))
+    : [];
   const media: Record<string, MediaEntry> = {};
-  for (const row of rows) {
+  const shared = await Promise.all(rows.map((row) => shareAssetFile(row)));
+  for (const [index, row] of rows.entries()) {
     media[row.id] = {
-      fileName: await shareAssetFile(row),
+      fileName: shared[index] as string,
       mime: row.mime,
       kind: row.kind,
       label: row.label,

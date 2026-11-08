@@ -14,18 +14,30 @@ export default defineAction({
   http: { method: "GET" },
   readOnly: true,
   run: async ({ videoId, version }, ctx) => {
-    await loadVideo(videoId, ctx);
     const who = identity(ctx);
-    const entry = version ? { version, composition: await compositionAt(videoId, version) } : await latestComposition(videoId);
+    const db = getDb();
+    // The access check runs alongside the reads (one round trip instead of
+    // four in a row); nothing is returned unless it passes.
+    const [video, entry, versions, ownAssets] = await Promise.all([
+      loadVideo(videoId, ctx),
+      version ? compositionAt(videoId, version).then((composition) => ({ version, composition })) : latestComposition(videoId),
+      listCompositionVersions(videoId),
+      // This video's uploads and the person's library.
+      db
+        .select()
+        .from(schema.assets)
+        .where(or(eq(schema.assets.videoId, videoId), and(isNull(schema.assets.videoId), eq(schema.assets.ownerEmail, who.email)))),
+    ]);
     if (!entry?.composition) return { composition: null, versions: [], assetUrls: {} };
-    const referenced = referencedAssetIds(entry.composition);
-    // This video's uploads, the person's library, and anything the composition references.
-    const where = or(
-      eq(schema.assets.videoId, videoId),
-      and(isNull(schema.assets.videoId), eq(schema.assets.ownerEmail, who.email)),
-      ...(referenced.length ? [inArray(schema.assets.id, referenced)] : []),
-    );
-    const [versions, assets] = await Promise.all([listCompositionVersions(videoId), getDb().select().from(schema.assets).where(where)]);
+    // Plus anything else the composition references (rare: the owner's other
+    // uploads). Only the owner's or the caller's own files: an id typed into a
+    // composition must never reveal someone else's file.
+    const known = new Set(ownAssets.map((asset) => asset.id));
+    const extra = referencedAssetIds(entry.composition).filter((id) => !known.has(id));
+    const owners = [...new Set([video.row.ownerEmail, who.email])];
+    const assets = extra.length
+      ? [...ownAssets, ...(await db.select().from(schema.assets).where(and(inArray(schema.assets.id, extra), inArray(schema.assets.ownerEmail, owners))))]
+      : ownAssets;
     const urls = await resolveFileUrls("assets", assets.map((asset) => asset.fileName));
     const assetUrls = Object.fromEntries(assets.map((asset) => [asset.id, urls.get(asset.fileName) ?? ""]));
     return { version: entry.version, composition: entry.composition, versions, assetUrls };

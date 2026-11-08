@@ -48,6 +48,21 @@ async function remoteProvider(): Promise<Provider | null> {
 
 const keyOf = (area: StorageArea, fileName: string) => `${area}/${fileName}`;
 
+/**
+ * Remote URLs by storage key. Uploads use stable URLs and file names never
+ * point at different bytes, so a known URL stays right until the file is
+ * removed. Only hits are cached: a miss may be uploaded by another server.
+ * Saves a database round trip on almost every read that returns media.
+ */
+const URL_CACHE_MAX = 5000;
+const urlCache = new Map<string, string>();
+
+function rememberUrl(key: string, url: string): void {
+  urlCache.delete(key);
+  urlCache.set(key, url);
+  if (urlCache.size > URL_CACHE_MAX) urlCache.delete(urlCache.keys().next().value as string);
+}
+
 export interface StoredFile {
   provider: string;
   /** Remote URL, or null when the file is on local disk (use fileUrl for a signed link). */
@@ -69,6 +84,7 @@ export async function putFile(area: StorageArea, fileName: string, bytes: Uint8A
   }
   const row = { key: keyOf(area, fileName), area, fileName, provider: result.provider, url: result.url, remoteId: result.id ?? null, mime, bytes: bytes.byteLength };
   await getDb().insert(schema.storedFiles).values(row).onConflictDoUpdate({ target: schema.storedFiles.key, set: { provider: row.provider, url: row.url, remoteId: row.remoteId, mime, bytes: row.bytes } });
+  rememberUrl(row.key, row.url);
   if (options.keepLocal) await writeStorageFile(area, fileName, bytes);
   return { provider: result.provider, url: result.url };
 }
@@ -78,11 +94,22 @@ export async function resolveFileUrls(area: Exclude<StorageArea, "jobs">, fileNa
   const unique = [...new Set(fileNames)];
   const urls = new Map<string, string>();
   if (unique.length === 0) return urls;
-  const rows = await getDb()
-    .select({ fileName: schema.storedFiles.fileName, url: schema.storedFiles.url })
-    .from(schema.storedFiles)
-    .where(inArray(schema.storedFiles.key, unique.map((name) => keyOf(area, name))));
-  for (const row of rows) urls.set(row.fileName, row.url);
+  const unknown: string[] = [];
+  for (const name of unique) {
+    const cached = urlCache.get(keyOf(area, name));
+    if (cached) urls.set(name, cached);
+    else unknown.push(name);
+  }
+  if (unknown.length > 0) {
+    const rows = await getDb()
+      .select({ key: schema.storedFiles.key, fileName: schema.storedFiles.fileName, url: schema.storedFiles.url })
+      .from(schema.storedFiles)
+      .where(inArray(schema.storedFiles.key, unknown.map((name) => keyOf(area, name))));
+    for (const row of rows) {
+      urls.set(row.fileName, row.url);
+      rememberUrl(row.key, row.url);
+    }
+  }
   for (const name of unique) if (!urls.has(name)) urls.set(name, signMediaUrl(area, name));
   return urls;
 }
@@ -98,6 +125,7 @@ async function storedRow(area: StorageArea, fileName: string) {
 
 /** Deletes a file wherever it lives (remote object, index row, local copy). */
 export async function removeFile(area: StorageArea, fileName: string): Promise<void> {
+  urlCache.delete(keyOf(area, fileName));
   const row = await storedRow(area, fileName);
   if (row) {
     await deleteUploadedFile(row.provider, { url: row.url, ...(row.remoteId ? { id: row.remoteId } : {}) }).catch(() => false);

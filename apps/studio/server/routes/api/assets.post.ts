@@ -1,6 +1,6 @@
 import { getSession, runWithRequestContext } from "@agent-native/core/server";
 import { assertAccess } from "@agent-native/core/sharing";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { defineEventHandler, getQuery } from "h3";
 
 import { getDb, schema } from "../../db/index.js";
@@ -10,6 +10,10 @@ import { sniffMedia as sniff } from "../../lib/sniff.js";
 import { newId } from "../../lib/storage.js";
 
 const MAX_BYTES = 100 * 1024 * 1024;
+/** Uploads each owner may keep in total (CREWCUT_STORAGE_QUOTA_MB, default 5 GB), so one account can't fill the disk. */
+const QUOTA_BYTES = Math.max(1, Number(process.env.CREWCUT_STORAGE_QUOTA_MB ?? 5120)) * 1024 * 1024;
+
+type VideoRow = typeof schema.videos.$inferSelect;
 
 const AUDIO_ROLES = new Set(["music", "sfx", "voice", "audio"]);
 
@@ -24,16 +28,30 @@ export default defineEventHandler(async (event) => {
   if (!email) return Response.json({ error: { code: "unauthorized", message: "Sign in to upload." } }, { status: 401 });
   const query = getQuery(event) as { videoId?: string; role?: string; label?: string; durationMs?: string };
   const videoId = query.videoId || null;
+  const context = { userEmail: email, ...(session?.orgId ? { orgId: session.orgId } : {}) };
+  let video: VideoRow | null = null;
   if (videoId) {
     try {
-      const access = { userEmail: email, ...(session?.orgId ? { orgId: session.orgId } : {}) };
-      await runWithRequestContext(access, () => assertAccess("video", videoId, "editor", access, { skipResourceBody: true }));
+      // The access check reads the video row: keep it (no second query).
+      const access = await runWithRequestContext(context, () => assertAccess("video", videoId, "editor", context));
+      video = access.resource as VideoRow;
     } catch {
       return Response.json({ error: { code: "forbidden", message: "You can't edit this video." } }, { status: 403 });
     }
   }
   const length = Number(event.req.headers.get("content-length") ?? 0);
   if (length > MAX_BYTES) return Response.json({ error: { code: "too_large", message: "Files are limited to 100 MB." } }, { status: 413 });
+  // Uploads count against the owner of where they land (the video's owner, or the uploader's library).
+  const owner = video?.ownerEmail ?? email;
+  const [usage] = await runWithRequestContext(context, () =>
+    getDb()
+      .select({ bytes: sql<number>`coalesce(sum(${schema.assets.bytes}), 0)` })
+      .from(schema.assets)
+      .where(and(eq(schema.assets.ownerEmail, owner), sql`${schema.assets.fileName} not like 'lib-%' and ${schema.assets.fileName} not like 'tpl-%' and ${schema.assets.fileName} not like 'cat-%'`)),
+  );
+  if (Number(usage?.bytes ?? 0) + Math.max(length, 0) > QUOTA_BYTES) {
+    return Response.json({ error: { code: "quota", message: `Uploads are limited to ${Math.round(QUOTA_BYTES / 1024 ** 3)} GB per account. Delete media you no longer use to make room.` } }, { status: 413 });
+  }
   const bytes = new Uint8Array(await event.req.arrayBuffer());
   if (bytes.byteLength > MAX_BYTES) return Response.json({ error: { code: "too_large", message: "Files are limited to 100 MB." } }, { status: 413 });
   const sniffed = sniff(bytes);
@@ -43,7 +61,6 @@ export default defineEventHandler(async (event) => {
   const durationMs = Number(query.durationMs);
 
   return runWithRequestContext({ userEmail: email, ...(session?.orgId ? { orgId: session.orgId } : {}) }, async () => {
-  const [video] = videoId ? await getDb().select().from(schema.videos).where(eq(schema.videos.id, videoId)).limit(1) : [];
   const id = newId("ast");
   const fileName = `${id}.${type.ext}`;
   // Keep a disk copy too: render workers and the preview read local files fastest.

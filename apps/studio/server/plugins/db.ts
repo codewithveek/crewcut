@@ -125,6 +125,31 @@ export default runMigrations(
         "CREATE UNIQUE INDEX IF NOT EXISTS catalog_item_versions_idx ON catalog_item_versions (item_id, version)",
       ].join(";\n"),
     },
+    {
+      // Every per-video read (get-video, the proof report, the editor) filters
+      // these tables by video; without an index each one scanned the table.
+      // Owner lookups compare emails exactly, so the framework's lower(owner_email)
+      // indexes don't serve them.
+      version: 5,
+      name: "crewcut-read-path-indexes",
+      sql: [
+        "CREATE INDEX IF NOT EXISTS sources_video_idx ON sources (video_id, retrieved_at)",
+        "CREATE INDEX IF NOT EXISTS assets_video_idx ON assets (video_id)",
+        "CREATE INDEX IF NOT EXISTS assets_owner_idx ON assets (owner_email, video_id)",
+        "CREATE INDEX IF NOT EXISTS render_jobs_video_idx ON render_jobs (video_id, created_at)",
+        "CREATE INDEX IF NOT EXISTS publish_jobs_video_idx ON publish_jobs (video_id, created_at)",
+        "CREATE INDEX IF NOT EXISTS claim_audits_video_idx ON claim_audits (video_id, created_at)",
+        "CREATE INDEX IF NOT EXISTS qa_reports_video_idx ON qa_reports (video_id, created_at)",
+        "CREATE INDEX IF NOT EXISTS insights_video_idx ON insights (video_id, created_at)",
+        "CREATE INDEX IF NOT EXISTS metric_snapshots_video_idx ON metric_snapshots (video_id, captured_at)",
+        "CREATE INDEX IF NOT EXISTS learnings_project_idx ON learnings (project_id)",
+        "CREATE INDEX IF NOT EXISTS projects_owner_idx ON projects (owner_email, created_at)",
+        "CREATE INDEX IF NOT EXISTS videos_updated_idx ON videos (updated_at)",
+        "CREATE INDEX IF NOT EXISTS connections_owner_idx ON connections (owner_email, provider)",
+        "CREATE INDEX IF NOT EXISTS catalog_items_owner_idx ON catalog_items (owner_email, scope)",
+      ].join(";\n"),
+    },
+    },
   ],
   { table: "crewcut_migrations" },
 );

@@ -132,7 +132,8 @@ export async function verifyState(state: string, secret: string, now = Date.now(
   if (!valid) throw new OAuthError("state_invalid", "OAuth state signature is invalid.");
   const payload = JSON.parse(new TextDecoder().decode(fromBase64Url(body))) as OAuthStatePayload;
   if (payload.expiresAt < now) throw new OAuthError("state_expired", "The connection attempt expired. Start again.");
-  if (!payload.returnTo.startsWith("/") || payload.returnTo.startsWith("//")) {
+  // Browsers read "/\host" like "//host": both would leave the app.
+  if (!payload.returnTo.startsWith("/") || payload.returnTo.startsWith("//") || payload.returnTo.includes("\\")) {
     throw new OAuthError("state_invalid", "Redirect target must be an app path.");
   }
   return payload;

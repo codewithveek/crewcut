@@ -7,7 +7,7 @@ import { getDb, schema } from "../server/db/index.js";
 import { assetsUsedElsewhere, deleteAssetFile } from "../server/lib/assets.js";
 import { requireHuman } from "../server/lib/identity.js";
 import { removeFile } from "../server/lib/blob-store.js";
-import { loadVideo } from "../server/lib/store.js";
+import { loadVideo, requireOwner } from "../server/lib/store.js";
 
 /**
  * People-only: hidden from the agent, MCP and A2A, and re-checked at run
@@ -23,6 +23,7 @@ export default defineAction({
   run: async ({ videoId }, ctx) => {
     requireHuman(ctx, "Deleting a video");
     const video = await loadVideo(videoId, ctx, "editor");
+    requireOwner(video, "Deleting a video");
     const db = getDb();
     const [assets, renders] = await Promise.all([
       db.select().from(schema.assets).where(eq(schema.assets.videoId, videoId)),

@@ -1,5 +1,5 @@
 import type { ActionRunContext } from "@agent-native/core/action";
-import { accessFilter, assertAccess } from "@agent-native/core/sharing";
+import { accessFilter, assertAccess, resolveAccess, roleSatisfies } from "@agent-native/core/sharing";
 import { type Composition, type StyleFingerprint, parseComposition, styleFingerprint } from "@crewcut/composition";
 import {
   type ApprovalEvent,
@@ -26,10 +26,11 @@ import { type SQL, and, asc, desc, eq, inArray, not, or, sql } from "drizzle-orm
 import { z } from "zod";
 
 import { getDb, schema } from "../db/index.js";
-import { type Identity, accessContext, identity } from "./identity.js";
+import { type Identity, ForbiddenError, accessContext, identity } from "./identity.js";
 import { nowIso, parseJson, parseJsonStrict, toJson } from "./json.js";
 import { containsText } from "./search.js";
 import { newId } from "./storage.js";
+import { UserError } from "./errors.js";
 
 export type VideoRow = typeof schema.videos.$inferSelect;
 export type ProjectRow = typeof schema.projects.$inferSelect;
@@ -50,9 +51,16 @@ export function ownership(who: Identity): { ownerEmail: string; orgId: string | 
 
 export async function loadVideo(videoId: string, ctx: ActionRunContext | undefined, role: "viewer" | "editor" = "viewer"): Promise<VideoRecord> {
   const who = identity(ctx);
-  await assertAccess("video", videoId, role, accessContext(who), { skipResourceBody: true });
-  const [row] = await getDb().select().from(schema.videos).where(eq(schema.videos.id, videoId)).limit(1);
+  // The access check already reads the whole row: use it instead of a second round trip.
+  const access = await assertAccess("video", videoId, role, accessContext(who));
+  const loaded = access.resource as Partial<VideoRow> | undefined;
+  const row =
+    loaded && typeof loaded.id === "string" && typeof loaded.stages === "string"
+      ? (loaded as VideoRow)
+      : (await getDb().select().from(schema.videos).where(eq(schema.videos.id, videoId)).limit(1))[0];
   if (!row) throw new Error(`Video ${videoId} not found`);
+  const sameWorkspace = Boolean(who.orgId && row.orgId === who.orgId);
+  if (row.visibility === "public" && row.ownerEmail.toLowerCase() !== who.email.toLowerCase() && !sameWorkspace) await assertNotOnlyPublic(videoId, who);
   return {
     row,
     stages: parseJson(stageStatesSchema, row.stages, stageStatesSchema.parse({})),
@@ -60,6 +68,40 @@ export async function loadVideo(videoId: string, ctx: ActionRunContext | undefin
     platforms: parseJson(z.array(platformSchema), row.platforms, ["youtube"]),
     who,
   };
+}
+
+/** Things only the video's owner may do (publish to their channel, delete the video), whatever an editor share allows. */
+export function requireOwner(video: VideoRecord, what: string): void {
+  if (video.row.ownerEmail.toLowerCase() !== video.who.email.toLowerCase()) {
+    throw new ForbiddenError(`${what} is only for the video's owner. Ask them to do it.`);
+  }
+}
+
+/**
+ * "Anyone with the link" means anyone may WATCH the finished export (/watch).
+ * The framework would also make every signed-in person a viewer of the whole
+ * project (brief, script, sources, edit, approvals with emails), so a public
+ * video opens in the app only for people it was actually shared with.
+ */
+async function assertNotOnlyPublic(videoId: string, who: Identity): Promise<void> {
+  if (!(await isInvited(schema.videoShares, videoId, who))) throw new ForbiddenError(`No access to video ${videoId}`);
+}
+
+/** True when the resource was shared with this person, or with their workspace. */
+async function isInvited(shares: typeof schema.videoShares | typeof schema.projectShares, resourceId: string, who: Identity): Promise<boolean> {
+  const principals = or(
+    and(eq(shares.principalType, "user"), sql`lower(${shares.principalId}) = ${who.email.toLowerCase()}`),
+    ...(who.orgId ? [and(eq(shares.principalType, "org"), eq(shares.principalId, who.orgId))] : []),
+  );
+  const [share] = await getDb().select({ id: shares.id }).from(shares).where(and(eq(shares.resourceId, resourceId), principals)).limit(1);
+  return Boolean(share);
+}
+
+/** The owner, someone in the same workspace, or someone it was shared with: the people who may know a resource exists. */
+async function isMember(row: { ownerEmail: string; orgId: string | null }, shares: typeof schema.videoShares | typeof schema.projectShares, resourceId: string, who: Identity): Promise<boolean> {
+  if (row.ownerEmail.toLowerCase() === who.email.toLowerCase()) return true;
+  if (who.orgId && row.orgId === who.orgId) return true;
+  return isInvited(shares, resourceId, who);
 }
 
 export async function listVideos(ctx: ActionRunContext | undefined): Promise<VideoRow[]> {
@@ -126,6 +168,25 @@ export async function listProjects(ctx: ActionRunContext | undefined): Promise<P
 export async function getProject(projectId: string): Promise<ProjectRow | null> {
   const [row] = await getDb().select().from(schema.projects).where(eq(schema.projects.id, projectId)).limit(1);
   return row ?? null;
+}
+
+/** A project the caller may add to (videos, learnings): never trust a project id from the request on its own. */
+/**
+ * A project the caller may add to (videos, learnings): never trust a project
+ * id from the request on its own. Someone who wasn't invited and isn't in the
+ * project's workspace gets the same 404 as for a project that doesn't exist,
+ * so an id never reveals that a project is there. Members without the role
+ * (e.g. viewers) are told they need edit access.
+ */
+export async function requireProjectAccess(projectId: string, ctx: ActionRunContext | undefined, role: "viewer" | "editor" = "editor"): Promise<ProjectRow> {
+  const who = identity(ctx);
+  const access = await resolveAccess("project", projectId, accessContext(who));
+  const loaded = access?.resource as Partial<ProjectRow> | undefined;
+  const row = !access ? null : loaded && typeof loaded.id === "string" && typeof loaded.gatePolicy === "string" ? (loaded as ProjectRow) : await getProject(projectId);
+  // Public visibility alone doesn't count: only owners, the workspace and invited people.
+  if (!access || !row || !(await isMember(row, schema.projectShares, projectId, who))) throw new UserError("Project not found.", 404);
+  if (!roleSatisfies(access.role, role)) throw new ForbiddenError(`You need ${role} access to this project. Ask its owner to invite you as an ${role}.`);
+  return row;
 }
 
 export function gatePolicyOf(project: ProjectRow | null): GatePolicy {
@@ -199,11 +260,11 @@ export async function loadDossier(videoId: string): Promise<Dossier | null> {
 }
 
 export async function saveDossier(video: VideoRecord, dossier: Dossier): Promise<void> {
-  const db = getDb();
   const body = toJson(dossier);
-  const existing = await loadDossier(video.row.id);
-  if (existing) await db.update(schema.dossiers).set({ body, updatedAt: nowIso() }).where(eq(schema.dossiers.videoId, video.row.id));
-  else await db.insert(schema.dossiers).values({ videoId: video.row.id, body, ownerEmail: video.row.ownerEmail, orgId: video.row.orgId });
+  await getDb()
+    .insert(schema.dossiers)
+    .values({ videoId: video.row.id, body, ownerEmail: video.row.ownerEmail, orgId: video.row.orgId })
+    .onConflictDoUpdate({ target: schema.dossiers.videoId, set: { body, updatedAt: nowIso() } });
 }
 
 export async function listSources(videoId: string) {
@@ -275,6 +336,36 @@ export async function latestComposition(videoId: string): Promise<{ version: num
   return row ? { version: row.version, composition: parseComposition(JSON.parse(row.body)), label: row.label } : null;
 }
 
+/**
+ * Latest compositions of many videos in one query, using each video's
+ * recorded composition version (falls back per video if that row is missing).
+ */
+export async function latestCompositions(videos: ReadonlyArray<{ id: string; compositionVersion: number }>): Promise<Map<string, Composition>> {
+  const wanted = videos.filter((video) => video.compositionVersion > 0);
+  const result = new Map<string, Composition>();
+  if (wanted.length === 0) return result;
+  const C = schema.compositions;
+  const rows = await getDb()
+    .select({ videoId: C.videoId, body: C.body })
+    .from(C)
+    .where(or(...wanted.map((video) => and(eq(C.videoId, video.id), eq(C.version, video.compositionVersion)))));
+  for (const row of rows) {
+    try {
+      result.set(row.videoId, parseComposition(JSON.parse(row.body)));
+    } catch {
+      // A composition that no longer parses shows as a card without a preview.
+    }
+  }
+  const missing = wanted.filter((video) => !rows.some((row) => row.videoId === video.id));
+  await Promise.all(
+    missing.map(async (video) => {
+      const entry = await latestComposition(video.id).catch(() => null);
+      if (entry) result.set(video.id, entry.composition);
+    }),
+  );
+  return result;
+}
+
 export async function compositionAt(videoId: string, version: number): Promise<Composition | null> {
   const [row] = await getDb()
     .select()
@@ -336,10 +427,12 @@ export async function recentFingerprints(projectId: string, excludeVideoId: stri
     .limit(11);
   const others = videos.filter((video) => video.id !== excludeVideoId && video.version > 0).slice(0, 10);
   if (others.length === 0) return [];
+  // Only each video's current version, not every version it ever had.
+  const C = schema.compositions;
   const rows = await db
-    .select({ videoId: schema.compositions.videoId, version: schema.compositions.version, fingerprint: schema.compositions.fingerprint })
-    .from(schema.compositions)
-    .where(inArray(schema.compositions.videoId, others.map((video) => video.id)));
+    .select({ videoId: C.videoId, version: C.version, fingerprint: C.fingerprint })
+    .from(C)
+    .where(or(...others.map((video) => and(eq(C.videoId, video.id), eq(C.version, video.version)))));
   return others.flatMap((video) => {
     const row = rows.find((candidate) => candidate.videoId === video.id && candidate.version === video.version);
     return row ? [{ id: video.id, title: video.title, fingerprint: JSON.parse(row.fingerprint) as StyleFingerprint }] : [];

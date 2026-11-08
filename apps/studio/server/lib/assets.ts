@@ -1,5 +1,5 @@
 import type { ActionRunContext } from "@agent-native/core/action";
-import { accessFilter } from "@agent-native/core/sharing";
+import { accessFilter, assertAccess } from "@agent-native/core/sharing";
 import { type SQL, and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import { getDb, schema } from "../db/index.js";
@@ -8,7 +8,7 @@ import { accessContext, identity } from "./identity.js";
 import { containsText } from "./search.js";
 import { referencedAssetIds } from "./render-runner.js";
 import { removeFile, resolveFileUrls } from "./blob-store.js";
-import { latestComposition, listVideos } from "./store.js";
+import { latestCompositions, listVideos } from "./store.js";
 
 export type AssetRow = typeof schema.assets.$inferSelect;
 export type MediaType = "image" | "video" | "audio";
@@ -113,15 +113,26 @@ export async function findVisibleAsset(ctx: ActionRunContext | undefined, assetI
   return row ?? null;
 }
 
+/**
+ * One asset the person may change or delete: their own library file, or a
+ * file of a video they can edit. Viewers of a shared video can't touch its media.
+ */
+export async function findEditableAsset(ctx: ActionRunContext | undefined, assetId: string): Promise<AssetRow | null> {
+  const row = await findVisibleAsset(ctx, assetId);
+  if (!row) return null;
+  if (row.videoId) await assertAccess("video", row.videoId, "editor", accessContext(identity(ctx)));
+  return row;
+}
+
 /** Which of the person's videos currently use an asset (latest composition only). */
 export async function videosUsingAsset(ctx: ActionRunContext | undefined, assetId: string): Promise<Array<{ id: string; title: string }>> {
   const videos = await listVideos(ctx);
-  const users: Array<{ id: string; title: string }> = [];
-  for (const video of videos) {
-    const latest = await latestComposition(video.id);
-    if (latest && referencedAssetIds(latest.composition).includes(assetId)) users.push({ id: video.id, title: video.title });
-  }
-  return users;
+  // One query for every video's latest edit (was one query per video).
+  const latest = await latestCompositions(videos);
+  return videos.filter((video) => {
+    const composition = latest.get(video.id);
+    return composition ? referencedAssetIds(composition).includes(assetId) : false;
+  }).map((video) => ({ id: video.id, title: video.title }));
 }
 
 /**
@@ -130,15 +141,18 @@ export async function videosUsingAsset(ctx: ActionRunContext | undefined, assetI
  * projects, so deleting a project must not take shared files with it.
  */
 export async function assetsUsedElsewhere(assetIds: readonly string[], videoId: string): Promise<Set<string>> {
-  const db = getDb();
   const used = new Set<string>();
-  for (const assetId of assetIds) {
-    const [hit] = await db
-      .select({ id: schema.compositions.id })
-      .from(schema.compositions)
-      .where(and(sql`${schema.compositions.videoId} <> ${videoId}`, sql`${schema.compositions.body} like ${`%asset:${assetId}%`}`))
-      .limit(1);
-    if (hit) used.add(assetId);
+  const ids = [...new Set(assetIds)];
+  if (ids.length === 0) return used;
+  // One pass over the other videos' edits for all assets at once (was one full scan per asset).
+  const body = schema.compositions.body;
+  const [row] = await getDb()
+    .select({ hits: sql<string>`concat_ws(',', ${sql.join(ids.map((id, index) => sql`case when bool_or(${body} like ${`%asset:${id}%`}) then ${sql.raw(`'${index}'`)} end`), sql`, `)})` })
+    .from(schema.compositions)
+    .where(sql`${schema.compositions.videoId} <> ${videoId}`);
+  for (const index of (row?.hits ?? "").split(",")) {
+    const id = ids[Number(index)];
+    if (index !== "" && id) used.add(id);
   }
   return used;
 }

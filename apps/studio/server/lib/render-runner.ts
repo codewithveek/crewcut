@@ -3,9 +3,10 @@ import path from "node:path";
 
 import { type Composition, type ExportResolution, iterateLayers } from "@crewcut/composition";
 import { runWithRequestContext } from "@agent-native/core/server";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 
 import { getDb, schema } from "../db/index.js";
+import { UserError } from "./errors.js";
 import { toJson } from "./json.js";
 import { resolveFileUrls } from "./blob-store.js";
 import { STORAGE_DIR, WORKSPACE_ROOT, newId, writeStorageFile } from "./storage.js";
@@ -39,6 +40,43 @@ export function referencedAssetIds(composition: Composition): string[] {
   return [...ids];
 }
 
+/**
+ * Every media `src` in a composition must be one the render browser may load:
+ * our own assets, inline images, or public https hosts. The render runs a
+ * real browser inside the app's container, so a typed-in http://127.0.0.1,
+ * metadata or file: address would otherwise be fetched from inside it.
+ */
+export function unsafeMediaSources(composition: Composition): string[] {
+  const bad = new Set<string>();
+  const check = (src: string) => {
+    if (src === "" || src.startsWith("asset:") || src.startsWith("estimated:") || /^data:(image|audio)\//.test(src)) return;
+    try {
+      const url = new URL(src);
+      const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+      const internal =
+        host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal") || host.endsWith(".local") ||
+        /^[\d.]+$/.test(host) || host.includes(":"); // IP literals (v4 and v6): public media has a host name
+      if (url.protocol === "https:" && !internal) return;
+    } catch {
+      // Not a URL (a relative path): the renderer can't load it either.
+    }
+    bad.add(src.slice(0, 120));
+  };
+  const walk = (value: unknown, depth: number): void => {
+    if (depth > 40 || !value || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item, depth + 1);
+      return;
+    }
+    for (const [key, item] of Object.entries(value)) {
+      if (key === "src" && typeof item === "string") check(item);
+      else walk(item, depth + 1);
+    }
+  };
+  walk(composition, 0);
+  return [...bad];
+}
+
 export interface QueueRenderInput {
   video: VideoRecord;
   composition: Composition;
@@ -50,10 +88,29 @@ export interface QueueRenderInput {
 }
 
 export async function queueRender(input: QueueRenderInput): Promise<{ renderId: string; mode: RenderMode }> {
+  const unsafe = unsafeMediaSources(input.composition);
+  if (unsafe.length > 0) throw new UserError(`This video points at media that can't be exported (${unsafe.slice(0, 3).join(", ")}). Replace it with an upload.`);
   const db = getDb();
+  // One person can't fill the server with exports: a few at a time each.
+  // Jobs that stopped reporting for 30 minutes don't count (a crashed worker).
+  const [active] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(schema.renderJobs)
+    .where(and(eq(schema.renderJobs.ownerEmail, input.video.row.ownerEmail), inArray(schema.renderJobs.status, ["queued", "running"]), sql`(${schema.renderJobs.updatedAt})::timestamptz > now() - interval '30 minutes'`));
+  if (Number(active?.count ?? 0) >= MAX_ACTIVE_RENDERS_PER_OWNER) {
+    throw new UserError(`${MAX_ACTIVE_RENDERS_PER_OWNER} exports are already in progress. Wait for one to finish, then export again.`);
+  }
   const renderId = newId("rnd");
   const assetIds = referencedAssetIds(input.composition);
-  const assets = assetIds.length ? await db.select().from(schema.assets).where(inArray(schema.assets.id, assetIds)) : [];
+  // Only this video's files and its owner's library: an asset id typed into a
+  // composition never pulls someone else's file into a render.
+  const A = schema.assets;
+  const assets = assetIds.length
+    ? await db
+        .select()
+        .from(A)
+        .where(and(inArray(A.id, assetIds), or(eq(A.videoId, input.video.row.id), eq(A.ownerEmail, input.video.row.ownerEmail))))
+    : [];
   const payload = {
     jobId: renderId,
     composition: input.composition,
@@ -80,12 +137,39 @@ export async function queueRender(input: QueueRenderInput): Promise<{ renderId: 
   const mode = renderMode();
   if (mode === "spawn") {
     const jobFile = await writeStorageFile("jobs", `${renderId}.json`, toJson(payload));
-    spawnWorker(renderId, jobFile, { userEmail: input.video.row.ownerEmail, orgId: input.video.row.orgId });
+    startOrWait({ renderId, jobFile, owner: { userEmail: input.video.row.ownerEmail, orgId: input.video.row.orgId } });
   }
   return { renderId, mode };
 }
 
 const running = new Map<string, ReturnType<typeof spawn>>();
+
+const MAX_ACTIVE_RENDERS_PER_OWNER = Math.max(1, Number(process.env.CREWCUT_MAX_RENDERS_PER_USER ?? 2));
+/**
+ * Exports running at once on this server. Each is a Chromium plus ffmpeg using
+ * every core it gets, so on a small machine one at a time finishes each
+ * export sooner than two sharing the CPU (and can't run out of memory).
+ */
+const MAX_PARALLEL_RENDERS = Math.max(1, Number(process.env.CREWCUT_MAX_PARALLEL_RENDERS ?? 1));
+
+interface WaitingRender {
+  renderId: string;
+  jobFile: string;
+  owner: { userEmail: string; orgId: string | null };
+}
+const waiting: WaitingRender[] = [];
+
+function startOrWait(job: WaitingRender): void {
+  if (running.size < MAX_PARALLEL_RENDERS) spawnWorker(job.renderId, job.jobFile, job.owner);
+  else waiting.push(job); // Stays "queued" in the database until a slot frees up.
+}
+
+function startNextWaiting(): void {
+  while (running.size < MAX_PARALLEL_RENDERS && waiting.length > 0) {
+    const next = waiting.shift() as WaitingRender;
+    spawnWorker(next.renderId, next.jobFile, next.owner);
+  }
+}
 
 type JobPatch = Partial<typeof schema.renderJobs.$inferInsert>;
 
@@ -96,17 +180,26 @@ type JobPatch = Partial<typeof schema.renderJobs.$inferInsert>;
  */
 function jobWriter(renderId: string, owner: { userEmail: string; orgId: string | null }) {
   let chain: Promise<unknown> = Promise.resolve();
+  // Patches that arrive while a write is waiting merge into it: on a slow
+  // database link, progress never queues up behind itself and "done" lands
+  // as soon as the write before it finishes.
+  let pending: JobPatch | null = null;
   return (patch: JobPatch) => {
-    chain = chain.then(() =>
-      Promise.resolve(
+    const scheduled = pending !== null;
+    pending = { ...(pending ?? {}), ...patch };
+    if (scheduled) return chain;
+    chain = chain.then(() => {
+      const next = pending ?? {};
+      pending = null;
+      return Promise.resolve(
         runWithRequestContext({ userEmail: owner.userEmail, ...(owner.orgId ? { orgId: owner.orgId } : {}) }, () =>
           getDb()
             .update(schema.renderJobs)
-            .set({ ...patch, updatedAt: new Date().toISOString() })
+            .set({ ...next, updatedAt: new Date().toISOString() })
             .where(eq(schema.renderJobs.id, renderId)),
         ),
-      ).catch((error: unknown) => console.error(`[render ${renderId}] could not record progress:`, error)),
-    );
+      ).catch((error: unknown) => console.error(`[render ${renderId}] could not record progress:`, error));
+    });
     return chain;
   };
 }
@@ -154,17 +247,24 @@ function spawnWorker(renderId: string, jobFile: string, owner: { userEmail: stri
   });
   child.on("exit", (code) => {
     running.delete(renderId);
+    startNextWaiting();
     if (code !== 0 && !finished) {
       void write({ status: "failed", error: (stderr || `Render worker exited with code ${code}`).slice(-2000) });
     }
   });
   child.on("error", (error) => {
     running.delete(renderId);
+    startNextWaiting();
     void write({ status: "failed", error: `Couldn't start the render worker: ${error.message}` });
   });
 }
 
 export function cancelRender(renderId: string): boolean {
+  const queued = waiting.findIndex((job) => job.renderId === renderId);
+  if (queued >= 0) {
+    waiting.splice(queued, 1);
+    return true;
+  }
   const child = running.get(renderId);
   if (!child) return false;
   child.kill();

@@ -7,7 +7,7 @@ import { getDb, schema } from "../server/db/index.js";
 import { identity } from "../server/lib/identity.js";
 import { toJson } from "../server/lib/json.js";
 import { newId } from "../server/lib/storage.js";
-import { ensureDefaultProject, loadVideo, ownership, recentFingerprints, saveComposition } from "../server/lib/store.js";
+import { ensureDefaultProject, loadVideo, ownership, recentFingerprints, requireProjectAccess, saveComposition } from "../server/lib/store.js";
 
 export default defineAction({
   description:
@@ -19,7 +19,7 @@ export default defineAction({
   }),
   run: async ({ title, ratio, projectId }, ctx) => {
     const who = identity(ctx);
-    const project = projectId ? { id: projectId } : await ensureDefaultProject(who);
+    const project = projectId ? await requireProjectAccess(projectId, ctx) : await ensureDefaultProject(who);
     const id = newId("vid");
     const seed = Math.floor(Math.random() * 1_000_000) + 1;
     const portrait = FRAME_SIZE[ratio].height > FRAME_SIZE[ratio].width;

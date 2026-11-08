@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
 import { identity } from "../server/lib/identity.js";
-import { getProject, listProjects } from "../server/lib/store.js";
+import { listProjects, requireProjectAccess } from "../server/lib/store.js";
 import { newId } from "../server/lib/storage.js";
 import { UserError } from "../server/lib/errors.js";
 
@@ -20,7 +20,8 @@ export default defineAction({
   }),
   run: async ({ projectId, scope, text, evidence }, ctx) => {
     const who = identity(ctx);
-    const project = projectId ? await getProject(projectId) : (await listProjects(ctx))[0];
+    // Learnings steer the agents that write for this project: only its editors may add or read them.
+    const project = projectId ? await requireProjectAccess(projectId, ctx) : (await listProjects(ctx))[0];
     if (!project) throw new UserError("No project yet.");
     const db = getDb();
     if (text && scope) {

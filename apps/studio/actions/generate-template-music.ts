@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireHuman } from "../server/lib/identity.js";
 import { generateTemplateMusic } from "../server/lib/templates.js";
 import { UserError } from "../server/lib/errors.js";
+import { requireAdmin } from "../server/lib/catalog.js";
 
 /**
  * People-only: spends the workspace's ElevenLabs music allowance. Generates
@@ -14,9 +15,12 @@ import { UserError } from "../server/lib/errors.js";
 export default defineAction({
   description: "Generate the music bed for one template or every template that has none yet (ElevenLabs; people only).",
   schema: z.object({ templateId: z.string().optional(), force: z.boolean().default(false) }),
+  uiOnly: true,
   agentTool: false,
   toolCallable: false,
   run: async ({ templateId, force }, ctx) => {
+    // Spends the operator's ElevenLabs plan and replaces music every user shares: admins only.
+    requireAdmin(ctx);
     requireHuman(ctx, "Generating template music");
     const targets = templateId ? [getTemplate(templateId)].filter((entry) => entry !== null) : [...TEMPLATES];
     if (targets.length === 0) throw new UserError(`No template "${templateId}"`);
