@@ -92,6 +92,7 @@ export const TRANSITION_CATALOG: Record<TransitionType, TransitionInfo> = {
   "bokeh-subtle": { label: "Subtle bokeh", group: "light", description: "Light, transparent bokeh over a soft focus pull.", durationMs: 900, directions: NONE, stillAt: 0.45 },
   "bokeh-bright": { label: "Bright bokeh", group: "light", description: "Bright bokeh and a glow between clips.", durationMs: 1000, directions: NONE, stillAt: 0.42 },
 
+  "slip-cut": { label: "Slip cut", group: "shapes", description: "Two slabs in the ink and accent colours slip past each other along a tilted seam, each wiping on half of the next clip: Crewcut's split C as a transition.", durationMs: 700, directions: SIDEWAYS, stillAt: 0.4 },
   "liquid-swipe": { label: "Liquid swipe", group: "shapes", description: "Cartoon liquid washes across, then clears onto the next clip.", durationMs: 1000, directions: ALL, stillAt: 0.42 },
   "liquid-splash": { label: "Cartoon liquid", group: "shapes", description: "A splash floods in from the bottom-right corner.", durationMs: 1100, directions: NONE, stillAt: 0.4 },
   "diagonal-stripes": { label: "Diagonal colours", group: "shapes", description: "Coloured stripes close in from the edges and vanish in the middle.", durationMs: 1000, directions: NONE, stillAt: 0.3 },
@@ -193,6 +194,7 @@ export const TRANSITION_PRESETS: ReadonlyArray<TransitionPreset> = [
   preset("bokeh-subtle", "bokeh-subtle"),
   preset("bokeh-bright", "bokeh-bright"),
 
+  preset("slip-cut", "slip-cut", "Slip cut", "right"),
   preset("liquid-swipe", "liquid-swipe", "Liquid swipe", "right"),
   preset("liquid-splash", "liquid-splash"),
   preset("diagonal-stripes", "diagonal-stripes"),

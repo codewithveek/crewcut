@@ -452,6 +452,7 @@ export const TRANSITION_TYPES = [
   "bokeh-subtle",
   "bokeh-bright",
   // Shapes
+  "slip-cut",
   "liquid-swipe",
   "liquid-splash",
   "diagonal-stripes",

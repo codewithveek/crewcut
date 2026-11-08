@@ -834,7 +834,73 @@ function blobPath(cx: number, cy: number, radius: number, amp: number, phase: nu
 
 const svgFill: CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible" };
 
+/**
+ * Slip cut: Crewcut's own mark as a transition. Two slabs, the halves of the
+ * split C (ink above the seam, accent below), slip past each other along a
+ * slightly tilted seam. Each one wipes the next clip on behind it, so the new
+ * shot arrives as two halves that meet a beat apart, as the logo's cut half
+ * does. Each clip is still drawn once: the halves are clip-path regions.
+ */
+function slipCut(c: TransitionContext): TransitionFrame {
+  const angle = -6;
+  const rad = (angle * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const cx = c.width / 2;
+  const cy = c.height / 2;
+  // Rotated frame: u runs along the seam, v across it. Big enough to cover the corners.
+  const reachU = (c.width * Math.abs(cos) + c.height * Math.abs(sin)) / 2 + 8;
+  const reachV = (c.width * Math.abs(sin) + c.height * Math.abs(cos)) / 2 + 8;
+  const slab = reachU * 0.62;
+  const sign = c.direction === "left" ? -1 : 1;
+  const travel = (delay: number) => ease.inOut(seg(c.t, delay, delay + 0.86));
+  // Top slab runs with `direction`, the bottom one against it, a beat later (the logo's slip).
+  const lead = (k: number, dir: number) => dir * mix(-reachU - 2, reachU + slab + 2, k);
+  const top = { dir: sign, k: travel(0) };
+  const bottom = { dir: -sign, k: travel(0.1) };
+  const toScreen = (u: number, v: number): [number, number] => [cx + u * cos - v * sin, cy + u * sin + v * cos];
+  const quad = (u1: number, u2: number, v1: number, v2: number) => pointsPath([toScreen(u1, v1), toScreen(u2, v1), toScreen(u2, v2), toScreen(u1, v2)]);
+  // The revealed part of each half: everything the slab has already passed.
+  const revealed = (half: { dir: number; k: number }, v1: number, v2: number) => {
+    const edge = lead(half.k, half.dir) - half.dir * slab;
+    return half.dir > 0 ? (edge > -reachU ? quad(-reachU - 4, edge, v1, v2) : "") : edge < reachU ? quad(edge, reachU + 4, v1, v2) : "";
+  };
+  const enterPath = [revealed(top, -reachV - 4, 0.5), revealed(bottom, -0.5, reachV + 4)].filter(Boolean).join("");
+  const slabRect = (half: { dir: number; k: number }, v1: number, v2: number) => {
+    const front = lead(half.k, half.dir);
+    const back = front - half.dir * slab;
+    return { u: Math.min(front, back), w: slab, v: v1, h: v2 - v1 };
+  };
+  const ink = c.palette.ink;
+  const accent = c.palette.accent;
+  const a = slabRect(top, -reachV, 0);
+  const b = slabRect(bottom, 0, reachV);
+  const blur = c.speed * 10 * c.unit;
+  const both = Math.min(top.k, bottom.k);
+  return {
+    exit: { style: { transform: `scale(${1 + 0.05 * ease.in(both)})`, filter: `brightness(${(1 - 0.35 * both).toFixed(3)})` } },
+    enter: {
+      style: { clipPath: enterPath ? `path('${enterPath}')` : "inset(50% 50% 50% 50%)", transform: `scale(${1.06 - 0.06 * ease.out(seg(c.t, 0.2, 1))})` },
+      hidden: !enterPath,
+    },
+    overlay: (
+      <svg style={svgFill} viewBox={`0 0 ${c.width} ${c.height}`} aria-hidden>
+        <defs>
+          <filter id={`${c.id}-slip`} x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation={`${blur.toFixed(2)} 0`} />
+          </filter>
+        </defs>
+        <g transform={`rotate(${angle} ${cx} ${cy})`} filter={blur > 0.3 ? `url(#${c.id}-slip)` : undefined}>
+          <rect x={cx + a.u} y={cy + a.v} width={a.w} height={a.h} fill={ink} />
+          <rect x={cx + b.u} y={cy + b.v} width={b.w} height={b.h} fill={accent} />
+        </g>
+      </svg>
+    ),
+  };
+}
+
 const shapes: Partial<Record<TransitionType, Effect>> = {
+  "slip-cut": slipCut,
   "liquid-swipe": (c) => {
     const d = VEC[c.direction];
     const colors = swatches(c.palette);
