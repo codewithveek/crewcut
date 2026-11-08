@@ -149,6 +149,21 @@ export default runMigrations(
         "CREATE INDEX IF NOT EXISTS catalog_items_owner_idx ON catalog_items (owner_email, scope)",
       ].join(";\n"),
     },
+    {
+      // Email (Resend) arrived on 2026-11-08, and with it the framework requires
+      // verified emails to sign in. Accounts made before that were never sent a
+      // verification email, so they count as verified (agreed with the
+      // operator) instead of being locked out. Runs once, before the new code
+      // serves requests: every account created later goes through verification.
+      version: 6,
+      name: "crewcut-verify-accounts-before-email",
+      sql: {},
+      run: async (exec) => {
+        const { rows } = await exec.execute(`SELECT to_regclass('public."user"')::text AS name`);
+        if (!rows[0]?.name) return; // A new database: no accounts yet.
+        const result = await exec.execute(`UPDATE "user" SET email_verified = true WHERE email_verified = false AND created_at < now()`);
+        console.log(`[db] Marked ${result.rowsAffected} account(s) from before email verification as verified`);
+      },
     },
   ],
   { table: "crewcut_migrations" },

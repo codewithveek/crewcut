@@ -27,6 +27,12 @@
   "vars": {
     "APP_URL": "https://getcrewcut.app",
     "BETTER_AUTH_URL": "https://getcrewcut.app",
-    "YOUTUBE_REDIRECT_URI": "https://getcrewcut.app/api/connections/youtube/callback"
+    "YOUTUBE_REDIRECT_URI": "https://getcrewcut.app/api/connections/youtube/callback",
+    // Email (Resend; RESEND_API_KEY is a secret). mail.getcrewcut.app is the
+    // domain verified in Resend, sending only: nobody reads replies there.
+    "EMAIL_FROM": "Crewcut <noreply@mail.getcrewcut.app>",
+    "APP_NAME": "Crewcut",
+    // A PNG: email clients don't show SVG logos.
+    "APP_LOGO_URL": "https://getcrewcut.app/email-logo.png"
   }
 }
