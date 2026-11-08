@@ -29,6 +29,13 @@ RUN cd apps/render-worker && node -e "import('@remotion/renderer').then(r => r.e
 COPY . .
 RUN pnpm install --frozen-lockfile --offline && pnpm --filter @crewcut/studio build
 
+# The render bundle, built once into the image: exports reuse it (it's named
+# after the code it was built from) instead of running webpack on the first
+# export after every container start. Not fatal: without it the first export
+# builds it.
+RUN cd apps/render-worker && node --import tsx -e "import('@crewcut/renderer/node').then((m) => m.bundleRenderer({ outDir: '/app/storage/.remotion-bundle' }))" \
+    || echo "Render bundle not prebuilt; the first export will build it."
+
 ENV NODE_ENV=production PORT=8080 HOST=0.0.0.0 CREWCUT_RENDER_MODE=spawn
 EXPOSE 8080
 WORKDIR /app/apps/studio
