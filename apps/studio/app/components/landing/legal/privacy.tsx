@@ -19,7 +19,7 @@ export const privacyDoc: LegalDoc = {
   summary: [
     <>We collect what we need to run your account and make your videos: your name and email, the media and text you add, and basic security records such as your IP address.</>,
     <>We don't sell your data, we don't show ads, and we don't use your content to train AI models.</>,
-    <>When you use the AI crew, voice-overs or YouTube, the content involved goes to the model provider you choose, to ElevenLabs or to Google. Each receives only what it needs for that task.</>,
+    <>When you use the AI crew, voice-overs or YouTube, the content involved goes to an AI model provider (ours, through Cloudflare, unless you add your own key), to ElevenLabs or to Google. Each receives only what it needs for that task.</>,
     <>Files you upload are stored at long, random web addresses. Anyone who has the exact address of a file can open it.</>,
     <>You can ask for a copy of your data, or ask us to correct or delete it, from Settings or by emailing {LEGAL.email}.</>,
   ],
@@ -122,8 +122,10 @@ export const privacyDoc: LegalDoc = {
             </li>
             <li>
               <strong>AI crew usage records:</strong> for each crew run we record which tools ran, whether they succeeded, how long they took, how
-              many tokens they used, an estimated cost, short error summaries, and any thumbs-up or thumbs-down you give. These records do not
-              include the text of your prompts or of the crew&rsquo;s answers. Those are kept in your chat history instead.
+              many tokens they used, an estimated cost, short error summaries, and any thumbs-up or thumbs-down you give. For Crewcut AI and
+              voice-overs on our accounts we also record the model, the cost, the credits used, and which video and step they were for, and we keep
+              your workspace&rsquo;s credit balance and history. These records do not include the text of your prompts or of the crew&rsquo;s
+              answers. Those are kept in your chat history instead.
             </li>
             <li>
               <strong>Cookies and browser storage:</strong> see section 12 and our <a href="/cookies">Cookie Policy</a>.
@@ -246,13 +248,17 @@ export const privacyDoc: LegalDoc = {
           </p>
           <ul>
             <li>
-              <strong>You choose the provider.</strong> You connect a model in Settings, using your own account with that provider or a connection
-              we offer there. The providers that can be connected include Anthropic, OpenAI, Google (Gemini), OpenRouter, Groq, Mistral, Cohere,
-              Builder.io and Ollama servers you run yourself. The provider handles the content under its terms and privacy policy and under your
-              agreement with it.
+              <strong>Crewcut AI (when you haven&rsquo;t added your own key).</strong> The crew runs on our own accounts with these model providers,
+              depending on the model in use: <strong>Anthropic</strong> (Claude), <strong>OpenAI</strong>, <strong>Google</strong> (Gemini API) and{" "}
+              <strong>Cloudflare</strong> (open models on Workers AI). Requests reach them through <strong>Cloudflare AI Gateway</strong>, which
+              passes each request on and counts its usage and cost. We have switched off the gateway&rsquo;s request logs, so Cloudflare doesn&rsquo;t
+              keep the content of these requests. Under the business API terms we use these providers on, they don&rsquo;t use what we send them
+              to train their models. We will add any other provider to this list before it receives your data.
             </li>
             <li>
-              <strong>If we ever supply the model for you</strong>, we will name that provider on this page before it receives any of your data.
+              <strong>Your own provider.</strong> You can instead connect your own account with a provider (Anthropic, OpenAI, Google (Gemini),
+              OpenRouter, Groq, Mistral, Cohere, Builder.io, or an Ollama server you run yourself). The crew then sends the content straight to that
+              provider, not through our gateway, and the provider handles it under its terms and privacy policy and your agreement with it.
             </li>
             <li>
               <strong>Not for training by us.</strong> We don&rsquo;t use your content to train or fine-tune AI models. What a provider may do
@@ -362,8 +368,13 @@ export const privacyDoc: LegalDoc = {
             rows={[
               [
                 "Cloudflare, Inc.",
-                "Runs our servers, network, domain and security protection, and stores files (uploads, voice-overs, exported videos)",
-                "All data passing through the app, including files, IP addresses and logs",
+                "Runs our servers, network, domain and security protection, stores files (uploads, voice-overs, exported videos), routes Crewcut AI requests (AI Gateway) and runs open AI models (Workers AI)",
+                "All data passing through the app, including files, IP addresses and logs, and the content of Crewcut AI requests",
+              ],
+              [
+                "Anthropic PBC, OpenAI, L.L.C. and Google LLC (Gemini API)",
+                "Run the AI models behind Crewcut AI when you haven't added your own key (only the provider of the model in use receives a request)",
+                "Your instructions, the chat, your brief and script, source text, project details and descriptions of your timeline and media, for the task at hand",
               ],
               ["Timescale, Inc. (on Amazon Web Services)", "Hosts our database", "Account details, content records, conversations, usage records"],
               [

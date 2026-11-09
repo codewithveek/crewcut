@@ -91,16 +91,45 @@ export const termsDoc: LegalDoc = {
       body: (
         <>
           <p>
-            {LEGAL.product} is currently offered free of charge. We may offer paid plans in the future. Before you buy one, we will show you the
-            price, what it includes and how often you will be billed, and you will have to agree to those details. Any plan-specific terms we
-            show you then form part of this agreement.
+            {LEGAL.product} has a free plan and paid plans (Creator and Studio). Our <a href="/pricing">pricing page</a> shows what each includes
+            and costs. Before you buy, checkout shows you the price, what you are buying and how often you will be billed, and you have to agree
+            to those details. Any plan-specific terms we show you then form part of this agreement.
           </p>
+          <H3>Credits</H3>
+          <ul>
+            <li>
+              <strong>What they pay for:</strong> credits pay for Crewcut AI, meaning the AI crew&rsquo;s model use and AI voice-overs when they run
+              on our accounts. Editing by hand, templates, stock media and exports don&rsquo;t use credits, and neither does the crew when it runs on
+              your own AI provider key.
+            </li>
+            <li>
+              <strong>Monthly credits:</strong> each plan includes a number of credits for each monthly period. Unused monthly credits end with the
+              period and don&rsquo;t roll over.
+            </li>
+            <li>
+              <strong>Top-ups:</strong> credits you buy separately can be used for 12 months from your latest top-up purchase. We use your
+              monthly credits first.
+            </li>
+            <li>
+              <strong>How many a task uses:</strong> a task uses credits in proportion to the AI work it takes, so the same kind of task can use a
+              different number each time. The Plan page shows your balance and what used it. We may change how many credits AI work uses, and will
+              tell you at least 30 days before a change that increases them.
+            </li>
+            <li>
+              <strong>Running out:</strong> when a workspace has no credits left, Crewcut AI pauses until the next period or a top-up. We never
+              charge you automatically for extra credits.
+            </li>
+            <li>
+              <strong>No cash value:</strong> credits can&rsquo;t be exchanged for money, transferred or sold, and aren&rsquo;t refundable except
+              as described below or where the law requires. They belong to the workspace (a team, or your personal workspace) that has them.
+            </li>
+          </ul>
           <H3>If you buy a paid plan</H3>
           <ul>
             <li>
-              <strong>Billing:</strong> paid plans are charged in advance for each billing period. Payments are processed by Bachs Technologies
-              Limited (&ldquo;Bachs&rdquo;), a payments company in {LEGAL.country}, using the methods its checkout offers, such as cards, bank
-              transfer or mobile money. We are the seller: your contract for a paid plan is with us, and you bring questions, refunds and
+              <strong>Billing:</strong> paid plans are charged in advance for each billing period, monthly or yearly, in US dollars by card.
+              Payments are processed by Bachs Technologies Limited (&ldquo;Bachs&rdquo;), a payments company in {LEGAL.country}; top-ups can
+              also use the other methods its checkout offers, such as bank transfer or mobile money. We are the seller: your contract for a paid plan is with us, and you bring questions, refunds and
               complaints to us, not to Bachs. We never receive or store your full card details.
             </li>
             <li>
@@ -207,7 +236,8 @@ export const termsDoc: LegalDoc = {
           <H3>Services you connect</H3>
           <p>
             When you connect an AI model provider, ElevenLabs, YouTube or another service, you also enter into that provider&rsquo;s terms. Any fees
-            they charge are between you and them, including charges on your own API keys. We aren&rsquo;t responsible for their services, their
+            they charge are between you and them, including charges on your own API keys. Crewcut AI, which runs on our own provider accounts, is
+            paid for with credits instead (see &ldquo;Free and paid plans&rdquo;). We aren&rsquo;t responsible for their services, their
             availability or what they do with data they receive under their own policies.
           </p>
           <H3>YouTube</H3>
