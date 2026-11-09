@@ -16,10 +16,11 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
-import { Button, IconButton, Segmented, useDebouncedValue } from "@/components/ds";
+import { Button, IconButton, Segmented, Switch, useDebouncedValue } from "@/components/ds";
 import { STAGE_LABELS, STAGE_PROMPTS, askAgent, errorMessage } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
+import { AUTOPILOT_HINT, launchAutopilot, useAutopilotList } from "./autopilot/autopilot";
 import { CreateProjectDialog } from "./dashboard/create-project";
 import { EmptyProjects, ProjectCard, ProjectGridSkeleton, ProjectRow } from "./dashboard/project-card";
 import { useLoadDemo, useVideoList } from "./dashboard/use-videos";
@@ -37,7 +38,9 @@ function greeting(): string {
 /** The bell: every video whose pipeline is waiting on a person's click. */
 function WaitingBell() {
   // Its own small query: the bell must count every waiting video, not just the recent ones.
-  const { videos: waiting, total } = useVideoList({ filter: "waiting", pageSize: 20, withCompositions: false });
+  const { videos: waiting, total: waitingTotal } = useVideoList({ filter: "waiting", pageSize: 20, withCompositions: false });
+  const autopilot = useAutopilotList().filter((video) => video.phase === "ready" || video.phase === "needs_you" || video.phase === "paused");
+  const total = waitingTotal + autopilot.length;
   return (
     <PopoverPrimitive.Root>
       <PopoverPrimitive.Trigger asChild>
@@ -54,6 +57,23 @@ function WaitingBell() {
       </PopoverPrimitive.Trigger>
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content align="end" sideOffset={8} collisionPadding={12} className="ds-popover ds-menu-enter z-[200] w-[min(340px,calc(100vw-24px))] p-1.5">
+          {autopilot.length ? (
+            <>
+              <p className="px-2.5 pb-1.5 pt-2 ds-overline text-ds-text-3">Autopilot</p>
+              <ul className="flex flex-col">
+                {autopilot.map((video) => (
+                  <li key={video.id}>
+                    <PopoverPrimitive.Close asChild>
+                      <Link to={`/videos/${video.id}`} className="flex flex-col gap-0.5 rounded-[8px] px-2.5 py-2 outline-none hover:bg-ds-surface-3 focus-visible:bg-ds-surface-3">
+                        <span className="truncate text-[13px] font-medium text-ds-text">{video.title}</span>
+                        <span className={cn("truncate text-xs", video.phase === "ready" ? "text-supported" : "text-ds-warning")}>{video.phase === "ready" ? "Ready to review" : video.phase === "paused" ? "Stopped working: resume it" : "Needs you"}</span>
+                      </Link>
+                    </PopoverPrimitive.Close>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
           <p className="px-2.5 pb-1.5 pt-2 ds-overline text-ds-text-3">Waiting on you</p>
           {waiting.length === 0 ? (
             <p className="px-2.5 pb-3 text-[13px] text-ds-text-2">Nothing needs your OK right now.</p>
@@ -109,6 +129,7 @@ export function HomePage() {
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const [brief, setBrief] = useState("");
   const [ratio, setRatio] = useState<Ratio>("16:9");
+  const [autopilot, setAutopilot] = useState(false);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -132,9 +153,12 @@ export function HomePage() {
     if (brief.trim().length < 3) return;
     try {
       const portrait = ratio === "9:16" || ratio === "4:5";
-      const result = (await start.mutateAsync({ brief: brief.trim(), ratio, platforms: [portrait ? "youtube_shorts" : "youtube"] } as never)) as { videoId: string };
+      const result = (await start.mutateAsync({ brief: brief.trim(), ratio, platforms: [portrait ? "youtube_shorts" : "youtube"], autopilot } as never)) as { videoId: string };
       navigate(`/videos/${result.videoId}`);
-      askAgent(STAGE_PROMPTS.trend(result.videoId), { videoId: result.videoId, idea: brief.trim() });
+      if (autopilot) {
+        // A background run: the crew carries on even if this page closes.
+        if (await launchAutopilot(result.videoId)) toast.success("Autopilot is making your video", { description: "You can close this page. We'll show you when it's ready." });
+      } else askAgent(STAGE_PROMPTS.trend(result.videoId), { videoId: result.videoId, idea: brief.trim() });
     } catch (error) {
       toast.error(errorMessage(error));
     }
@@ -224,12 +248,26 @@ export function HomePage() {
               onChange={setRatio}
               options={(["16:9", "9:16", "1:1", "4:5"] as const).map((value) => ({ value, label: value }))}
             />
-            <Button type="submit" disabled={brief.trim().length < 3 || start.isPending} className="pc-press">
-              <IconSparkles className="size-4" />
-              {start.isPending ? "Starting…" : "Generate"}
-            </Button>
+            <div className="flex items-center gap-3">
+              <label className="flex cursor-pointer items-center gap-2 text-[13px] font-medium text-ds-text" title={AUTOPILOT_HINT}>
+                <Switch label="Autopilot" checked={autopilot} onCheckedChange={setAutopilot} />
+                Autopilot
+              </label>
+              <Button type="submit" disabled={brief.trim().length < 3 || start.isPending} className="pc-press">
+                <IconSparkles className="size-4" />
+                {start.isPending ? "Starting…" : autopilot ? "Make the video" : "Generate"}
+              </Button>
+            </div>
           </div>
-          <p className="ds-caption text-ds-text-3">Ideas → research → script → fact-check → animation → voice → publish → results. You approve each key step, and every claim links to its source.</p>
+          <p className="ds-caption text-ds-text-3" aria-live="polite">
+            {autopilot ? (
+              <>
+                <span className="font-medium text-ds-text-2">Autopilot:</span> {AUTOPILOT_HINT}
+              </>
+            ) : (
+              "Ideas → research → script → fact-check → animation → voice → publish → results. You approve each key step, and every claim links to its source."
+            )}
+          </p>
         </form>
       </section>
 

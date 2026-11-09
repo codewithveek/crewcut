@@ -3,6 +3,7 @@ import { STAGE_LABELS, type Stage } from "@crewcut/contracts";
 /** The verb shown after who decided: "Dana approved Script". */
 export const DECISION_LABEL: Record<string, string> = {
   approved: "approved",
+  fixed: "fixed a claim in",
   sent_back: "sent back",
   override: "overrode a check on",
   rejected: "rejected",

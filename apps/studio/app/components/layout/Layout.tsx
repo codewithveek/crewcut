@@ -32,6 +32,8 @@ import { cn } from "@/lib/utils";
 // would mount the page once before its chunk loads and again after.
 // AgentSidebar already lazy-loads its own panel.
 import { AgentInspector } from "./AgentInspector";
+import { AutopilotWatchdog } from "@/components/crewcut/autopilot/autopilot";
+
 import { AppRail } from "./AppRail";
 import { MobileAppBar } from "./MobileAppBar";
 import { MobileNav } from "./MobileNav";
@@ -83,6 +85,8 @@ export function Layout({ children }: LayoutProps) {
   return (
     <RealtimeVoiceModeProvider browserTabId={TAB_ID}>
       <EndVoiceChatOutsideChat />
+      {/* Autopilot: resumes stalled runs and says when a video is ready, on any page. */}
+      <AutopilotWatchdog />
       <LayoutShell>{children}</LayoutShell>
     </RealtimeVoiceModeProvider>
   );

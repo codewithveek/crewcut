@@ -28,6 +28,8 @@ export interface VideoState {
     updatedAt: string;
   };
   stages: StageStates;
+  /** Null when this video never ran on autopilot. */
+  autopilot: import("../autopilot/autopilot").AutopilotInfo | null;
   progress: { done: number; total: number; current: Stage; waiting: Stage[] };
   ideas: Idea[];
   dossier: Dossier | null;

@@ -1,4 +1,4 @@
-import { sendToAgentChat } from "@agent-native/core/client/agent-chat";
+import { sendToAgentChat, sendToAgentChatAndConfirm } from "@agent-native/core/client/agent-chat";
 import { STAGE_LABELS, type Stage, type StageStatus } from "@crewcut/contracts";
 
 export { STAGE_LABELS };
@@ -34,6 +34,27 @@ export function askAgent(message: string, context?: Record<string, unknown>): vo
     submit: true,
     openSidebar: true,
   } as Parameters<typeof sendToAgentChat>[0]);
+}
+
+/**
+ * Puts the crew to work on a video on autopilot: a background agent run (its
+ * own chat thread, shown in the runs tray) that makes the whole video. The run
+ * lives on the server, so it carries on when the page or tab closes.
+ * Resolves false when the run couldn't start (most often: no AI model connected).
+ */
+export async function runAutopilot(videoId: string, resume = false): Promise<boolean> {
+  const result = await sendToAgentChatAndConfirm({
+    chatTarget: "local",
+    message: resume
+      ? `Continue autopilot for video ${videoId}: load the crewcut-autopilot skill, check where it got to with get-video, and carry on from there to an exported draft.`
+      : `Run autopilot for video ${videoId}: load the crewcut-autopilot skill and make the whole video, from ideas to an exported draft, without waiting for me.`,
+    context: JSON.stringify({ videoId, autopilot: true }),
+    submit: true,
+    newTab: true,
+    background: true,
+    openSidebar: false,
+  } as Parameters<typeof sendToAgentChatAndConfirm>[0], { timeoutMs: 20_000 });
+  return result.delivered;
 }
 
 /** Opens the agent with context attached and the composer ready for the person's request. */

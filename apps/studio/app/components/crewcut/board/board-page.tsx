@@ -10,6 +10,7 @@ import { STAGE_LABELS, STAGE_ORDER, STAGE_PROMPTS, askAgent, formatAgo } from "@
 import { DECISION_LABEL, describeDecision, plainStageNote } from "@/lib/decisions";
 import { cn } from "@/lib/utils";
 
+import { AutopilotPanel, StartAutopilotButton } from "../autopilot/autopilot";
 import { Panel, SkeletonLines, StatusPill } from "../primitives";
 import { ResearchStage, TrendStage } from "./stage-research";
 import { AnalyticsStage, MotionStage, PublishStage, VoiceStage } from "./stage-production";
@@ -113,13 +114,16 @@ function DecisionDetail({ event, state }: { event: ApprovalEvent; state: VideoSt
 
 export function BoardPage({ videoId }: { videoId: string }) {
   const [busy, setBusy] = useState(false);
-  const query = useActionQuery("get-video", { videoId } as never, { refetchInterval: busy ? 2000 : false });
+  const [autopilotWorking, setAutopilotWorking] = useState(false);
+  const query = useActionQuery("get-video", { videoId } as never, { refetchInterval: busy ? 2000 : autopilotWorking ? 5000 : false });
   const state = query.data as VideoState | undefined;
   const [selected, setSelected] = useState<Stage | null>(null);
 
   useEffect(() => {
     if (!state) return;
     setBusy(state.renders.some((render) => render.status === "queued" || render.status === "running") || state.publishJobs.some((job) => job.status === "uploading"));
+    // While autopilot works, the page follows along.
+    setAutopilotWorking(Boolean(state.autopilot && (state.autopilot.phase === "making" || state.autopilot.phase === "exporting" || state.autopilot.phase === "paused")));
   }, [state]);
 
   if (query.isLoading || !state) {
@@ -148,6 +152,7 @@ export function BoardPage({ videoId }: { videoId: string }) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {!state.video.isDemo && !state.autopilot?.on && !["publish", "analytics"].includes(state.progress.current) ? <StartAutopilotButton videoId={videoId} onStarted={() => void query.refetch()} /> : null}
           <Button variant="outline" asChild className="pc-press">
             <Link to={`/videos/${videoId}/proof`}>
               <IconCertificate className="size-4" />
@@ -164,6 +169,15 @@ export function BoardPage({ videoId }: { videoId: string }) {
           ) : null}
         </div>
       </header>
+
+      {state.autopilot ? (
+        <AutopilotPanel
+          videoId={videoId}
+          info={state.autopilot}
+          exportProgress={state.renders.find((render) => render.id === state.autopilot?.renderId)?.progress ?? null}
+          onChanged={() => void query.refetch()}
+        />
+      ) : null}
 
       <Tabs value={active} onValueChange={(value) => setSelected(value as Stage)} className="flex flex-col gap-5">
       <StageTabs state={state} active={active} />
