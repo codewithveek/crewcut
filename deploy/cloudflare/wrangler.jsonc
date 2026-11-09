@@ -25,6 +25,7 @@
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CrewcutApp"] }],
   "vars": {
+    "CREWCUT_STORAGE": "remote",
     "APP_URL": "https://getcrewcut.app",
     "BETTER_AUTH_URL": "https://getcrewcut.app",
     "YOUTUBE_REDIRECT_URI": "https://getcrewcut.app/api/connections/youtube/callback",
