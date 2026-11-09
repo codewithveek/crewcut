@@ -6,6 +6,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
+import { autopilotView } from "../server/lib/autopilot.js";
 import { parseJsonLoose } from "../server/lib/json.js";
 import { summarizeComposition } from "../server/lib/pipeline-ops.js";
 import {
@@ -75,6 +76,8 @@ export default defineAction({
         updatedAt: video.row.updatedAt,
       },
       stages: video.stages,
+      // Where autopilot is (null when this video never ran on autopilot).
+      autopilot: await autopilotView(video.row),
       stageLabels: STAGE_LABELS,
       progress: pipelineProgress(video.stages),
       ideas: video.ideas,

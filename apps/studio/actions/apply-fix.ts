@@ -26,7 +26,7 @@ export default defineAction({
     if (!fix) throw new UserError(`No fix #${fixIndex}; there are ${fixes.length}.`);
     const fixed = applyFix(scriptEntry.script, fix);
     const version = await saveScript(video, fixed, `Fix ${result.lineId}: ${fix.label}`);
-    await recordApproval(video, { stage: "qa", decision: "approved", reason: `Applied fix: ${fix.label}`, subject: `${claimId} → script v${version}` });
+    await recordApproval(video, { stage: "qa", decision: "fixed", reason: `Applied fix: ${fix.label}`, subject: `${claimId} → script v${version}` });
     const summary = await runAuditAndQa(video, { completeQaStage: true });
     return { applied: fix.label, scriptVersion: version, qa: summary };
   },

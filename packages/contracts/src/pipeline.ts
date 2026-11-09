@@ -67,7 +67,8 @@ export type StageStates = z.infer<typeof stageStatesSchema>;
 export const actorKindSchema = z.enum(["human", "agent", "system"]);
 export type ActorKind = z.infer<typeof actorKindSchema>;
 
-export const approvalDecisionSchema = z.enum(["approved", "sent_back", "override", "rejected", "notified", "published"]);
+/** "fixed": the crew fixed a flagged claim (its own work, never a sign-off). */
+export const approvalDecisionSchema = z.enum(["approved", "sent_back", "override", "rejected", "notified", "published", "fixed"]);
 
 export const approvalEventSchema = z.object({
   id: z.string(),

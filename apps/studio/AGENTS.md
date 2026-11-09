@@ -28,6 +28,7 @@ trend (approve: person picks an idea) → research (notify) → script (approve)
 - Beat sync: `get-music-tempo` (a music asset's known BPM). The editor's "Snap cuts to the beat" does the rest; there's no separate action.
 - Stock photos: `search-stock-photos` (free Pexels photos, curated when the search is empty), `import-stock-photo` (saves one into a video's media, or the library, with the photographer's credit; returns an asset id)
 - Pipeline: `start-pipeline`, `get-video`, `send-back`, `get-proof-report` · people-only: `approve-stage`, `seed-demo`
+- Autopilot: the person switches it on (`start-pipeline` with `autopilot`, or people-only `set-autopilot` start/resume/stop). Then every gate up to publishing notifies instead of waiting, the trend step picks the top-scored idea, failed fact-checks go back to the script (3 rounds, then it stops with a reason), and `render-video` ends the run. `get-video` returns `autopilot` (phase: making, paused, needs_you, exporting, ready, stopped); `list-autopilot` lists the person's. Skill: `crewcut-autopilot`.
 - Research: `find-trends`, `add-source`, `read-source`, `build-dossier`
 - Script: `write-script`, `edit-line`, `rewrite-hook`
 - QA: `audit-claims`, `apply-fix`, `check-sameness` · people-only: `override-claim`

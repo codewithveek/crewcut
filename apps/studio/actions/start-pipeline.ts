@@ -5,7 +5,9 @@ import { initialStageStates, startStage } from "@crewcut/pipeline";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
+import { startAutopilot } from "../server/lib/autopilot.js";
 import { identity } from "../server/lib/identity.js";
+import { UserError } from "../server/lib/errors.js";
 import { nowIso, toJson } from "../server/lib/json.js";
 import { ensureDefaultProject, ownership, requireProjectAccess } from "../server/lib/store.js";
 import { newId } from "../server/lib/storage.js";
@@ -19,9 +21,12 @@ export default defineAction({
     ratio: aspectRatioSchema.default("16:9"),
     platforms: z.array(platformSchema).min(1).default(["youtube"]),
     projectId: z.string().optional(),
+    autopilot: z.boolean().default(false).describe("People only: the crew makes the whole video without stopping at the gates"),
   }),
   run: async (args, ctx) => {
     const who = identity(ctx);
+    // Autopilot replaces the person's sign-offs, so only the person can switch it on.
+    if (args.autopilot && who.kind !== "human") throw new UserError("Only the person can put a video on autopilot. Ask them to switch it on.", 403);
     const project = args.projectId ? await requireProjectAccess(args.projectId, ctx) : await ensureDefaultProject(who);
     const id = newId("vid");
     const stages = startStage(initialStageStates(), "trend", { now: nowIso(), actor: { kind: who.kind === "human" ? "human" : "agent", id: who.actorId } });
@@ -34,6 +39,7 @@ export default defineAction({
       platforms: toJson(args.platforms),
       stages: toJson(stages),
       seed: Math.floor(Math.random() * 1_000_000) + 1,
+      ...(args.autopilot ? { autopilot: toJson(startAutopilot(who.email)) } : {}),
       ...ownership(who),
     });
     return { videoId: id, path: `/videos/${id}`, next: "Research the idea and call find-trends with ranked ideas and evidence." };

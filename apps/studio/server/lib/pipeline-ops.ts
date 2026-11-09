@@ -3,6 +3,7 @@ import { type Composition, clipEndMs, visualTracks } from "@crewcut/composition"
 import type { Stage } from "@crewcut/contracts";
 import { completeStage, runQa, startStage } from "@crewcut/pipeline";
 
+import { AUTOPILOT_GATE_POLICY, AUTOPILOT_MAX_QA_ROUNDS, autopilotDriving, readAutopilot, updateAutopilot, withDecision } from "./autopilot.js";
 import type { Identity } from "./identity.js";
 import { nowIso } from "./json.js";
 import {
@@ -31,9 +32,12 @@ export async function beginStage(video: VideoRecord, stage: Stage): Promise<void
 
 /** Completes a stage through its gate; notify-gates log a notification event. */
 export async function finishStage(video: VideoRecord, stage: Stage, options: { note?: string; blockedReason?: string } = {}): Promise<string> {
-  const project = await getProject(video.row.projectId);
+  // On autopilot every gate up to publishing notifies: the person's switch was the sign-off.
+  const autopilot = readAutopilot(video.row);
+  const onAutopilot = autopilotDriving(autopilot);
+  const policy = onAutopilot ? AUTOPILOT_GATE_POLICY : gatePolicyOf(await getProject(video.row.projectId));
   video.stages = completeStage(video.stages, stage, {
-    policy: gatePolicyOf(project),
+    policy,
     now: nowIso(),
     actor: actorOf(video.who),
     ...(options.blockedReason ? { blockedReason: options.blockedReason } : {}),
@@ -43,7 +47,8 @@ export async function finishStage(video: VideoRecord, stage: Stage, options: { n
   const status = video.stages[stage].status;
   // A notify gate completes on its own: the agent did the work, nobody approved it.
   if (status === "notified") {
-    await recordApproval(video, { stage, decision: "notified", reason: options.note ?? "No sign-off needed for this step", actor: { ...video.who, kind: "agent", actorId: "agent" } });
+    const reason = onAutopilot ? `Autopilot, switched on by ${autopilot.startedBy ?? "the owner"}${options.note ? `: ${options.note}` : ""}` : (options.note ?? "No sign-off needed for this step");
+    await recordApproval(video, { stage, decision: "notified", reason: reason.slice(0, 1000), actor: { ...video.who, kind: "agent", actorId: "agent" } });
   }
   return status;
 }
@@ -56,6 +61,8 @@ export interface AuditSummary {
   overridden: number;
   qaPass: boolean;
   qaScore: number;
+  /** On autopilot: which fact-check round this was, and whether autopilot has stopped for the person. */
+  autopilot?: { round: number; maxRounds: number; stopped: boolean };
   blockers: Array<{ claimId: string; lineId: string; text: string; suggestion?: string }>;
   findings: Array<{ severity: string; code: string; message: string; fix?: string; where?: string }>;
 }
@@ -88,6 +95,21 @@ export async function runAuditAndQa(video: VideoRecord, options: { completeQaSta
   await saveQa(video, qa, { script: scriptEntry.version, composition: compositionEntry?.version ?? 0 });
 
   const blockers = findApprovalBlockers(report);
+  // Autopilot counts failed fact-checks: after the last allowed round it stops and asks the person.
+  let autopilotRound: AuditSummary["autopilot"];
+  if (options.completeQaStage && autopilotDriving(readAutopilot(video.row))) {
+    const next = await updateAutopilot(video.row.id, (state) => {
+      if (blockers.length === 0) return withDecision(state, "qa", state.qaRounds > 0 ? `Fact-check passed after ${state.qaRounds + 1} rounds.` : "Fact-check passed first time.");
+      const rounds = state.qaRounds + 1;
+      const lines = blockers.map((blocker) => `“${blocker.text.slice(0, 80)}”`).join(", ");
+      const counted = withDecision({ ...state, qaRounds: rounds }, "qa", `Fact-check round ${rounds}: ${blockers.length} unsupported claim${blockers.length === 1 ? "" : "s"} sent back to the script.`);
+      return rounds >= AUTOPILOT_MAX_QA_ROUNDS
+        ? { ...counted, status: "needs_you", reason: `After ${rounds} fact-check rounds, ${blockers.length} claim${blockers.length === 1 ? " still has" : "s still have"} no source: ${lines}. Fix or cut ${blockers.length === 1 ? "it" : "them"} in the script, then resume autopilot.`.slice(0, 600) }
+        : counted;
+    });
+    video.row = { ...video.row, autopilot: JSON.stringify(next) };
+    autopilotRound = { round: next.qaRounds, maxRounds: AUTOPILOT_MAX_QA_ROUNDS, stopped: next.status === "needs_you" };
+  }
   if (options.completeQaStage) {
     await finishStage(video, "qa", {
       ...(blockers.length > 0
@@ -101,6 +123,7 @@ export async function runAuditAndQa(video: VideoRecord, options: { completeQaSta
     ...report.counts,
     qaPass: qa.pass,
     qaScore: qa.score,
+    ...(autopilotRound ? { autopilot: autopilotRound } : {}),
     blockers: blockers.map((blocker) => ({ claimId: blocker.claimId, lineId: blocker.lineId, text: blocker.text, ...(blocker.suggestion ? { suggestion: blocker.suggestion } : {}) })),
     findings: qa.findings.slice(0, 20).map((finding) => ({
       severity: finding.severity,

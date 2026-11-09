@@ -165,6 +165,12 @@ export default runMigrations(
         console.log(`[db] Marked ${result.rowsAffected} account(s) from before email verification as verified`);
       },
     },
+    {
+      // Autopilot: the crew makes the whole video without stopping at the gates (publishing stays with a person).
+      version: 7,
+      name: "crewcut-autopilot",
+      sql: `ALTER TABLE videos ADD COLUMN IF NOT EXISTS autopilot TEXT NOT NULL DEFAULT '{}'`,
+    },
   ],
   { table: "crewcut_migrations" },
 );

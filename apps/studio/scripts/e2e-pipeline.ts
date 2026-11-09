@@ -169,6 +169,9 @@ async function main(): Promise<void> {
   // 12. Saved templates, the catalog and Pro.
   await checkCatalog();
 
+  // 12b. Autopilot: the crew makes the whole video with nobody approving; fact-check loops; export ends it.
+  await checkAutopilot();
+
   // 13. Search and paging run in the database, with counts per filter.
   await checkSearchAndPaging();
 
@@ -192,7 +195,69 @@ async function checkTemplates(): Promise<void> {
   const music = composition.composition.tracks.filter((track) => track.kind === "audio").flatMap((track) => track.clips);
   check(music.length > 0 && existsSync(path.join(process.env.CREWCUT_STORAGE_DIR ?? "", "assets", "lib-template-product-drop.mp3")), "a fresh server copies the bundled template music into storage (nothing regenerated)");
   await expectFailure(call("use-template", { templateId: "golden-hour", ratio: "9:16", values: { headline: "x" } }, human), /no slot "headline"/, "an unknown slot id is refused (no silent typos)");
-  await expectFailure(call("generate-template-music", {}, agent), /needs a person/, "the agent can't spend the music allowance");
+  await expectFailure(call("generate-template-music", {}, agent), /needs a person|signed-in app UI/, "the agent can't spend the music allowance");
+}
+
+/** Autopilot end to end, through the same actions the background agent run calls. */
+async function checkAutopilot(): Promise<void> {
+  const { DEMO_SOURCE, demoDossier, demoIdeas, demoScript } = await import("@crewcut/pipeline");
+  const { getDb, schema } = await import("../server/db/index.ts");
+  const { eq } = await import("drizzle-orm");
+  type Board = { stages: Record<string, { status: string }>; video: { pickedIdeaId: string | null; title: string }; autopilot: { on: boolean; phase: string; qaRounds: number; reason: string | null; decisions: Array<{ text: string }> } | null; approvals: Array<{ stage: string; decision: string; actorKind: string; reason: string | null }> };
+  const board = (videoId: string) => call<Board>("get-video", { videoId }, human);
+
+  await expectFailure(call("start-pipeline", { brief: "Why do cats purr?", autopilot: true }, agent), /Only the person can put a video on autopilot/, "the agent can't put a video on autopilot");
+  const { videoId } = await call<{ videoId: string }>("start-pipeline", { brief: "Why do spring animations feel physical?", ratio: "9:16", autopilot: true }, human);
+
+  // Ideas: the top-scored one is picked without a click.
+  const trend = await call<{ status: string; picked?: { title: string } }>("find-trends", { videoId, ideas: demoIdeas() });
+  let state = await board(videoId);
+  const top = [...demoIdeas()].sort((a, b) => b.score - a.score)[0];
+  check(trend.status === "notified" && state.video.pickedIdeaId === top?.id, "on autopilot the top-scored idea is picked without waiting for a person");
+
+  // Research and script move on by themselves.
+  const source = await call<{ sourceId: string }>("add-source", { videoId, text: DEMO_SOURCE.text, title: DEMO_SOURCE.title, publisher: DEMO_SOURCE.publisher });
+  const seeded = demoDossier(new Date().toISOString());
+  await call("build-dossier", { videoId, topic: seeded.topic, angle: seeded.angle, summary: seeded.summary, facts: seeded.facts.map(({ verified: _verified, locator: _locator, ...fact }) => ({ ...fact, sourceId: source.sourceId })) });
+  const script = await call<{ status: string }>("write-script", { videoId, script: demoScript() });
+  check(script.status === "notified", "the script doesn't wait for approval on autopilot");
+
+  // Fact-check: the unsupported claim fails, round after round, until autopilot stops for the person.
+  const round1 = await call<{ blockers: unknown[]; autopilot?: { round: number; stopped: boolean }; next: string }>("audit-claims", { videoId });
+  check(round1.blockers.length === 1 && round1.autopilot?.round === 1 && !round1.autopilot.stopped && /Fix every blocker/.test(round1.next), "a failed fact-check goes back to the script with the reason (round 1 of 3)");
+  await call("audit-claims", { videoId });
+  const round3 = await call<{ autopilot?: { round: number; stopped: boolean }; next: string }>("audit-claims", { videoId });
+  state = await board(videoId);
+  check(round3.autopilot?.stopped === true && state.autopilot?.phase === "needs_you" && /no source/.test(state.autopilot.reason ?? ""), "after 3 failed rounds autopilot stops and says which claims need the person");
+  await expectFailure(call("set-autopilot", { videoId, action: "resume" }, agent), /needs a person|signed-in app UI/, "the agent can't resume autopilot itself");
+
+  // The person fixes it and resumes: the fact-check passes and the gate opens on its own.
+  await call("set-autopilot", { videoId, action: "resume" }, human);
+  state = await board(videoId);
+  check(state.autopilot?.phase === "making" && state.autopilot.qaRounds === 0, "resuming starts the fact-check rounds again");
+  await call("apply-fix", { videoId, claimId: "claim:l9", fixIndex: (await call<{ fixes: Array<{ index: number; kind: string }> }>("apply-fix", { videoId, claimId: "claim:l9" })).fixes.find((fix) => fix.kind === "cut")?.index });
+  await call("audit-claims", { videoId });
+  state = await board(videoId);
+  check(state.stages.qa?.status === "notified" && state.autopilot?.decisions.some((decision) => /Fact-check passed/.test(decision.text)), "once every claim has a source, fact-check passes without a click");
+
+  // Animation and voice, then the export ends the run.
+  const composed = await call<{ status: string }>("compose-video", { videoId });
+  const voiced = await call<{ status: string }>("synthesize-voice", { videoId });
+  check(composed.status === "notified" && voiced.status === "notified", "animation and voice move on by themselves");
+  const render = await call<{ renderId: string }>("render-video", { videoId });
+  state = await board(videoId);
+  check(state.autopilot?.phase === "exporting", "exporting is autopilot's last step");
+  await getDb().update(schema.renderJobs).set({ status: "done", progress: 1, outputFile: `${render.renderId}.mp4` }).where(eq(schema.renderJobs.id, render.renderId));
+  state = await board(videoId);
+  check(state.autopilot?.phase === "ready", "when the export finishes, the video is ready to review");
+  check(state.stages.publish?.status !== "approved" && !state.approvals.some((event) => event.stage === "publish" && event.decision === "published"), "nothing is published on autopilot");
+  check(state.approvals.filter((event) => event.decision === "notified").every((event) => /Autopilot, switched on by e2e@crewcut\.test/.test(event.reason ?? "")) && !state.approvals.some((event) => event.decision === "approved" && event.actorKind === "agent"), "the approval log says each step went ahead on autopilot, switched on by the person");
+  const listed = await call<{ videos: Array<{ id: string; phase: string }> }>("list-autopilot", {}, human);
+  check(listed.videos.some((video) => video.id === videoId && video.phase === "ready"), "the person's autopilot list shows it ready");
+
+  // After autopilot hands over, the person's edits go through the usual gates again.
+  const again = await call<{ status: string }>("compose-video", { videoId });
+  check(again.status === "awaiting_approval", "once autopilot has handed the video over, new work waits for the person again");
 }
 
 /** "Save as template", workspace privacy, the catalog's people-only steps and the Pro export rule. */

@@ -51,6 +51,8 @@ export const videos = table("videos", {
   /** "draft" | "published" | "sample". */
   status: text("status").notNull().default("draft"),
   isDemo: boolean("is_demo").notNull().default(false),
+  /** AutopilotState JSON ("{}" = off): see server/lib/autopilot.ts. */
+  autopilot: text("autopilot").notNull().default("{}"),
   createdAt: text("created_at").notNull().default(now()),
   updatedAt: text("updated_at").notNull().default(now()),
   ...ownableColumns(),

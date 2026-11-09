@@ -12,12 +12,15 @@ export default defineAction({
     const video = await loadVideo(videoId, ctx, "editor");
     await beginStage(video, "qa");
     const summary = await runAuditAndQa(video, { completeQaStage: true });
-    return {
-      ...summary,
-      next:
-        summary.blockers.length > 0
-          ? "For each blocker, use apply-fix (cite a fact, soften, or cut), or send-back to the script stage. Only a person can override."
-          : "QA passed. The person approves QA; then compose the video.",
-    };
+    const next = summary.autopilot?.stopped
+      ? `Autopilot stopped after ${summary.autopilot.round} fact-check rounds. Don't continue: tell the person which claims still have no source, in one or two sentences.`
+      : summary.blockers.length > 0
+        ? summary.autopilot
+          ? `Fact-check round ${summary.autopilot.round} of ${summary.autopilot.maxRounds} failed. Fix every blocker in the script (cite a fact, soften the line, or cut it) with apply-fix or write-script, then run audit-claims again.`
+          : "For each blocker, use apply-fix (cite a fact, soften, or cut), or send-back to the script stage. Only a person can override."
+        : summary.autopilot
+          ? "Fact-check passed. Autopilot carries on: compose the video next."
+          : "QA passed. The person approves QA; then compose the video.";
+    return { ...summary, next };
   },
 });

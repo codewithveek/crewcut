@@ -2,6 +2,7 @@ import { defineAction } from "@agent-native/core/action";
 import { EXPORT_RESOLUTION_IDS } from "@crewcut/composition";
 import { z } from "zod";
 
+import { autopilotDriving, readAutopilot, updateAutopilot, withDecision } from "../server/lib/autopilot.js";
 import { planOf, proContentIn, workspaceOf } from "../server/lib/catalog.js";
 import { queueRender } from "../server/lib/render-runner.js";
 import { latestComposition, loadVideo } from "../server/lib/store.js";
@@ -33,6 +34,10 @@ export default defineAction({
       burnCaptions: burnCaptions ?? current.composition.ratio !== "16:9",
       ...(resolution ? { resolution } : {}),
     });
+    // On autopilot this is the last step: the video is ready once this export finishes.
+    if (autopilotDriving(readAutopilot(video.row))) {
+      await updateAutopilot(video.row.id, (state) => withDecision({ ...state, status: "exporting", renderId }, "publish", `Exporting version ${current.version}${resolution ? ` at ${resolution}` : ""}.`));
+    }
     return {
       renderId,
       mode,
