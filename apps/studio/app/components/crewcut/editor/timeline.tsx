@@ -12,8 +12,11 @@ import {
   findLayer,
   formatTimecode,
   frameToMs,
+  nearestFreeStart,
   snapSpan,
   snapTime,
+  trimBounds,
+  trackGaps,
   TRANSITION_CATALOG,
 } from "@crewcut/composition";
 import { CrewcutVideo } from "@crewcut/renderer";
@@ -441,6 +444,41 @@ function openTransitionPicker(clipId: string) {
   state.setLeftTab("transitions");
 }
 
+/**
+ * An empty stretch between two clips. Hovering shows it and a trash button;
+ * the button deletes the gap (the clips after it move up). Clicking the empty
+ * space itself still moves the playhead, like the rest of the lane.
+ */
+function GapZone({ left, width, seconds, touch, onEmptyPointerDown, onDelete }: { left: number; width: number; seconds: number; touch: boolean; onEmptyPointerDown: (event: React.PointerEvent) => void; onDelete: () => void }) {
+  const label = `Delete this ${seconds < 1 ? `${Math.round(seconds * 1000)} ms` : `${seconds.toFixed(1)} s`} gap`;
+  return (
+    <div
+      className="group/gap absolute inset-y-1 z-[1] rounded-ds-xs hover:bg-ds-surface-3/60 hover:shadow-[inset_0_0_0_1px_var(--ds-hairline)]"
+      style={{ left, width }}
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) onEmptyPointerDown(event);
+      }}
+    >
+      <button
+        type="button"
+        aria-label={label}
+        title={label}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onDelete();
+        }}
+        className={cn(
+          "pc-press absolute left-1/2 top-1/2 flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-ds-surface text-ds-text-2 shadow-[0_1px_3px_rgb(0_0_0/0.25),0_0_0_1px_var(--ds-hairline)] outline-none transition-opacity hover:bg-ds-danger hover:text-white focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ds-accent",
+          touch ? "opacity-100" : "opacity-0 group-hover/gap:opacity-100",
+        )}
+      >
+        <IconTrash className="size-3.5" />
+      </button>
+    </div>
+  );
+}
+
 function CutButton({ left, transition, size, onOpen }: { left: number; transition: Transition | undefined; size: number; onOpen: () => void }) {
   const label = transition ? `Transition: ${TRANSITION_CATALOG[transition.type].label} (change)` : "Add a transition";
   return (
@@ -697,7 +735,7 @@ export function Timeline({
     const originX = event.clientX;
     const originY = event.clientY;
     let moved = false;
-    let latest = { trackId: track.id, startMs: clip.startMs, durationMs: clip.durationMs, newTrack: false };
+    let latest: { trackId: string; startMs: number; durationMs: number; newTrack: boolean; reorder?: { beforeClipId: string | null } } = { trackId: track.id, startMs: clip.startMs, durationMs: clip.durationMs, newTrack: false };
     const targets = collectSnapTargets(composition as Composition, { playheadMs: state.playheadMs, excludeClipIds: new Set([clip.id]) });
     setDrag({ clipId: clip.id, trackId: track.id, kind, ghost: null });
     const move = (moveEvent: PointerEvent) => {
@@ -716,15 +754,46 @@ export function Timeline({
           const target = (composition as Composition).tracks.find((candidate) => candidate.id === lane.trackId);
           if (target && target.kind === track.kind && !target.locked) trackId = target.id;
         }
-        latest = { trackId, startMs, durationMs: clip.durationMs, newTrack };
+        // Never drop onto another clip. On the main track the clips reorder (the clip slots in at the
+        // nearest cut and the rest make room); elsewhere it takes the nearest gap that fits, and on an
+        // overlay track a gap more than a second away means "here", so it goes on a new track.
+        let placedMs = startMs;
+        let reorder: { beforeClipId: string | null } | undefined;
+        if (!newTrack) {
+          const target = (composition as Composition).tracks.find((candidate) => candidate.id === trackId);
+          if (target) {
+            const free = nearestFreeStart(target.clips, startMs, clip.durationMs, clip.id);
+            const isMain = target.id === (composition as Composition).tracks.find((candidate) => candidate.kind === "visual")?.id;
+            if (isMain && target.id === track.id) {
+              const others = [...target.clips].filter((other) => other.id !== clip.id).sort((a, b) => a.startMs - b.startMs);
+              const center = startMs + clip.durationMs / 2;
+              let before = others.find((other) => other.startMs + other.durationMs / 2 > center) ?? null;
+              // The Crewcut ending card stays last.
+              const last = others[others.length - 1];
+              if (!before && last && "recipe" in last && last.recipe === "crewcut-ending") before = last;
+              reorder = { beforeClipId: before?.id ?? null };
+              const oldEnd = clipEndMs(clip);
+              placedMs = before
+                ? before.startMs - (before.startMs >= oldEnd - 0.5 ? clip.durationMs : 0)
+                : others.reduce((end, other) => Math.max(end, clipEndMs(other) - (other.startMs >= oldEnd - 0.5 ? clip.durationMs : 0)), 0);
+            } else if (Math.abs(free - startMs) > 1000 && target.kind === "visual" && !isMain && !mobile) newTrack = true;
+            else placedMs = free;
+          }
+        }
+        latest = { trackId, startMs: placedMs, durationMs: clip.durationMs, newTrack, ...(reorder ? { reorder } : {}) };
       } else if (kind === "start") {
         const end = clipEndMs(clip);
-        const raw = Math.min(end - 40, Math.max(0, clip.startMs + deltaMs));
-        const snapped = snap ? snapTime(raw, targets, thresholdMs).timeMs : raw;
+        // Without "close gaps", a trim stops at the neighbouring clip instead of running into it.
+        const magnetic = editor.getState().ripple || track.id === (composition as Composition).tracks.find((candidate) => candidate.kind === "visual")?.id;
+        const floor = magnetic ? 0 : trimBounds(track.clips, clip.id).minStartMs;
+        const raw = Math.min(end - 40, Math.max(floor, clip.startMs + deltaMs));
+        const snapped = Math.max(floor, snap ? snapTime(raw, targets, thresholdMs).timeMs : raw);
         latest = { trackId: track.id, startMs: snapped, durationMs: end - snapped, newTrack: false };
       } else {
-        const raw = Math.max(clip.startMs + 40, clipEndMs(clip) + deltaMs);
-        const snapped = snap ? snapTime(raw, targets, thresholdMs).timeMs : raw;
+        const magnetic = editor.getState().ripple || track.id === (composition as Composition).tracks.find((candidate) => candidate.kind === "visual")?.id;
+        const ceiling = magnetic ? Number.POSITIVE_INFINITY : trimBounds(track.clips, clip.id).maxEndMs;
+        const raw = Math.min(ceiling, Math.max(clip.startMs + 40, clipEndMs(clip) + deltaMs));
+        const snapped = Math.min(ceiling, snap ? snapTime(raw, targets, thresholdMs).timeMs : raw);
         latest = { trackId: track.id, startMs: clip.startMs, durationMs: snapped - clip.startMs, newTrack: false };
       }
       setDrag({ clipId: clip.id, trackId: track.id, kind, ghost: { trackId: latest.newTrack ? "__new__" : latest.trackId, startMs: latest.startMs, durationMs: latest.durationMs } });
@@ -744,6 +813,8 @@ export function Timeline({
             { op: "add-track", track: trackSpecOf(track), id: trackId },
             { op: "move-clip", clipId: clip.id, startMs, trackId },
           ]);
+        } else if (latest.reorder) {
+          if (startMs !== clip.startMs) void run("Reorder clip", [{ op: "reorder-clip", clipId: clip.id, beforeClipId: latest.reorder.beforeClipId }]);
         } else if (latest.trackId !== track.id) {
           void run("Move clip to another track", [{ op: "move-clip", clipId: clip.id, startMs, trackId: latest.trackId }]);
         } else if (startMs !== clip.startMs) {
@@ -929,6 +1000,25 @@ export function Timeline({
                               />
                             );
                           })}
+                        {!drag && !track.locked
+                          ? trackGaps(track)
+                              .filter((gap) => gap.toMs >= visibleStart - 2000 && gap.fromMs <= visibleEnd + 2000 && (gap.toMs - gap.fromMs) * pxPerMs >= 4)
+                              .map((gap) => (
+                                <GapZone
+                                  key={`gap-${track.id}-${gap.fromMs}`}
+                                  left={gap.fromMs * pxPerMs}
+                                  width={(gap.toMs - gap.fromMs) * pxPerMs}
+                                  seconds={(gap.toMs - gap.fromMs) / 1000}
+                                  touch={mobile}
+                                  onEmptyPointerDown={(event) => {
+                                    if (event.button !== 0) return;
+                                    editor.getState().selectClip(null);
+                                    if (!mobile) editor.getState().setPlayhead(xToMs(event.clientX));
+                                  }}
+                                  onDelete={() => void run("Delete gap", [{ op: "close-gap", trackId: track.id, fromMs: gap.fromMs, toMs: gap.toMs }])}
+                                />
+                              ))
+                          : null}
                         {cuts
                           .filter((cut) => cut.atMs >= visibleStart - 2000 && cut.atMs <= visibleEnd + 2000 && !(drag?.clipId === cut.clipId && drag.ghost))
                           .map((cut) => (

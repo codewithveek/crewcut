@@ -53,6 +53,21 @@ export function clipEndMs(clip: { startMs: number; durationMs: number }): number
   return clip.startMs + clip.durationMs;
 }
 
+/** How far a clip's edge can be trimmed without running into its neighbours on the track. */
+export function trimBounds(clips: ReadonlyArray<{ id: string; startMs: number; durationMs: number }>, clipId: string): { minStartMs: number; maxEndMs: number } {
+  const clip = clips.find((candidate) => candidate.id === clipId);
+  if (!clip) return { minStartMs: 0, maxEndMs: Number.POSITIVE_INFINITY };
+  let minStartMs = 0;
+  let maxEndMs = Number.POSITIVE_INFINITY;
+  for (const other of clips) {
+    if (other.id === clipId) continue;
+    const end = clipEndMs(other);
+    if (end <= clip.startMs + 0.5) minStartMs = Math.max(minStartMs, end);
+    if (other.startMs >= clipEndMs(clip) - 0.5) maxEndMs = Math.min(maxEndMs, other.startMs);
+  }
+  return { minStartMs, maxEndMs };
+}
+
 export function computeDurationMs(composition: Composition): number {
   let end = 0;
   for (const track of composition.tracks) {

@@ -12,6 +12,7 @@ import {
   type Track,
   type VisualClip,
   clipEndMs,
+  trackGaps,
 } from "@crewcut/composition";
 import {
   IconArrowBarToLeft,
@@ -318,6 +319,9 @@ export function TrackMenu({ track }: { track: Track }) {
           Add {track.kind === "audio" ? `${track.role} ` : "overlay "}track
         </ContextMenuItem>
       ) : null}
+      <ContextMenuItem icon={<IconArrowBarToLeft />} disabled={trackGaps(track).length === 0 || track.locked} onSelect={() => void run("Close all gaps", [{ op: "close-gaps", trackId: track.id }])}>
+        Close all gaps
+      </ContextMenuItem>
       <ContextMenuItem icon={<IconTrash />} danger disabled={isMain || (track.kind === "visual" && visualCount <= 1)} onSelect={() => removeTrack(track)}>
         Delete track
       </ContextMenuItem>
@@ -330,6 +334,8 @@ export function LaneMenu({ track, atMs }: { track: Track; atMs: number }) {
   const hasClipboard = useEditor((state) => state.clipboard !== null);
   const brief = useEditor((state) => state.composition?.brief);
   const title = TEXT_PRESETS.find((preset) => preset.id === "subtitle");
+  const gaps = trackGaps(track);
+  const gap = gaps.find((candidate) => atMs >= candidate.fromMs && atMs <= candidate.toMs);
   return (
     <ContextMenuContent>
       <ContextMenuItem icon={<IconClipboard />} disabled={!hasClipboard} onSelect={() => void paste(atMs)}>
@@ -350,6 +356,15 @@ export function LaneMenu({ track, atMs }: { track: Track; atMs: number }) {
       </ContextMenuItem>
       <ContextMenuItem icon={<IconScissors />} onSelect={splitAtPlayhead}>
         Split at playhead
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      {gap ? (
+        <ContextMenuItem icon={<IconTrash />} disabled={track.locked} onSelect={() => void run("Delete gap", [{ op: "close-gap", trackId: track.id, fromMs: gap.fromMs, toMs: gap.toMs }])}>
+          Delete this gap
+        </ContextMenuItem>
+      ) : null}
+      <ContextMenuItem icon={<IconArrowBarToLeft />} disabled={gaps.length === 0 || track.locked} onSelect={() => void run("Close all gaps", [{ op: "close-gaps", trackId: track.id }])}>
+        Close all gaps
       </ContextMenuItem>
       <ContextMenuSeparator />
       <TrackStateItems track={track} />

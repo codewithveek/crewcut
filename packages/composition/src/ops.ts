@@ -137,6 +137,58 @@ export function moveClip(
 }
 
 /**
+ * The main track (the first visual track, "Scenes") is magnetic: trimming or
+ * deleting a clip there always closes the gap, whatever the ripple setting.
+ * A main track with holes in it plays as black frames, which is never wanted.
+ */
+export function isMainTrack(composition: Composition, track: Track): boolean {
+  return track.kind === "visual" && composition.tracks.find((candidate) => candidate.kind === "visual")?.id === track.id;
+}
+
+/** Moves a clip in time (and its caption words with it). */
+function shiftClip(clip: AnyClip, deltaMs: number): void {
+  if (deltaMs === 0) return;
+  clip.startMs += deltaMs;
+  if ("words" in clip) {
+    for (const word of clip.words) {
+      word.startMs += deltaMs;
+      word.endMs += deltaMs;
+    }
+  }
+}
+
+/**
+ * Reorders a clip on its track, the way a main track behaves: the clip
+ * leaves its place (the clips after it close the gap), then goes in just
+ * before `beforeClipId` (that clip and everything after it make room), or
+ * after the last clip when it's null. Nothing overlaps and the total length
+ * doesn't change.
+ */
+export function reorderClip(composition: Composition, input: { clipId: string; beforeClipId?: string | null }): Composition {
+  return edit(composition, (draft) => {
+    const location = requireClip(draft, input.clipId);
+    assertTrackEditable(location.track);
+    const { clip, track } = location;
+    if (input.beforeClipId === clip.id) return;
+    const others = (track.clips as AnyClip[]).filter((candidate) => candidate.id !== clip.id);
+    const before = input.beforeClipId ? others.find((candidate) => candidate.id === input.beforeClipId) : null;
+    if (input.beforeClipId && !before) throw new CompositionEditError("clip_not_found", `No clip "${input.beforeClipId}" on ${track.name}`);
+    // Out of its place: the clips after it close the gap.
+    const oldEnd = clipEndMs(clip);
+    for (const other of others) if (other.startMs >= oldEnd - 0.5) shiftClip(other, -clip.durationMs);
+    // Into its new place: that clip and everything after it make room.
+    let at: number;
+    if (before) {
+      at = before.startMs;
+      for (const other of others) if (other.startMs >= at - 0.5) shiftClip(other, clip.durationMs);
+    } else {
+      at = others.reduce((end, other) => Math.max(end, clipEndMs(other)), 0);
+    }
+    shiftClip(clip, at - clip.startMs);
+  });
+}
+
+/**
  * Trims a clip edge to `toMs` (absolute). With `ripple`, later clips on the
  * same track shift to keep the gap closed. Narration-timed clips unlock.
  */
@@ -148,6 +200,7 @@ export function trimClip(
     const location = requireClip(draft, input.clipId);
     assertTrackEditable(location.track);
     const { clip, track } = location;
+    input = { ...input, ripple: input.ripple || isMainTrack(draft, track) };
     const oldEnd = clipEndMs(clip);
     if (input.edge === "end") {
       const newEnd = Math.max(clip.startMs + MIN_CLIP_MS, input.toMs);
@@ -249,7 +302,7 @@ export function deleteClips(composition: Composition, input: { clipIds: string[]
       if (removed.length === 0) continue;
       assertTrackEditable(track);
       (track as { clips: AnyClip[] }).clips = track.clips.filter((clip) => !targets.has(clip.id));
-      if (!input.ripple) continue;
+      if (!input.ripple && !isMainTrack(draft, track)) continue;
       // Close each gap: later clips move left by the removed durations before them.
       for (const clip of track.clips) {
         const shift = removed.filter((gone) => clipEndMs(gone) <= clip.startMs + 0.5).reduce((sum, gone) => sum + gone.durationMs, 0);
@@ -257,6 +310,53 @@ export function deleteClips(composition: Composition, input: { clipIds: string[]
       }
     }
   });
+}
+
+/**
+ * Removes an empty stretch of a track (fromMs–toMs): every clip after it moves
+ * left by its length. Refuses if a clip sits inside the stretch.
+ */
+export function closeGap(composition: Composition, input: { trackId: string; fromMs: number; toMs: number }): Composition {
+  return edit(composition, (draft) => {
+    const found = findTrack(draft, input.trackId);
+    if (!found) throw new CompositionEditError("track_not_found", `No track "${input.trackId}"`);
+    const { track } = found;
+    assertTrackEditable(track);
+    const fromMs = Math.max(0, input.fromMs);
+    const length = input.toMs - fromMs;
+    if (length <= 0.5) return;
+    const inside = track.clips.find((clip) => clip.startMs < input.toMs - 0.5 && clipEndMs(clip) > fromMs + 0.5);
+    if (inside) throw new CompositionEditError("invalid", `There's a clip in that space ("${"name" in inside && inside.name ? inside.name : inside.id}"), so it isn't a gap.`);
+    for (const clip of track.clips as AnyClip[]) if (clip.startMs >= input.toMs - 0.5) shiftClip(clip, -length);
+  });
+}
+
+/** Removes every gap between the clips of a track (the first clip keeps its place). */
+export function closeGaps(composition: Composition, input: { trackId: string }): Composition {
+  return edit(composition, (draft) => {
+    const found = findTrack(draft, input.trackId);
+    if (!found) throw new CompositionEditError("track_not_found", `No track "${input.trackId}"`);
+    const { track } = found;
+    assertTrackEditable(track);
+    const ordered = [...(track.clips as AnyClip[])].sort((a, b) => a.startMs - b.startMs);
+    let cursor: number | null = null;
+    for (const clip of ordered) {
+      if (cursor !== null && clip.startMs > cursor + 0.5) shiftClip(clip, cursor - clip.startMs);
+      cursor = Math.max(cursor ?? 0, clipEndMs(clip));
+    }
+  });
+}
+
+/** The empty stretches between the clips of a track (from the end of one clip to the start of the next). */
+export function trackGaps(track: Track): Array<{ fromMs: number; toMs: number }> {
+  const ordered = [...track.clips].sort((a, b) => a.startMs - b.startMs);
+  const gaps: Array<{ fromMs: number; toMs: number }> = [];
+  for (let index = 1; index < ordered.length; index += 1) {
+    const fromMs = clipEndMs(ordered[index - 1]!);
+    const toMs = ordered[index]!.startMs;
+    if (toMs - fromMs > 0.5) gaps.push({ fromMs, toMs });
+  }
+  return gaps;
 }
 
 export type ClipPatch = Partial<Pick<VisualClip, "name" | "background" | "beatId" | "lineIds" | "timing" | "adjust" | "filter">> &

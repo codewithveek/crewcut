@@ -32,7 +32,7 @@ trend (approve: person picks an idea) → research (notify) → script (approve)
 - Research: `find-trends`, `add-source`, `read-source`, `build-dossier`
 - Script: `write-script`, `edit-line`, `rewrite-hook`
 - QA: `audit-claims`, `apply-fix`, `check-sameness` · people-only: `override-claim`
-- Composition: `compose-video`, `get-composition`, `edit-composition`, `add-clip`, `move-clip`, `trim-clip`, `split-clip`, `delete-clips`, `set-keyframe`, `apply-motion-preset`, `add-layer`, `update-layer`, `remove-layers`, `set-transition`, `update-clip`, `set-art-direction`, `restore-composition-version`
+- Composition: `compose-video`, `get-composition`, `edit-composition`, `add-clip`, `move-clip`, `trim-clip`, `split-clip`, `delete-clips`, `set-keyframe`, `apply-motion-preset`, `add-layer`, `update-layer`, `remove-layers`, `set-transition`, `update-clip`, `set-art-direction`, `restore-composition-version`. The main track (the first visual track) is magnetic: trims and deletes there always close the gap; reorder scenes with the `reorder-clip` op, remove empty space with `close-gap` (one stretch) or `close-gaps` (a whole track).
 - Audio: `synthesize-voice`, `set-music`
 - Render & publish: `render-video`, `get-render-link`, `prepare-post` · people-only: `publish-post`
 - Connections: `list-connections` · people-only: `connect-account`, `disconnect-account`, `refresh-health`

@@ -109,8 +109,11 @@ describe("edit operations", () => {
     expect(clip.timing).toBe("manual");
   });
 
-  it("refuses to trim into a neighbour without ripple", () => {
-    expect(() => trimClip(base, { clipId: firstClipId, edge: "end", toMs: 4000 })).toThrow(CompositionEditError);
+  it("the main track is magnetic: a trim always closes or makes the gap", () => {
+    const longer = trimClip(base, { clipId: firstClipId, edge: "end", toMs: 4000 });
+    expect(findClip(longer, "scene-2")?.clip.startMs).toBe(4000);
+    const shorter = trimClip(base, { clipId: firstClipId, edge: "end", toMs: 2000 });
+    expect(findClip(shorter, "scene-2")?.clip.startMs).toBe(2000);
   });
 
   it("ripple-trims, shifting later clips", () => {
@@ -118,12 +121,15 @@ describe("edit operations", () => {
     expect(findClip(next, "scene-2")?.clip.startMs).toBe(4000);
   });
 
-  it("trimming the start keeps content anchored in absolute time", () => {
+  it("trimming the start keeps content anchored, and on the main track the rest moves up", () => {
     const next = trimClip(base, { clipId: "scene-2", edge: "start", toMs: 3500 });
     const { clip } = requireVisualClip(next, "scene-2");
     const original = requireVisualClip(base, "scene-2").clip;
-    expect(clip.startMs).toBe(3500);
+    // The first 500 ms are cut: the clip keeps its place, its content starts 500 ms in.
+    expect(clip.startMs).toBe(original.startMs);
+    expect(clip.durationMs).toBe(original.durationMs - 500);
     expect(clip.layers[0]?.startMs).toBe((original.layers[0]?.startMs ?? 0) - 500);
+    expect(findClip(next, "scene-3")?.clip.startMs).toBe((findClip(base, "scene-3")?.clip.startMs ?? 0) - 500);
   });
 
   it("splits at the playhead into two editable clips", () => {
@@ -137,11 +143,16 @@ describe("edit operations", () => {
     expect(right.transitionIn).toBeUndefined();
   });
 
-  it("moves a clip and rejects overlaps", () => {
-    const freed = deleteClips(base, { clipIds: ["scene-2"] });
-    const moved = moveClip(freed, { clipId: firstClipId, startMs: 3010 });
-    expect(findClip(moved, firstClipId)?.clip.startMs).toBe(3010);
+  it("moves a clip into free space and rejects overlaps", () => {
+    const end = Math.max(...base.tracks.flatMap((track) => (track.kind === "visual" ? track.clips.map((clip) => clip.startMs + clip.durationMs) : [0])));
+    const moved = moveClip(base, { clipId: firstClipId, startMs: end + 10 });
+    expect(findClip(moved, firstClipId)?.clip.startMs).toBe(end + 10);
     expect(() => moveClip(base, { clipId: firstClipId, startMs: 3500 })).toThrow(/overlap/);
+  });
+
+  it("deleting on the main track always closes the gap", () => {
+    const next = deleteClips(base, { clipIds: ["scene-2"] });
+    expect(findClip(next, "scene-3")?.clip.startMs).toBe(findClip(base, "scene-2")?.clip.startMs);
   });
 
   it("ripple-deletes", () => {

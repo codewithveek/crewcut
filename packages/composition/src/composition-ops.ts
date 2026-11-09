@@ -18,6 +18,9 @@ import {
   duplicateLayers,
   groupLayers,
   moveClip,
+  reorderClip,
+  closeGap,
+  closeGaps,
   moveKeyframes,
   nudgeLayers,
   pasteClips,
@@ -132,6 +135,9 @@ const media = z.object({
 export const compositionOpSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("trim-clip"), clipId: z.string(), edge: z.enum(["start", "end"]), toMs: z.number().min(0), ripple: z.boolean().nullish() }),
   z.object({ op: z.literal("move-clip"), clipId: z.string(), startMs: z.number().min(0), trackId: z.string().nullish() }),
+  z.object({ op: z.literal("close-gap"), trackId: z.string(), fromMs: z.number().min(0), toMs: z.number().min(0) }),
+  z.object({ op: z.literal("close-gaps"), trackId: z.string() }),
+  z.object({ op: z.literal("reorder-clip"), clipId: z.string(), beforeClipId: z.string().nullish().describe("Clip to go in front of; null = after the last clip") }),
   z.object({ op: z.literal("split-clip"), clipId: z.string(), atMs: z.number().min(0) }),
   z.object({ op: z.literal("delete-clips"), clipIds: z.array(z.string()).min(1), ripple: z.boolean().nullish() }),
   z.object({ op: z.literal("add-clip"), trackId: z.string(), clip: clipInput, ripple: z.boolean().nullish() }),
@@ -218,6 +224,12 @@ export function applyCompositionOp(composition: Composition, rawOp: CompositionO
       return trimClip(composition, op);
     case "move-clip":
       return moveClip(composition, op);
+    case "reorder-clip":
+      return reorderClip(composition, op);
+    case "close-gap":
+      return closeGap(composition, op);
+    case "close-gaps":
+      return closeGaps(composition, op);
     case "split-clip":
       return splitClip(composition, op).composition;
     case "delete-clips":
