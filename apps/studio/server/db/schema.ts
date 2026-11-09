@@ -330,3 +330,113 @@ export const approvalEvents = table("approval_events", {
   createdAt: text("created_at").notNull().default(now()),
   ...ownableColumns(),
 });
+
+// ── Crewcut AI and billing ──────────────────────────────────────────────────
+
+/**
+ * One row per Crewcut AI model call or AI voice-over: what it cost us and,
+ * for Crewcut AI (source "managed"), the credits it used. Calls on people's
+ * own keys (source "byok") are logged for the cost picture but never charged.
+ */
+export const aiUsage = table("ai_usage", {
+  id: text("id").primaryKey(),
+  workspace: text("workspace").notNull(),
+  ownerEmail: text("owner_email").notNull(),
+  orgId: text("org_id"),
+  /** managed | byok | deployment */
+  source: text("source").notNull(),
+  /** llm | voice */
+  kind: text("kind").notNull().default("llm"),
+  provider: text("provider").notNull().default(""),
+  model: text("model").notNull().default(""),
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
+  cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
+  /** Voice: characters spoken. */
+  units: integer("units").notNull().default(0),
+  /** Our cost in millionths of a US dollar. */
+  costMicros: integer("cost_micros").notNull().default(0),
+  millicredits: integer("millicredits").notNull().default(0),
+  videoId: text("video_id"),
+  stage: text("stage").notNull().default("chat"),
+  threadId: text("thread_id"),
+  runId: text("run_id"),
+  durationMs: integer("duration_ms").notNull().default(0),
+  error: text("error"),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+/** A workspace's credits: this month's grant (no rollover) and bought top-ups (12 months). */
+export const creditBalances = table("credit_balances", {
+  workspace: text("workspace").primaryKey(),
+  plan: text("plan").notNull().default("free"),
+  periodStart: text("period_start").notNull(),
+  periodEnd: text("period_end").notNull(),
+  monthlyMillicredits: integer("monthly_millicredits").notNull().default(0),
+  topupMillicredits: integer("topup_millicredits").notNull().default(0),
+  topupExpiresAt: text("topup_expires_at"),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+/** Every change to a balance: grants, top-ups, usage, admin adjustments, expiry. */
+export const creditLedger = table("credit_ledger", {
+  id: text("id").primaryKey(),
+  workspace: text("workspace").notNull(),
+  /** grant | topup | usage | adjust | expire */
+  kind: text("kind").notNull(),
+  /** monthly | topup */
+  pool: text("pool").notNull().default("monthly"),
+  /** Signed: negative for usage and expiry. */
+  millicredits: integer("millicredits").notNull(),
+  ref: text("ref").notNull().default(""),
+  note: text("note").notNull().default(""),
+  createdBy: text("created_by").notNull().default(""),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const billingCustomers = table("billing_customers", {
+  workspace: text("workspace").primaryKey(),
+  customerId: text("customer_id").notNull(),
+  email: text("email").notNull().default(""),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+/** A checkout Crewcut started, so a completed payment maps back to its workspace and item. */
+export const billingCheckouts = table("billing_checkouts", {
+  id: text("id").primaryKey(),
+  workspace: text("workspace").notNull(),
+  /** subscription | topup */
+  kind: text("kind").notNull(),
+  /** creator | studio | topup-300 | topup-1000 */
+  item: text("item").notNull(),
+  billingInterval: text("billing_interval"),
+  sessionId: text("session_id"),
+  /** open | completed | expired */
+  status: text("status").notNull().default("open"),
+  createdBy: text("created_by").notNull().default(""),
+  createdAt: text("created_at").notNull().default(now()),
+  completedAt: text("completed_at"),
+});
+
+export const billingSubscriptions = table("billing_subscriptions", {
+  id: text("id").primaryKey(),
+  workspace: text("workspace").notNull(),
+  plan: text("plan").notNull(),
+  billingInterval: text("billing_interval").notNull().default("month"),
+  status: text("status").notNull(),
+  productId: text("product_id").notNull().default(""),
+  currentPeriodEnd: text("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+/** Webhook events, stored before processing so each is applied once. */
+export const billingEvents = table("billing_events", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  payload: text("payload").notNull(),
+  receivedAt: text("received_at").notNull().default(now()),
+  processedAt: text("processed_at"),
+  error: text("error"),
+});

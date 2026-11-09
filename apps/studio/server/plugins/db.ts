@@ -171,6 +171,46 @@ export default runMigrations(
       name: "crewcut-autopilot",
       sql: `ALTER TABLE videos ADD COLUMN IF NOT EXISTS autopilot TEXT NOT NULL DEFAULT '{}'`,
     },
+    {
+      // Crewcut AI and billing: what each AI call and voice-over costs (the admin
+      // cost page), credit balances and their ledger, and Bachs subscriptions.
+      version: 8,
+      name: "crewcut-ai-usage-credits-billing",
+      sql: [
+        `CREATE TABLE IF NOT EXISTS ai_usage (
+          id TEXT PRIMARY KEY, workspace TEXT NOT NULL, owner_email TEXT NOT NULL, org_id TEXT, source TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'llm',
+          provider TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0,
+          cache_read_tokens INTEGER NOT NULL DEFAULT 0, cache_write_tokens INTEGER NOT NULL DEFAULT 0, units INTEGER NOT NULL DEFAULT 0,
+          cost_micros INTEGER NOT NULL DEFAULT 0, millicredits INTEGER NOT NULL DEFAULT 0, video_id TEXT, stage TEXT NOT NULL DEFAULT 'chat',
+          thread_id TEXT, run_id TEXT, duration_ms INTEGER NOT NULL DEFAULT 0, error TEXT, created_at TEXT NOT NULL DEFAULT now())`,
+        "CREATE INDEX IF NOT EXISTS ai_usage_created_idx ON ai_usage (created_at)",
+        "CREATE INDEX IF NOT EXISTS ai_usage_video_idx ON ai_usage (video_id, created_at)",
+        "CREATE INDEX IF NOT EXISTS ai_usage_workspace_idx ON ai_usage (workspace, created_at)",
+        `CREATE TABLE IF NOT EXISTS credit_balances (
+          workspace TEXT PRIMARY KEY, plan TEXT NOT NULL DEFAULT 'free', period_start TEXT NOT NULL, period_end TEXT NOT NULL,
+          monthly_millicredits INTEGER NOT NULL DEFAULT 0, topup_millicredits INTEGER NOT NULL DEFAULT 0, topup_expires_at TEXT,
+          updated_at TEXT NOT NULL DEFAULT now())`,
+        `CREATE TABLE IF NOT EXISTS credit_ledger (
+          id TEXT PRIMARY KEY, workspace TEXT NOT NULL, kind TEXT NOT NULL, pool TEXT NOT NULL DEFAULT 'monthly', millicredits INTEGER NOT NULL,
+          ref TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', created_by TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT now())`,
+        "CREATE INDEX IF NOT EXISTS credit_ledger_workspace_idx ON credit_ledger (workspace, created_at)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS credit_ledger_ref_idx ON credit_ledger (kind, ref) WHERE ref <> ''",
+        `CREATE TABLE IF NOT EXISTS billing_customers (
+          workspace TEXT PRIMARY KEY, customer_id TEXT NOT NULL, email TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT now())`,
+        "CREATE UNIQUE INDEX IF NOT EXISTS billing_customers_customer_idx ON billing_customers (customer_id)",
+        `CREATE TABLE IF NOT EXISTS billing_checkouts (
+          id TEXT PRIMARY KEY, workspace TEXT NOT NULL, kind TEXT NOT NULL, item TEXT NOT NULL, billing_interval TEXT, session_id TEXT,
+          status TEXT NOT NULL DEFAULT 'open', created_by TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT now(), completed_at TEXT)`,
+        "CREATE INDEX IF NOT EXISTS billing_checkouts_session_idx ON billing_checkouts (session_id)",
+        `CREATE TABLE IF NOT EXISTS billing_subscriptions (
+          id TEXT PRIMARY KEY, workspace TEXT NOT NULL, plan TEXT NOT NULL, billing_interval TEXT NOT NULL DEFAULT 'month', status TEXT NOT NULL,
+          product_id TEXT NOT NULL DEFAULT '', current_period_end TEXT, cancel_at_period_end BOOLEAN NOT NULL DEFAULT false,
+          updated_at TEXT NOT NULL DEFAULT now())`,
+        "CREATE INDEX IF NOT EXISTS billing_subscriptions_workspace_idx ON billing_subscriptions (workspace)",
+        `CREATE TABLE IF NOT EXISTS billing_events (
+          id TEXT PRIMARY KEY, type TEXT NOT NULL, payload TEXT NOT NULL, received_at TEXT NOT NULL DEFAULT now(), processed_at TEXT, error TEXT)`,
+      ].join(";\n"),
+    },
   ],
   { table: "crewcut_migrations" },
 );
