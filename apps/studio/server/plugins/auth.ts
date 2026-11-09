@@ -8,7 +8,8 @@ export default createToolkitAuthPlugin({
   // workspaceAppPublicPaths covers pages only, never /api/*, so these were
   // still asking for a session: /watch showed nothing to signed-out viewers.
   // The public share data returns 404 unless the owner made the video public.
-  publicPaths: ["/api/share"],
+  // Bachs payment webhooks authenticate with their signature, not a session.
+  publicPaths: ["/api/share", "/api/billing/webhook"],
   // Media links carry their own expiring signature (checked by the route).
   publicPathsWithQueryToken: [{ path: "/api/media", queryParam: "sig" }],
   // Off so "/" renders the landing page instead of the framework's sign-in page;

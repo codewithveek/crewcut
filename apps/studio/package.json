@@ -13,7 +13,8 @@
     "action": "agent-native action",
     "script": "agent-native script",
     "test": "vitest --run --passWithNoTests",
-    "e2e": "tsx scripts/e2e-pipeline.ts"
+    "e2e": "tsx scripts/e2e-pipeline.ts",
+    "billing:setup": "tsx --env-file-if-exists=.env scripts/bachs-setup.ts"
   },
   "dependencies": {
     "@agent-native/agentkit": "0.223.0",
