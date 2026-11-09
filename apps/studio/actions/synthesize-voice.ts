@@ -14,6 +14,10 @@ import { putFile } from "../server/lib/blob-store.js";
 import { newId } from "../server/lib/storage.js";
 import { lineAudioFor } from "../server/lib/voice-ops.js";
 import { UserError } from "../server/lib/errors.js";
+import { recordAiUsage } from "../server/lib/ai/usage.js";
+import { workspaceOf } from "../server/lib/catalog.js";
+import { assertCredits } from "../server/lib/credits.js";
+import { voiceCostMicros, voiceOperatorKey } from "../server/lib/voice-billing.js";
 
 export default defineAction({
   description:
@@ -23,12 +27,19 @@ export default defineAction({
     const video = await loadVideo(videoId, ctx, "editor");
     const [scriptEntry, compositionEntry] = await Promise.all([latestScript(videoId), latestComposition(videoId)]);
     if (!scriptEntry || !compositionEntry) throw new UserError("Write the script and create the draft video first.");
-    await beginStage(video, "voice");
     const credentialCtx = accessContext(video.who);
-    const apiKey = await resolveCredential("ELEVENLABS_API_KEY", credentialCtx);
+    // The person's own ElevenLabs key costs no credits; otherwise Crewcut's
+    // key voices it and the video owner's workspace pays in credits.
+    const ownKey = await resolveCredential("ELEVENLABS_API_KEY", credentialCtx);
+    const crewcutKey = ownKey ? undefined : voiceOperatorKey();
+    const owner = { email: video.row.ownerEmail, orgId: video.row.orgId };
+    if (crewcutKey) await assertCredits(workspaceOf(owner), "a voice-over");
+    const apiKey = ownKey ?? crewcutKey;
+    await beginStage(video, "voice");
     const defaultVoice = voiceId ?? (await resolveCredential("ELEVENLABS_VOICE_ID", credentialCtx)) ?? "JBFqnCBsd6RMkjVDRZzb";
     const lineAudio = lineAudioFor(scriptEntry.script, compositionEntry.composition);
     let synthesized = 0;
+    let characters = 0;
 
     if (apiKey) {
       const provider = new ElevenLabsVoiceProvider({ apiKey, defaultVoiceId: defaultVoice });
@@ -40,6 +51,7 @@ export default defineAction({
           ...(lines[index - 1] ? { previousText: lines[index - 1]?.text } : {}),
           ...(lines[index + 1] ? { nextText: lines[index + 1]?.text } : {}),
         });
+        characters += (line.say ?? line.text).length;
         const assetId = newId("ast");
         const fileName = `${assetId}.wav`;
         await putFile("assets", fileName, result.bytes, "audio/wav", { keepLocal: true });
@@ -70,6 +82,21 @@ export default defineAction({
         lineAudio.set(line.id, audio);
         synthesized += 1;
       }
+    }
+
+    if (apiKey && characters > 0) {
+      await recordAiUsage({
+        ownerEmail: owner.email,
+        orgId: owner.orgId,
+        source: crewcutKey ? "managed" : "byok",
+        kind: "voice",
+        provider: "elevenlabs",
+        model: "eleven_multilingual_v2",
+        units: characters,
+        costMicros: voiceCostMicros(characters),
+        videoId,
+        stage: "voice",
+      });
     }
 
     const emphasis = new Map(scriptEntry.script.beats.flatMap((beat) => beat.lines.map((line) => [line.id, line.emphasis] as const)));
