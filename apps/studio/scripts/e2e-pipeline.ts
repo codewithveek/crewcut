@@ -172,12 +172,70 @@ async function main(): Promise<void> {
   // 12b. Autopilot: the crew makes the whole video with nobody approving; fact-check loops; export ends it.
   await checkAutopilot();
 
+  // 12c. Credits and Bachs billing: monthly grants, spending, top-ups once, plan changes from webhooks.
+  await checkCreditsAndBilling();
+
   // 13. Search and paging run in the database, with counts per filter.
   await checkSearchAndPaging();
 
   // 14. Remote file storage (R2/S3/Builder) through a fake provider: one index, any backend.
   await checkRemoteStorage();
   console.log(`\nAll ${passed} checks passed.`);
+}
+
+async function checkCreditsAndBilling(): Promise<void> {
+  const { ensureBalance, spendCredits } = await import("../server/lib/credits.ts");
+  const { handleBachsEvent } = await import("../server/lib/billing/webhooks.ts");
+  const { recordAiUsage } = await import("../server/lib/ai/usage.ts");
+  const buyer: Ctx = { caller: "frontend", userEmail: "buyer@crewcut.test", orgId: null };
+  const workspace = `user:${buyer.userEmail}`;
+  type Credits = { balance: { plan: string; available: number; monthly: number; topup: number }; usedThisPeriod: Array<{ stage: string; credits: number }> };
+  const credits = () => call<Credits>("get-credits", {}, buyer);
+
+  let state = await credits();
+  check(state.balance.plan === "free" && state.balance.available === 100, "a new workspace starts on Free with 100 credits");
+
+  // A Crewcut AI call is logged and charged (cost × 3 ÷ $0.05): $0.10 → 6 credits.
+  const charged = await recordAiUsage({ ownerEmail: buyer.userEmail, orgId: null, source: "managed", kind: "llm", provider: "workers-ai", model: "@cf/zai-org/glm-5.3", inputTokens: 1000, outputTokens: 100, costMicros: 100_000, stage: "script" });
+  await recordAiUsage({ ownerEmail: buyer.userEmail, orgId: null, source: "byok", kind: "llm", provider: "anthropic", model: "claude-sonnet-5-5", inputTokens: 1000, outputTokens: 100, costMicros: 100_000, stage: "script" });
+  state = await credits();
+  check(charged === 6000 && state.balance.available === 94, "Crewcut AI use costs credits; the person's own keys don't");
+  check(state.usedThisPeriod.some((row) => row.stage === "script" && row.credits === 6), "what used the credits shows by pipeline step");
+
+  await spendCredits(workspace, 200_000, "e2e:overspend", "test");
+  const empty = await ensureBalance(workspace);
+  check(empty.available <= 0, "an overspent workspace has nothing left");
+  const { assertCredits } = await import("../server/lib/credits.ts");
+  await expectFailure(assertCredits(workspace, "the crew"), /out of AI credits/, "and Crewcut AI then stops with a plain message");
+
+  const products = { BACHS_PRODUCT_CREATOR_MONTH: "prod_cm", BACHS_PRODUCT_CREATOR_YEAR: "prod_cy", BACHS_PRODUCT_STUDIO_MONTH: "prod_sm", BACHS_PRODUCT_STUDIO_YEAR: "prod_sy", BACHS_PRODUCT_TOPUP_300: "prod_t300", BACHS_PRODUCT_TOPUP_1000: "prod_t1000" };
+  Object.assign(process.env, products);
+  try {
+    const subscription = (type: string, extra: Record<string, unknown> = {}) => ({
+      id: `evt_${Math.random().toString(36).slice(2)}`,
+      type,
+      data: { subscription_id: "sub_e2e", product_id: "prod_sy", status: "active", customer: { customer_id: "cust_e2e", email: buyer.userEmail }, metadata: { workspace }, current_period_end: "2026-12-31T00:00:00Z", cancel_at_period_end: false, ...extra },
+    });
+    await handleBachsEvent(subscription("customer.subscription.created"));
+    state = await credits();
+    check(state.balance.plan === "studio", "a Studio subscription webhook moves the workspace to Studio");
+    check(state.balance.available >= 1700, "and adds the Studio credits straight away");
+
+    const payment = { id: "evt_pay_e2e", type: "collection.succeeded", data: { checkout_id: "chk_e2e", charge_id: "ch_e2e", customer: { id: "cust_e2e" }, product_cart: [{ product_id: "prod_t300", quantity: 1 }], metadata: { workspace } } };
+    const before = state.balance.topup;
+    await handleBachsEvent(payment);
+    const again = await handleBachsEvent(payment);
+    await handleBachsEvent({ ...payment, id: "evt_pay_e2e_retry" });
+    state = await credits();
+    check(again.duplicate && state.balance.topup === before + 300, "a paid top-up adds 300 credits once, however often it's delivered");
+
+    await handleBachsEvent(subscription("customer.subscription.deleted", { status: "canceled" }));
+    state = await credits();
+    check(state.balance.plan === "free" && state.balance.monthly <= 100 && state.balance.topup === before + 300, "cancelling ends at Free, capped to Free's credits, bought credits kept");
+    await expectFailure(call("start-checkout", { item: "creator" }, agent), /needs a person|signed-in app UI/, "the agent can't start a payment");
+  } finally {
+    for (const name of Object.keys(products)) delete process.env[name];
+  }
 }
 
 async function checkTemplates(): Promise<void> {
@@ -207,6 +265,9 @@ async function checkAutopilot(): Promise<void> {
   const board = (videoId: string) => call<Board>("get-video", { videoId }, human);
 
   await expectFailure(call("start-pipeline", { brief: "Why do cats purr?", autopilot: true }, agent), /Only the person can put a video on autopilot/, "the agent can't put a video on autopilot");
+  await expectFailure(call("start-pipeline", { brief: "Why do cats purr?", autopilot: true }, human), /Autopilot is part of Creator and Studio/, "on Free, autopilot asks for Creator or Studio");
+  const creator = { plan: "creator", source: "e2e", note: "", updatedBy: "e2e", updatedAt: new Date().toISOString() };
+  await getDb().insert(schema.workspacePlans).values({ workspace: `user:${human.userEmail}`, ...creator }).onConflictDoUpdate({ target: schema.workspacePlans.workspace, set: creator });
   const { videoId } = await call<{ videoId: string }>("start-pipeline", { brief: "Why do spring animations feel physical?", ratio: "9:16", autopilot: true }, human);
 
   // Ideas: the top-scored one is picked without a click.
