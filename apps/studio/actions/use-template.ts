@@ -70,7 +70,9 @@ export default defineAction({
         if (!photo) continue;
         try {
           filled[slot.id] = await importStockPhoto(photo, owner);
-        } catch {
+        } catch (error) {
+          // Logged with the reason, so a server's logs show why (download refused, storage upload failed…).
+          console.warn(`[use-template] ${template.id}: stock photo for "${slot.id}" (Pexels ${photo.id}) wasn't imported`, error);
           notes.push(`${slot.label} kept its placeholder (the stock photo didn't download).`);
         }
       }
