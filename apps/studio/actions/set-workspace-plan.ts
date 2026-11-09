@@ -7,7 +7,7 @@ import { requireHuman } from "../server/lib/identity.js";
 import { nowIso } from "../server/lib/json.js";
 
 export default defineAction({
-  description: "Admins (people only): give a workspace Pro or move it back to Free. A workspace is an organisation id, or a person's email for their personal workspace.",
+  description: "Admins (people only): put a workspace on Free, Creator or Studio (pro means Creator). Paid plans normally come from Bachs subscriptions; use this for comps and fixes. A workspace is an organisation id, or a person's email for their personal workspace.",
   schema: z.object({
     workspace: z
       .string()
@@ -15,7 +15,7 @@ export default defineAction({
       .min(3)
       .max(200)
       .transform((value) => (value.includes("@") && !value.startsWith("user:") ? `user:${value.toLowerCase()}` : value)),
-    plan: z.enum(["free", "pro"]),
+    plan: z.enum(["free", "creator", "studio", "pro"]).transform((value) => (value === "pro" ? "creator" : value)),
     note: z.string().trim().max(200).optional(),
   }),
   uiOnly: true,

@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
 import { startAutopilot } from "../server/lib/autopilot.js";
+import { requireAutopilot } from "../server/lib/plan-limits.js";
 import { identity } from "../server/lib/identity.js";
 import { UserError } from "../server/lib/errors.js";
 import { nowIso, toJson } from "../server/lib/json.js";
@@ -27,6 +28,7 @@ export default defineAction({
     const who = identity(ctx);
     // Autopilot replaces the person's sign-offs, so only the person can switch it on.
     if (args.autopilot && who.kind !== "human") throw new UserError("Only the person can put a video on autopilot. Ask them to switch it on.", 403);
+    if (args.autopilot) await requireAutopilot(who);
     const project = args.projectId ? await requireProjectAccess(args.projectId, ctx) : await ensureDefaultProject(who);
     const id = newId("vid");
     const stages = startStage(initialStageStates(), "trend", { now: nowIso(), actor: { kind: who.kind === "human" ? "human" : "agent", id: who.actorId } });

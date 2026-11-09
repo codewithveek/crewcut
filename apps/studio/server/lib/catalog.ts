@@ -26,6 +26,7 @@ import { isStoredRemotely, localCopy, putFile } from "./blob-store.js";
 import { newId, storagePath } from "./storage.js";
 import { latestComposition, loadVideo } from "./store.js";
 import { UserError } from "./errors.js";
+import { planDefinition } from "./plans.js";
 
 /**
  * The content catalog: templates, music and sounds that admins publish in
@@ -83,9 +84,10 @@ export function workspaceOf(owner: { email: string; orgId: string | null }): str
   return owner.orgId ?? `user:${owner.email.toLowerCase()}`;
 }
 
+/** "pro" when the workspace's plan includes Pro content (Creator and Studio), else "free". */
 export async function planOf(workspace: string): Promise<Tier> {
   const [row] = await getDb().select({ plan: schema.workspacePlans.plan }).from(schema.workspacePlans).where(eq(schema.workspacePlans.workspace, workspace)).limit(1);
-  return row?.plan === "pro" ? "pro" : "free";
+  return planDefinition(row?.plan).proContent ? "pro" : "free";
 }
 
 // ── Payloads ────────────────────────────────────────────────────────────────

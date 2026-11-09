@@ -1,9 +1,11 @@
 import { deleteCredential, resolveCredential } from "@agent-native/core/credentials";
 import { getSession, runWithRequestContext } from "@agent-native/core/server";
 import { YouTubeClient, exchangeCode, verifyState } from "@crewcut/distribute";
+import { and, eq } from "drizzle-orm";
 import { defineEventHandler, getQuery } from "h3";
 
 import { getDb, schema } from "../../../../db/index.js";
+import { planFor } from "../../../../lib/plan-limits.js";
 import { newId } from "../../../../lib/storage.js";
 import { appOrigin, credentialVault, oauthStateSecret, youtubeOAuthClient } from "../../../../lib/vault.js";
 
@@ -29,10 +31,19 @@ export default defineEventHandler(async (event) => {
     if (!client) throw new Error("YouTube isn't configured.");
 
     const tokens = await exchangeCode("youtube", client, { code: query.code, codeVerifier: verifier });
+    const channel = await new YouTubeClient({ getToken: async () => tokens.accessToken }).channel().catch(() => null);
+    // Plans limit how many channels a workspace publishes to; reconnecting one already connected is always fine.
+    const existing = await runWithRequestContext(ctx, () =>
+      getDb().select({ accountId: schema.connections.accountId }).from(schema.connections).where(and(eq(schema.connections.ownerEmail, payload.ownerEmail), eq(schema.connections.provider, "youtube"))),
+    );
+    const channels = new Set(existing.map((row) => row.accountId).filter(Boolean));
+    const plan = await planFor({ email: payload.ownerEmail, orgId: payload.orgId });
+    if (channel?.id && !channels.has(channel.id) && channels.size >= plan.channels) {
+      throw new Error(`${plan.name} publishes to ${plan.channels === 1 ? "one YouTube channel" : `${plan.channels} YouTube channels`}. Disconnect one first, or move to Studio for up to 5.`);
+    }
     const connectionId = newId("con");
     const vaultKey = `crewcut_youtube_${connectionId}`;
     await credentialVault({ userEmail: payload.ownerEmail, orgId: payload.orgId }).set(vaultKey, tokens);
-    const channel = await new YouTubeClient({ getToken: async () => tokens.accessToken }).channel().catch(() => null);
     await runWithRequestContext(ctx, () =>
       getDb()
       .insert(schema.connections)

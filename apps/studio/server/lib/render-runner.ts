@@ -85,6 +85,8 @@ export interface QueueRenderInput {
   burnCaptions: boolean;
   /** Output size; the project's own size when left out. */
   resolution?: ExportResolution;
+  /** Studio: jumps the queue of exports waiting for a free slot. */
+  priority?: boolean;
 }
 
 export async function queueRender(input: QueueRenderInput): Promise<{ renderId: string; mode: RenderMode }> {
@@ -137,7 +139,7 @@ export async function queueRender(input: QueueRenderInput): Promise<{ renderId: 
   const mode = renderMode();
   if (mode === "spawn") {
     const jobFile = await writeStorageFile("jobs", `${renderId}.json`, toJson(payload));
-    startOrWait({ renderId, jobFile, owner: { userEmail: input.video.row.ownerEmail, orgId: input.video.row.orgId } });
+    startOrWait({ renderId, jobFile, owner: { userEmail: input.video.row.ownerEmail, orgId: input.video.row.orgId }, priority: input.priority === true });
   }
   return { renderId, mode };
 }
@@ -156,12 +158,18 @@ interface WaitingRender {
   renderId: string;
   jobFile: string;
   owner: { userEmail: string; orgId: string | null };
+  priority?: boolean;
 }
 const waiting: WaitingRender[] = [];
 
 function startOrWait(job: WaitingRender): void {
   if (running.size < MAX_PARALLEL_RENDERS) spawnWorker(job.renderId, job.jobFile, job.owner);
-  else waiting.push(job); // Stays "queued" in the database until a slot frees up.
+  // Stays "queued" in the database until a slot frees up; priority exports go ahead of the others.
+  else if (job.priority) {
+    const firstOrdinary = waiting.findIndex((entry) => !entry.priority);
+    waiting.splice(firstOrdinary === -1 ? waiting.length : firstOrdinary, 0, job);
+  }
+  else waiting.push(job);
 }
 
 function startNextWaiting(): void {

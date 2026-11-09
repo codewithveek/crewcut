@@ -2,6 +2,7 @@ import { defineAction } from "@agent-native/core/action";
 import { approveStage, currentStage } from "@crewcut/pipeline";
 import { z } from "zod";
 
+import { requireAutopilot } from "../server/lib/plan-limits.js";
 import { AUTOPILOT_MAX_AUTO_RESUMES, autopilotView, readAutopilot, saveAutopilot, startAutopilot, timestampMs, withDecision } from "../server/lib/autopilot.js";
 import { UserError } from "../server/lib/errors.js";
 import { requireHuman } from "../server/lib/identity.js";
@@ -44,6 +45,7 @@ export default defineAction({
     }
 
     if (action === "start") {
+      await requireAutopilot({ email: video.row.ownerEmail, orgId: video.row.orgId });
       if (stage === "publish" || stage === "analytics") throw new UserError("This video is already made. Export or publish it from the editor.");
       let next = { ...startAutopilot(who.email), decisions: state.decisions };
       // The person's switch is their sign-off: a step already waiting for it is approved now
