@@ -1,11 +1,16 @@
 import { createToolkitAuthPlugin } from "@agent-native/toolkit/app/auth/server";
 
+import { PUBLIC_PATHS } from "../lib/public-paths.js";
+
 export default createToolkitAuthPlugin({
-  // The landing page ("/" for signed-out visitors, "/welcome" for anyone), the public template gallery,
-  // and view-only shared videos: /watch/<id> plus its data route (404 unless the owner shared it publicly)
-  // and /api/media, whose files are only served with a valid, expiring signature.
-  // The legal pages must be readable without an account (Google's OAuth review checks the privacy policy).
-  workspaceAppPublicPaths: ["/", "/welcome", "/gallery", "/watch", "/api/share", "/api/media", "/privacy", "/terms", "/cookies", "/acceptable-use"],
+  // Landing, gallery, shared videos, signed media and legal pages (see public-paths.ts).
+  workspaceAppPublicPaths: [...PUBLIC_PATHS],
+  // workspaceAppPublicPaths covers pages only, never /api/*, so these were
+  // still asking for a session: /watch showed nothing to signed-out viewers.
+  // The public share data returns 404 unless the owner made the video public.
+  publicPaths: ["/api/share"],
+  // Media links carry their own expiring signature (checked by the route).
+  publicPathsWithQueryToken: [{ path: "/api/media", queryParam: "sig" }],
   // Off so "/" renders the landing page instead of the framework's sign-in page;
   // signing in lives at /sign-in, and signed-in visitors to "/" are sent to /home.
   rootAuth: false,

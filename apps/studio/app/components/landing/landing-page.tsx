@@ -30,8 +30,10 @@ import { type EditorShot, LiveEditor } from "./live-editor";
 import { TemplatesShowcase } from "./templates-showcase";
 import { useInView } from "./use-landing";
 
-export const START_HREF = "/home";
-export const SIGN_IN_HREF = "/sign-in";
+/** Straight to the sign-up form; signed-in visitors are sent on to /home by the server. */
+export const START_HREF = "/sign-in?tab=signup";
+/** The sign-in form (/sign-in alone opens on sign-up). */
+export const SIGN_IN_HREF = "/sign-in?tab=login";
 
 export function LandingPage() {
   return (
