@@ -8,7 +8,7 @@
  * served with a valid, expiring signature) and the legal pages (Google's OAuth
  * review checks the privacy policy).
  */
-export const PUBLIC_PATHS = ["/", "/welcome", "/gallery", "/watch", "/api/share", "/api/media", "/privacy", "/terms", "/cookies", "/acceptable-use"] as const;
+export const PUBLIC_PATHS = ["/", "/welcome", "/gallery", "/pricing", "/watch", "/api/share", "/api/media", "/privacy", "/terms", "/cookies", "/acceptable-use"] as const;
 
 /** The framework's sign-in pages (it serves them itself). */
 export const SIGN_IN_PATHS = ["/sign-in", "/login", "/signup"] as const;

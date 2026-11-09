@@ -65,6 +65,7 @@ function navLinks(home: string): Array<{ label: string; href: string; page?: str
     { label: "How it works", href: `${home}#crew` },
     { label: "Fact-check", href: `${home}#receipts` },
     { label: "Templates", href: "/gallery", page: "/gallery" },
+    { label: "Pricing", href: "/pricing", page: "/pricing" },
     { label: "Editor", href: `${home}#editor` },
   ];
 }
@@ -127,7 +128,7 @@ export function Nav({ home = "", current }: { home?: string; current?: string })
             Sign in
           </a>
         </div>
-        <p className="lp-menu-note">Free while in beta. No card needed.</p>
+        <p className="lp-menu-note">Start free. No card needed.</p>
       </div>
     </header>
   );
@@ -162,7 +163,7 @@ function Hero() {
             <a href="#crew" className="lp-btn lp-btn-ghost">
               See how it works
             </a>
-            <p className="lp-hero-note">Free while in beta. No card needed.</p>
+            <p className="lp-hero-note">Start free. No card needed.</p>
           </div>
         </div>
       </div>
@@ -396,6 +397,7 @@ export function Footer({ home = "/" }: { home?: string }) {
         { label: "Fact-check", href: `${anchor}#receipts` },
         { label: "Editor", href: `${anchor}#editor` },
         { label: "Templates", href: "/gallery" },
+        { label: "Pricing", href: "/pricing" },
       ],
     },
     {
@@ -448,7 +450,7 @@ export function Footer({ home = "/" }: { home?: string }) {
           </div>
         </div>
         <div className="lp-footer-bar">
-          <p>© 2026 Crewcut. Free while in beta.</p>
+          <p>© 2026 Crewcut.</p>
           <div className="lp-footer-social">
             <a href={GITHUB_HREF} target="_blank" rel="noopener noreferrer" aria-label="Crewcut on GitHub (opens in a new tab)">
               <IconBrandGithub aria-hidden />

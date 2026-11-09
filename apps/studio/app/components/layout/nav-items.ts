@@ -1,5 +1,6 @@
 import {
   IconApps,
+  IconCreditCard,
   IconFolder,
   IconHome,
   IconMessageCircle,
@@ -34,6 +35,7 @@ export const PRIMARY_NAV: readonly NavItem[] = [
 ];
 
 export const SECONDARY_NAV: readonly NavItem[] = [
+  { to: "/billing", label: "Plan", title: "Plan & credits", icon: IconCreditCard, match: (path) => path.startsWith("/billing") },
   { to: "/settings", label: "Settings", title: "Settings", icon: IconSettings, match: (path) => path.startsWith("/settings") || path.startsWith("/team") },
 ];
 
@@ -55,6 +57,7 @@ export function isCrewcutPage(pathname: string): boolean {
     pathname.startsWith("/design") ||
     pathname.startsWith("/connections") ||
     pathname.startsWith("/admin") ||
+    pathname.startsWith("/billing") ||
     (pathname.startsWith("/videos/") && !isEditorPath(pathname))
   );
 }

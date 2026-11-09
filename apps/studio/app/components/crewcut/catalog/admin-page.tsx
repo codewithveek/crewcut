@@ -10,6 +10,7 @@ import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, Dr
 import { errorMessage, formatAgo } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
+import { AiCostsSection } from "../billing/ai-costs-admin";
 import { probeDuration } from "../editor/media";
 import { formatDuration } from "../dashboard/use-videos";
 import { useCatalogAccess } from "./use-catalog-access";
@@ -22,7 +23,7 @@ import { useCatalogAccess } from "./use-catalog-access";
  */
 
 type Kind = "template" | "music" | "sound";
-type Tab = Kind | "packs" | "workspaces";
+type Tab = Kind | "packs" | "workspaces" | "costs";
 
 interface Summary {
   type: "builtin" | "data" | "audio";
@@ -62,7 +63,7 @@ interface Pack {
 
 interface Plan {
   workspace: string;
-  plan: "free" | "pro";
+  plan: string;
   note: string;
   updatedBy: string;
   updatedAt: string;
@@ -80,6 +81,7 @@ const TABS: ReadonlyArray<{ value: Tab; label: string }> = [
   { value: "sound", label: "Sounds" },
   { value: "packs", label: "Packs" },
   { value: "workspaces", label: "Workspaces" },
+  { value: "costs", label: "AI costs" },
 ];
 
 async function act(name: string, args: Record<string, unknown>, success?: string): Promise<boolean> {
@@ -117,7 +119,9 @@ export function AdminPage() {
       <div className="ds-no-scrollbar -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <Segmented ariaLabel="Section" value={tab} onChange={setTab} options={TABS} />
       </div>
-      {!catalog ? (
+      {tab === "costs" ? (
+        <AiCostsSection />
+      ) : !catalog ? (
         <div className="flex flex-col gap-2" aria-busy="true">
           {Array.from({ length: 4 }, (_, index) => (
             <div key={index} className="pc-skeleton h-16 rounded-ds-md" />
@@ -496,40 +500,60 @@ function PacksSection({ packs, onChange }: { packs: Pack[]; onChange: () => void
 
 // ── Workspaces ──────────────────────────────────────────────────────────────
 
+const PLAN_LABEL: Record<string, string> = { free: "Free", creator: "Creator", pro: "Creator", studio: "Studio" };
+
 function WorkspacesSection({ plans, ownWorkspace, onChange }: { plans: Plan[]; ownWorkspace: string; onChange: () => void }) {
   const [workspace, setWorkspace] = useState("");
   const [note, setNote] = useState("");
-  const set = async (target: string, plan: "free" | "pro", extra?: string) => (await act("set-workspace-plan", { workspace: target, plan, ...(extra ? { note: extra } : {}) }, plan === "pro" ? "Pro given" : "Moved to Free")) && onChange();
+  const [plan, setPlan] = useState("creator");
+  const [credits, setCredits] = useState("");
+  const set = async (target: string, next: string, extra?: string) => (await act("set-workspace-plan", { workspace: target, plan: next, ...(extra ? { note: extra } : {}) }, `Now on ${PLAN_LABEL[next] ?? next}`)) && onChange();
+  const amount = Number(credits);
+  const giveCredits = async () => (await act("adjust-credits", { workspace: workspace.trim(), credits: amount, note: note.trim() || "Given by an admin" }, amount > 0 ? `${amount} credits given` : `${-amount} credits taken`)) && (setCredits(""), onChange());
   return (
     <section className="flex flex-col gap-3">
       <p className="text-[13px] text-ds-text-2">
-        Workspaces with Pro can export videos that use Pro content. Payments aren't connected yet, so Pro is given here. A workspace is a team's id, or a person's email for their own. Yours is <code className="rounded bg-ds-surface-2 px-1 font-mono text-[12px]">{ownWorkspace}</code>.
+        Plans normally come from Bachs subscriptions; set one here for comps and fixes (a paid subscription's next update sets it again). Creator and Studio unlock Pro content, autopilot and more credits. A workspace is a team's id, or a person's email for their own. Yours is <code className="rounded bg-ds-surface-2 px-1 font-mono text-[12px]">{ownWorkspace}</code>.
       </p>
-      <div className="flex flex-col gap-2 rounded-ds-md bg-ds-surface-2 p-3 shadow-[inset_0_0_0_1px_var(--ds-hairline)] sm:flex-row sm:items-end">
+      <div className="flex flex-col gap-2 rounded-ds-md bg-ds-surface-2 p-3 shadow-[inset_0_0_0_1px_var(--ds-hairline)] sm:flex-row sm:flex-wrap sm:items-end">
         <Field label="Workspace or email">
           <input value={workspace} onChange={(event) => setWorkspace(event.target.value)} className={cn(INPUT, "bg-ds-surface sm:w-72")} placeholder="name@example.com" />
         </Field>
         <Field label="Note (optional)">
           <input value={note} maxLength={200} onChange={(event) => setNote(event.target.value)} className={cn(INPUT, "bg-ds-surface sm:w-56")} placeholder="e.g. Hackathon judge" />
         </Field>
-        <Button className="pc-press" disabled={workspace.trim().length < 3} onClick={async () => (await set(workspace.trim(), "pro", note.trim())) && (setWorkspace(""), setNote(""))}>
-          <IconDiamond className="size-4" /> Give Pro
+        <Field label="Plan">
+          <Select label="Plan" size="sm" className="h-9 w-32" value={plan} onChange={setPlan} options={[{ value: "free", label: "Free" }, { value: "creator", label: "Creator" }, { value: "studio", label: "Studio" }]} />
+        </Field>
+        <Button className="pc-press" disabled={workspace.trim().length < 3} onClick={async () => (await set(workspace.trim(), plan, note.trim())) && setNote("")}>
+          <IconDiamond className="size-4" /> Set plan
+        </Button>
+        <Field label="Credits (+ or −)">
+          <input value={credits} inputMode="numeric" onChange={(event) => setCredits(event.target.value.replace(/[^0-9-]/g, ""))} className={cn(INPUT, "bg-ds-surface sm:w-28")} placeholder="e.g. 200" />
+        </Field>
+        <Button variant="outline" className="pc-press" disabled={workspace.trim().length < 3 || !Number.isInteger(amount) || amount === 0} onClick={() => void giveCredits()}>
+          Give credits
         </Button>
       </div>
-      {plans.length === 0 ? <p className="text-[13px] text-ds-text-3">No workspace has Pro yet.</p> : null}
+      {plans.length === 0 ? <p className="text-[13px] text-ds-text-3">Every workspace is on Free.</p> : null}
       <ul className="flex flex-col gap-2">
-        {plans.map((plan) => (
-          <li key={plan.workspace} className="flex items-center gap-3 rounded-ds-md bg-ds-surface p-3 shadow-[inset_0_0_0_1px_var(--ds-hairline)]">
+        {plans.map((entry) => (
+          <li key={entry.workspace} className="flex items-center gap-3 rounded-ds-md bg-ds-surface p-3 shadow-[inset_0_0_0_1px_var(--ds-hairline)]">
             <div className="min-w-0 flex-1">
-              <p className="truncate font-mono text-[13px] text-ds-text">{plan.workspace.replace(/^user:/, "")}</p>
+              <p className="truncate font-mono text-[13px] text-ds-text">{entry.workspace.replace(/^user:/, "")}</p>
               <p className="truncate text-[12px] text-ds-text-3">
-                {plan.plan === "pro" ? "Pro" : "Free"} · changed {formatAgo(plan.updatedAt)} by {plan.updatedBy}
-                {plan.note ? ` · ${plan.note}` : ""}
+                {PLAN_LABEL[entry.plan] ?? entry.plan} · changed {formatAgo(entry.updatedAt)} by {entry.updatedBy}
+                {entry.note ? ` · ${entry.note}` : ""}
               </p>
             </div>
-            <Button size="sm" variant="outline" onClick={() => void set(plan.workspace, plan.plan === "pro" ? "free" : "pro")}>
-              {plan.plan === "pro" ? "Move to Free" : "Give Pro"}
+            <Button size="sm" variant="outline" onClick={() => setWorkspace(entry.workspace)}>
+              Edit
             </Button>
+            {entry.plan !== "free" ? (
+              <Button size="sm" variant="outline" onClick={() => void set(entry.workspace, "free")}>
+                Move to Free
+              </Button>
+            ) : null}
           </li>
         ))}
       </ul>
