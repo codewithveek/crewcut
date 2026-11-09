@@ -8,7 +8,7 @@ import { identity } from "../server/lib/identity.js";
 
 export default defineAction({
   description:
-    "List Crewcut's royalty-free audio: music beds and sound effects (whoosh, pop, ding, impact, riser…), including tracks and sounds published in the catalog (ids starting cat:, with a pack and tier). Add one to a video with add-library-asset, then place it with edit-composition add-media-clip. Pro items (tier \"pro\") can be used and edited, but exporting them needs Crewcut Pro: say so before choosing one.",
+    "List Crewcut's royalty-free audio: music beds and sound effects (whoosh, swoosh in, glitch, pop, click, typing, shutter, error, ding, notification, success, cash register, impact, bass drop, record scratch, crowd cheer, riser, heartbeat), including tracks and sounds published in the catalog (ids starting cat:, with a pack and tier). Add one to a video with add-library-asset, then place it with edit-composition add-media-clip. Pro items (tier \"pro\") can be used and edited, but exporting them needs Crewcut Pro: say so before choosing one.",
   schema: z.object({ kind: z.enum(["music", "sfx"]).optional() }),
   http: { method: "GET" },
   readOnly: true,
@@ -16,9 +16,9 @@ export default defineAction({
     const who = identity(ctx);
     const items = AUDIO_LIBRARY.filter((item) => !kind || item.kind === kind);
     await Promise.all(items.map((item) => ensureLibraryFile(item)));
-    // Published catalog music and sounds come first: they're the real tracks; the built-in tones follow.
+    // Published catalog music and sounds come first; the built-in beds and sounds follow.
     const catalog = (await visibleItems(who, kind === "music" ? ["music"] : kind === "sfx" ? ["sound"] : ["music", "sound"])).flatMap((entry) => (entry.payload.type === "audio" ? [{ entry, payload: entry.payload }] : []));
-    const urls = await resolveFileUrls("assets", [...items.map((item) => libraryFileName(item.id)), ...catalog.map(({ payload }) => payload.media.fileName)]);
+    const urls = await resolveFileUrls("assets", [...items.map((item) => libraryFileName(item)), ...catalog.map(({ payload }) => payload.media.fileName)]);
     return {
       items: [
         ...catalog.map(({ entry, payload }) => ({
@@ -39,7 +39,7 @@ export default defineAction({
           mood: item.mood,
           bpm: item.bpm ?? null,
           durationMs: item.durationMs,
-          url: urls.get(libraryFileName(item.id)) ?? "",
+          url: urls.get(libraryFileName(item)) ?? "",
           tier: "free" as const,
           packName: null,
         })),

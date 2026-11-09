@@ -3,7 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
-import { AUDIO_LIBRARY, ensureLibraryFile, libraryFileName } from "../server/lib/audio-library.js";
+import { AUDIO_LIBRARY, ensureLibraryFile, LIBRARY_MIME, libraryFileName, libraryLicence } from "../server/lib/audio-library.js";
 import { usableItem } from "../server/lib/catalog.js";
 import { identity } from "../server/lib/identity.js";
 import { toJson } from "../server/lib/json.js";
@@ -50,13 +50,13 @@ export default defineAction({
       const item = AUDIO_LIBRARY.find((candidate) => candidate.id === itemId);
       if (!item) throw new UserError(`No library item "${itemId}"`);
       entry = {
-        fileName: libraryFileName(item.id),
+        fileName: libraryFileName(item),
         kind: item.kind,
         label: item.label,
-        mime: "audio/wav",
+        mime: LIBRARY_MIME,
         bytes: await ensureLibraryFile(item),
         durationMs: item.durationMs,
-        licence: { name: "Crewcut built-in library (synthesised, royalty-free)", commercialUse: true, aiGenerated: false },
+        licence: libraryLicence(item),
         provenance: { provider: "crewcut-library", itemId: item.id, ...(item.bpm ? { bpm: item.bpm } : {}) },
       };
     }
