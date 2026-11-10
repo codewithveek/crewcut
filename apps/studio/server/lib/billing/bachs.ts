@@ -100,8 +100,16 @@ export async function bachsRequest<T>(method: "GET" | "POST" | "PATCH" | "DELETE
     data = { message: text.slice(0, 300) };
   }
   if (!response.ok) {
-    const record = (data ?? {}) as { message?: string; error?: { message?: string } | string };
-    const detail = typeof record.error === "string" ? record.error : record.error?.message ?? record.message ?? response.statusText;
+    // Bachs answers {"detail": "...", "error_code": "VALIDATION_ERROR"}; older shapes use error/message.
+    const record = (data ?? {}) as { detail?: unknown; message?: string; error?: { message?: string } | string };
+    const detail =
+      typeof record.detail === "string"
+        ? record.detail
+        : Array.isArray(record.detail)
+          ? record.detail.map((entry) => (typeof entry === "object" && entry && "msg" in entry ? String((entry as { msg: unknown }).msg) : String(entry))).join("; ")
+          : typeof record.error === "string"
+            ? record.error
+            : (record.error?.message ?? record.message ?? response.statusText);
     console.error(`[billing] Bachs ${method} ${path} failed (${response.status}): ${detail}`);
     throw new BillingError(response.status >= 500 ? "The payment service isn't responding. Try again in a minute." : `The payment service refused this: ${detail}`, response.status >= 500 ? 502 : 400);
   }
@@ -117,7 +125,8 @@ export interface CheckoutSession {
 
 export async function createCheckoutSession(input: {
   productId: string;
-  customer: { customer_id: string } | { email: string; name?: string };
+  /** Required for subscriptions; a top-up without one is a guest checkout. */
+  customer?: { customer_id: string } | { email: string; name?: string };
   successUrl: string;
   cancelUrl: string;
   metadata: Record<string, string>;
@@ -128,7 +137,7 @@ export async function createCheckoutSession(input: {
     "/v1/checkout-sessions",
     {
       product_cart: [{ product_id: input.productId, quantity: 1 }],
-      customer: input.customer,
+      ...(input.customer ? { customer: input.customer } : {}),
       success_url: input.successUrl,
       cancel_url: input.cancelUrl,
       billing_currency: "USD",
