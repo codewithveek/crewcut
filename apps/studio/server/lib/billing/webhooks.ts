@@ -1,17 +1,19 @@
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 
 import { getDb, schema } from "../../db/index.js";
-import { addTopUp, ensureBalance } from "../credits.js";
+import { addTopUp, ensureBalance, syncSubscriptionPeriod, useCalendarPeriod } from "../credits.js";
 import { nowIso, toJson } from "../json.js";
 import { normalizePlan, PLANS, TOP_UPS } from "../plans.js";
-import { type BachsEvent, itemForProduct } from "./bachs.js";
+import { type BachsEvent, bachsRequest, itemForProduct } from "./bachs.js";
 
 /**
  * Applies Bachs webhook events. Each event is stored first (Bachs delivers
  * at least once), applied, then marked processed; a repeat delivery of a
  * processed event changes nothing. Plans come from subscription events, and
  * paid top-ups from `collection.succeeded` (the docs' rule: fulfil from the
- * payment, not the browser redirect).
+ * payment, not the browser redirect). Renewals arrive as `invoice.paid`: the
+ * subscription is then read back from Bachs, and its new billing period
+ * resets the workspace's credits.
  */
 
 const ENTITLED = new Set(["active", "trialing", "past_due"]);
@@ -59,15 +61,21 @@ async function planFromSubscriptions(workspace: string): Promise<string> {
   return "free";
 }
 
+/** The product of a subscription, wherever Bachs puts it (events: product_id; the API: product.id or the item's price). */
+function productIdOf(data: Data): string | undefined {
+  const item = obj((data.items as unknown[] | undefined)?.[0]);
+  return str(data.product_id) ?? str(obj(data.product).id) ?? str(obj(item.price).product_id) ?? str(item.product_id) ?? str(obj(item.product).id);
+}
+
 async function applySubscription(event: BachsEvent, deleted: boolean): Promise<string> {
   const data = event.data;
-  const subscriptionId = str(data.subscription_id) ?? str(data.id);
+  const subscriptionId = str(data.subscription_id) ?? str(obj(data.subscription).subscription_id) ?? str(data.id);
   if (!subscriptionId) return "no subscription id";
   const workspace = await workspaceFor(data);
   if (!workspace) return `subscription ${subscriptionId}: no workspace (metadata.workspace or a known customer)`;
   await rememberCustomer(workspace, data);
 
-  const productId = str(data.product_id) ?? str(obj((data.items as unknown[] | undefined)?.[0]).product_id);
+  const productId = productIdOf(data);
   const mapped = itemForProduct(productId);
   const plan = mapped && !mapped.item.startsWith("topup-") ? mapped.item : normalizePlan(str(obj(data.metadata).plan));
   if (plan === "free") return `subscription ${subscriptionId}: product ${productId ?? "?"} isn't a Crewcut plan`;
@@ -88,7 +96,27 @@ async function applySubscription(event: BachsEvent, deleted: boolean): Promise<s
 
   const next = await planFromSubscriptions(workspace);
   await setWorkspacePlan(workspace, next, `Bachs subscription ${subscriptionId} (${status})`);
-  return `${workspace} → ${PLANS[normalizePlan(next)].name} (subscription ${status})`;
+  // Credits follow the billing period while the plan is paid; back on Free they refill monthly on their own.
+  let period = "";
+  if (next === "free") await useCalendarPeriod(workspace);
+  else if (ENTITLED.has(status)) {
+    const outcome = await syncSubscriptionPeriod(workspace, str(data.current_period_start), str(data.current_period_end));
+    period = outcome === "renewed" ? ", credits renewed" : outcome === "aligned" ? ", period follows billing" : "";
+  }
+  return `${workspace} → ${PLANS[normalizePlan(next)].name} (subscription ${status}${period})`;
+}
+
+/** A paid invoice (the first payment or a renewal): read the subscription back from Bachs and apply it. */
+async function applyInvoicePaid(event: BachsEvent): Promise<string> {
+  const subscriptionId = str(obj(event.data.subscription).subscription_id) ?? str(event.data.subscription_id);
+  if (!subscriptionId) return "invoice without a subscription";
+  if (!/^[A-Za-z0-9_-]{3,80}$/.test(subscriptionId)) return `invoice for an unexpected subscription id`;
+  const subscription = await bachsRequest<Data>("GET", `/v1/subscriptions/${subscriptionId}`);
+  // The invoice's customer and metadata help find the workspace if the subscription lacks them.
+  const data: Data = { ...subscription, subscription_id: subscriptionId, metadata: { ...obj(event.data.metadata), ...obj(subscription.metadata) }, customer: { ...obj(event.data.customer), ...obj(subscription.customer) } };
+  if (!str(data.current_period_start)) data.current_period_start = event.data.period_start;
+  if (!str(data.current_period_end)) data.current_period_end = event.data.period_end;
+  return applySubscription({ ...event, data }, false);
 }
 
 async function applyPayment(event: BachsEvent): Promise<string> {
@@ -144,6 +172,9 @@ export async function handleBachsEvent(event: BachsEvent): Promise<{ duplicate: 
         break;
       case "collection.succeeded":
         result = await applyPayment(event);
+        break;
+      case "invoice.paid":
+        result = await applyInvoicePaid(event);
         break;
       case "checkout.completed":
         result = await applyCheckoutEnded(event, "completed");

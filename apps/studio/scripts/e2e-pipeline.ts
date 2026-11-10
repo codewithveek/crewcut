@@ -233,6 +233,48 @@ async function checkCreditsAndBilling(): Promise<void> {
     state = await credits();
     check(state.balance.plan === "free" && state.balance.monthly <= 100 && state.balance.topup === before + 300, "cancelling ends at Free, capped to Free's credits, bought credits kept");
     await expectFailure(call("start-checkout", { item: "creator" }, agent), /needs a person|signed-in app UI/, "the agent can't start a payment");
+
+    // Spending across both pools is recorded per pool.
+    const { addTopUp, recentLedger } = await import("../server/lib/credits.ts");
+    const split = "user:split@crewcut.test";
+    await ensureBalance(split);
+    await addTopUp(split, 300, "e2e:split-topup", "test top-up");
+    await spendCredits(split, 120_000, "e2e:split-spend", "test spend");
+    const splitBalance = await ensureBalance(split);
+    const splitRows = (await recentLedger(split)).filter((row) => row.kind === "usage");
+    check(splitBalance.monthly === 0 && splitBalance.topup === 280, "spending takes this month's credits first, then bought ones");
+    check(splitRows.some((row) => row.pool === "monthly" && row.millicredits === -100_000) && splitRows.some((row) => row.pool === "topup" && row.millicredits === -20_000), "and the history shows how much came from each");
+
+    // A subscriber's credits follow the Bachs billing period; a renewal refills them once.
+    const renew = "user:renew@crewcut.test";
+    const p1 = { start: "2026-11-05T10:00:00.000Z", end: "2026-12-05T10:00:00.000Z" };
+    const p2 = { start: "2026-12-05T10:00:00.000Z", end: "2027-01-05T10:00:00.000Z" };
+    const sub = (period: { start: string; end: string }) => ({ subscription_id: "sub_renew", product_id: "prod_cm", status: "active", customer: { customer_id: "cust_renew" }, metadata: { workspace: renew }, current_period_start: period.start, current_period_end: period.end, cancel_at_period_end: false });
+    await handleBachsEvent({ id: "evt_renew_created", type: "customer.subscription.created", data: sub(p1) });
+    let renewBalance = await ensureBalance(renew);
+    check(renewBalance.plan === "creator" && renewBalance.periodEnd === p1.end, "a new subscription's credit period follows its billing period");
+    await spendCredits(renew, 50_000, "e2e:renew-spend", "test spend");
+
+    const realFetch = globalThis.fetch;
+    process.env.BACHS_SECRET_KEY = "sk_sandbox_e2e";
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (!url.includes("/v1/subscriptions/sub_renew")) throw new Error(`unexpected request ${url}`);
+      const { product_id: _productId, subscription_id: _subscriptionId, ...rest } = sub(p2);
+      return new Response(JSON.stringify({ ...rest, id: "sub_renew", product: { id: "prod_cm" } }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    try {
+      const invoice = (id: string) => ({ id, type: "invoice.paid", data: { invoice_id: "inv_renew", subscription: { subscription_id: "sub_renew" }, customer: { customer_id: "cust_renew" }, period_start: p2.start, period_end: p2.end } });
+      await handleBachsEvent(invoice("evt_renew_paid"));
+      renewBalance = await ensureBalance(renew);
+      check(renewBalance.periodEnd === p2.end && renewBalance.monthly === 600, "a renewal (invoice paid) starts the new period with a full month of credits");
+      await handleBachsEvent(invoice("evt_renew_paid_again"));
+      const grants = (await recentLedger(renew)).filter((row) => row.kind === "grant" && row.note.includes("billing period"));
+      check(grants.length === 1 && (await ensureBalance(renew)).monthly === 600, "and a repeated renewal event refills nothing twice");
+    } finally {
+      globalThis.fetch = realFetch;
+      delete process.env.BACHS_SECRET_KEY;
+    }
   } finally {
     for (const name of Object.keys(products)) delete process.env[name];
   }

@@ -376,6 +376,8 @@ export const creditBalances = table("credit_balances", {
   monthlyMillicredits: integer("monthly_millicredits").notNull().default(0),
   topupMillicredits: integer("topup_millicredits").notNull().default(0),
   topupExpiresAt: text("topup_expires_at"),
+  /** calendar: refills monthly on its own · subscription: follows the Bachs billing period */
+  periodSource: text("period_source").notNull().default("calendar"),
   updatedAt: text("updated_at").notNull().default(now()),
 });
 

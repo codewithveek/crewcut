@@ -211,6 +211,12 @@ export default runMigrations(
           id TEXT PRIMARY KEY, type TEXT NOT NULL, payload TEXT NOT NULL, received_at TEXT NOT NULL DEFAULT now(), processed_at TEXT, error TEXT)`,
       ].join(";\n"),
     },
+    {
+      // A paying workspace's credit period follows its Bachs billing period.
+      version: 9,
+      name: "crewcut-credit-period-source",
+      sql: `ALTER TABLE credit_balances ADD COLUMN IF NOT EXISTS period_source TEXT NOT NULL DEFAULT 'calendar'`,
+    },
   ],
   { table: "crewcut_migrations" },
 );
