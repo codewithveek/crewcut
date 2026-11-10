@@ -15,7 +15,8 @@ interface ConnectionsData {
   accounts: Array<{ id: string; provider: string; accountName: string; scopes: string[]; status: string; statusDetail: string; lastUsedAt: string | null; createdAt: string }>;
   platforms: Array<{ id: string; label: string; supported: boolean; auditNote: string; limitNote: string }>;
   youtubeConfigured: boolean;
-  providers: { voice: { elevenlabs: boolean }; model: { anthropic: boolean } };
+  providers: Array<{ id: string; kind: "model" | "voice"; name: string; key: string; note: string; ownKey: boolean }>;
+  crewcutAi: { models: boolean; voice: boolean };
 }
 
 const STATUS_TONE: Record<string, string> = {
@@ -139,29 +140,53 @@ export function ConnectionsPage() {
         )}
       </Panel>
 
-      <Panel title="AI providers" description="Bring your own keys; they're stored encrypted per person.">
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {[
-            { name: "ElevenLabs voice", key: "ELEVENLABS_API_KEY", connected: data?.providers.voice.elevenlabs ?? false, note: "Realistic AI voice-overs. Without it, videos have no narration and caption timing is estimated." },
-            { name: "Anthropic (Claude)", key: "ANTHROPIC_API_KEY", connected: data?.providers.model.anthropic ?? false, note: "Powers the agents. Configure models in agent settings." },
-          ].map((provider) => (
-            <li key={provider.key} className="flex flex-col gap-2 rounded-xl border border-border p-4">
-              <div className="flex items-center gap-2">
-                <IconKey className="size-4 text-muted-foreground" />
-                <p className="font-medium text-foreground">{provider.name}</p>
-                {provider.connected ? (
-                  <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-supported">
-                    <IconCheck className="size-3.5" /> Connected
-                  </span>
-                ) : null}
-              </div>
-              <p className="text-xs text-muted-foreground">{provider.note}</p>
-              <Button size="sm" variant="outline" className="pc-press self-start" onClick={() => openAgentSettings("secrets")}>
-                {provider.connected ? "Manage key" : `Add ${provider.key}`}
-              </Button>
-            </li>
-          ))}
-        </ul>
+      <Panel
+        title="AI providers"
+        description={
+          data?.crewcutAi.models
+            ? "The crew runs on Crewcut AI and uses your credits. Add your own key for any provider below and the crew uses it instead: it goes straight to that provider, costs no credits, and they bill you."
+            : "Add a key for any provider below and the crew uses it: it goes straight to that provider and they bill you. Keys are stored encrypted."
+        }
+      >
+        {!data ? (
+          <SkeletonLines count={3} />
+        ) : (
+          <>
+            <p className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span>
+                Crewcut AI for the crew: <strong className="text-foreground">{data.crewcutAi.models ? "on" : "off"}</strong>
+              </span>
+              <span>
+                Crewcut voice-overs: <strong className="text-foreground">{data.crewcutAi.voice ? "on" : "off"}</strong>
+                {data.crewcutAi.voice ? "" : " (add an ElevenLabs key for narration)"}
+              </span>
+            </p>
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {data.providers.map((provider) => (
+                <li key={provider.key} className="flex flex-col gap-2 rounded-xl border border-border p-4">
+                  <div className="flex items-center gap-2">
+                    <IconKey className="size-4 text-muted-foreground" />
+                    <p className="font-medium text-foreground">{provider.name}</p>
+                    {provider.ownKey ? (
+                      <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-supported">
+                        <IconCheck className="size-3.5" /> Your key
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {provider.note} {provider.ownKey ? "Used instead of Crewcut AI; no credits." : provider.kind === "voice" ? (data.crewcutAi.voice ? "Without it, voice-overs use Crewcut's and cost credits." : "") : ""}
+                  </p>
+                  <Button size="sm" variant="outline" className="pc-press self-start" onClick={() => openAgentSettings("secrets")}>
+                    {provider.ownKey ? "Manage key" : `Add ${provider.key}`}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              With several keys, pick which model the crew uses in agent settings. <span className="whitespace-nowrap">Usage and credits: the Plan page.</span>
+            </p>
+          </>
+        )}
       </Panel>
 
       <Panel title="Platforms" description="What each platform requires before public posting works, and the limits the publish agent checks before exporting.">
