@@ -27,7 +27,14 @@ RUN for i in 1 2 3; do pnpm install --frozen-lockfile --network-concurrency 8 &&
 RUN cd apps/render-worker && node -e "import('@remotion/renderer').then(r => r.ensureBrowser())"
 
 COPY . .
-RUN pnpm install --frozen-lockfile --offline && pnpm --filter @crewcut/studio build
+# The framework stamps every page and request with a build id (x-agent-native-build-id)
+# so it can tell a tab left open from an older deploy. It reads AGENT_NATIVE_BUILD_ID
+# (or a host's commit variable) at build time and falls back to "development"; this
+# build sees none of those, so give it one: --build-arg AGENT_NATIVE_BUILD_ID=<sha>,
+# else the build time (a cached layer keeps its id, which is right: same code).
+ARG AGENT_NATIVE_BUILD_ID
+RUN pnpm install --frozen-lockfile --offline \
+    && AGENT_NATIVE_BUILD_ID="${AGENT_NATIVE_BUILD_ID:-$(date -u +%Y%m%d%H%M%S)}" pnpm --filter @crewcut/studio build
 
 # The render bundle, built once into the image: exports reuse it (it's named
 # after the code it was built from) instead of running webpack on the first
