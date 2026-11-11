@@ -40,10 +40,26 @@ export default defineAction({
     const lineAudio = lineAudioFor(scriptEntry.script, compositionEntry.composition);
     let synthesized = 0;
     let characters = 0;
+    const recordVoiceUsage = async () => {
+      if (!apiKey || characters === 0) return;
+      await recordAiUsage({
+        ownerEmail: owner.email,
+        orgId: owner.orgId,
+        source: crewcutKey ? "managed" : "byok",
+        kind: "voice",
+        provider: "elevenlabs",
+        model: "eleven_multilingual_v2",
+        units: characters,
+        costMicros: voiceCostMicros(characters),
+        videoId,
+        stage: "voice",
+      });
+    };
 
     if (apiKey) {
       const provider = new ElevenLabsVoiceProvider({ apiKey, defaultVoiceId: defaultVoice });
       const lines = scriptLines(scriptEntry.script);
+      try {
       for (const [index, line] of lines.entries()) {
         const result = await provider.synthesize({
           text: line.say ?? line.text,
@@ -82,22 +98,15 @@ export default defineAction({
         lineAudio.set(line.id, audio);
         synthesized += 1;
       }
+      } catch (error) {
+        // The lines voiced so far were paid for: record them before giving up.
+        await recordVoiceUsage().catch(() => undefined);
+        console.error(`[voice] ${videoId}: stopped after ${synthesized} of ${lines.length} lines:`, error);
+        throw new UserError(`The voice-over stopped after ${synthesized} of ${lines.length} lines: the voice service didn't answer. Try again in a minute.`);
+      }
     }
 
-    if (apiKey && characters > 0) {
-      await recordAiUsage({
-        ownerEmail: owner.email,
-        orgId: owner.orgId,
-        source: crewcutKey ? "managed" : "byok",
-        kind: "voice",
-        provider: "elevenlabs",
-        model: "eleven_multilingual_v2",
-        units: characters,
-        costMicros: voiceCostMicros(characters),
-        videoId,
-        stage: "voice",
-      });
-    }
+    await recordVoiceUsage();
 
     const emphasis = new Map(scriptEntry.script.beats.flatMap((beat) => beat.lines.map((line) => [line.id, line.emphasis] as const)));
     const composition = applyNarration(compositionEntry.composition, lineAudio, { emphasis });

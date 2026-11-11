@@ -1,7 +1,8 @@
 import { open, stat } from "node:fs/promises";
 
 import { type VideoSource, YouTubeClient, getAccessToken } from "@crewcut/distribute";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { runWithRequestContext } from "@agent-native/core/server";
 
 import { getDb, schema } from "../db/index.js";
 import { appOrigin, credentialVault, youtubeOAuthClient } from "./vault.js";
@@ -12,9 +13,41 @@ export async function youtubeConnectionFor(ownerEmail: string): Promise<Connecti
   const [row] = await getDb()
     .select()
     .from(schema.connections)
-    .where(and(eq(schema.connections.ownerEmail, ownerEmail), eq(schema.connections.provider, "youtube")))
+    .where(and(eq(schema.connections.ownerEmail, ownerEmail), eq(schema.connections.provider, "youtube"), ne(schema.connections.status, "revoked")))
+    // A working channel first, then the one connected most recently: never an
+    // older attempt that found no channel while a good connection exists.
+    .orderBy(sql`case when ${schema.connections.status} = 'healthy' and ${schema.connections.accountId} <> '' then 0 else 1 end`, desc(schema.connections.createdAt))
     .limit(1);
-  return row && row.status !== "revoked" ? row : null;
+  return row ?? null;
+}
+
+/** Posts this server process is uploading right now (an upload outlives the request that started it). */
+export const uploadsInFlight = new Set<string>();
+
+/**
+ * Marks uploads that can never finish as failed, so the post can be published
+ * again: the upload runs inside the web server, and a restart mid-upload left
+ * the post saying "uploading" for good. Returns how many were closed.
+ */
+export async function failStaleUploads(): Promise<number> {
+  const P = schema.publishJobs;
+  const rows = await getDb()
+    .select({ id: P.id, ownerEmail: P.ownerEmail, orgId: P.orgId })
+    .from(P)
+    .where(and(eq(P.status, "uploading"), sql`coalesce((${P.approvedAt})::timestamptz, (${P.createdAt})::timestamptz) < now() - interval '60 minutes'`))
+    .limit(200);
+  let closed = 0;
+  for (const row of rows) {
+    if (uploadsInFlight.has(row.id)) continue;
+    await runWithRequestContext({ userEmail: row.ownerEmail, ...(row.orgId ? { orgId: row.orgId } : {}) }, () =>
+      getDb()
+        .update(P)
+        .set({ status: "failed", error: "The upload was interrupted before it finished. Check your channel in case it arrived, then publish again." })
+        .where(and(eq(P.id, row.id), eq(P.status, "uploading"))),
+    );
+    closed += 1;
+  }
+  return closed;
 }
 
 export function youtubeClientFor(connection: ConnectionRow): YouTubeClient {

@@ -1,6 +1,6 @@
 import { defineAction } from "@agent-native/core/action";
 import { publishCopySchema, privacySchema } from "@crewcut/contracts";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
@@ -8,7 +8,7 @@ import { requireHuman } from "../server/lib/identity.js";
 import { nowIso, toJson } from "../server/lib/json.js";
 import { loadVideo, recordApproval, requireOwner, saveStages, updateVideo } from "../server/lib/store.js";
 import { localCopy } from "../server/lib/blob-store.js";
-import { fileVideoSource, youtubeClientFor, youtubeConnectionFor } from "../server/lib/youtube.js";
+import { fileVideoSource, uploadsInFlight, youtubeClientFor, youtubeConnectionFor } from "../server/lib/youtube.js";
 import { approveStage } from "@crewcut/pipeline";
 import { runWithRequestContext } from "@agent-native/core/server";
 import { UserError } from "../server/lib/errors.js";
@@ -44,7 +44,13 @@ export default defineAction({
     const approvedStages =
       video.stages.publish.status === "awaiting_approval" ? approveStage(video.stages, "publish", { now: nowIso(), actor: { kind: "human", id: who.email }, force: true }) : null;
 
-    await db.update(schema.publishJobs).set({ status: "uploading", privacy: finalPrivacy, approvedBy: who.email, approvedAt: nowIso(), error: null }).where(eq(schema.publishJobs.id, job.id));
+    // Claimed in one statement: a double click (or two tabs) can't start two uploads of the same post.
+    const claimed = await db
+      .update(schema.publishJobs)
+      .set({ status: "uploading", privacy: finalPrivacy, approvedBy: who.email, approvedAt: nowIso(), error: null })
+      .where(and(eq(schema.publishJobs.id, job.id), inArray(schema.publishJobs.status, ["awaiting_approval", "failed"])))
+      .returning({ id: schema.publishJobs.id });
+    if (claimed.length === 0) throw new UserError("This post is already being published.", 409);
     try {
       await recordApproval(video, { stage: "publish", decision: "approved", subject: `${job.platform} (${finalPrivacy})`, actor: who });
       if (approvedStages) {
@@ -58,6 +64,7 @@ export default defineAction({
     }
     // The upload outlives this request: re-establish the owner's context for its writes.
     const owner = { userEmail: video.row.ownerEmail, ...(video.row.orgId ? { orgId: video.row.orgId } : {}) };
+    uploadsInFlight.add(job.id);
     void runWithRequestContext(owner, async () => {
       try {
         const youtube = youtubeClientFor(connection);
@@ -79,7 +86,13 @@ export default defineAction({
         await recordApproval(video, { stage: "publish", decision: "published", subject: result.url, reason: result.warnings.join(" ") || `Uploaded as ${result.privacyStatus}`, actor: who });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        await db.update(schema.publishJobs).set({ status: "failed", error: message.slice(0, 2000) }).where(eq(schema.publishJobs.id, job.id));
+        await db
+          .update(schema.publishJobs)
+          .set({ status: "failed", error: message.slice(0, 2000) })
+          .where(eq(schema.publishJobs.id, job.id))
+          .catch((writeError: unknown) => console.error(`[publish ${job.id}] could not record the failure:`, writeError));
+      } finally {
+        uploadsInFlight.delete(job.id);
       }
     });
     return { publishJobId: job.id, status: "uploading", privacy: finalPrivacy };

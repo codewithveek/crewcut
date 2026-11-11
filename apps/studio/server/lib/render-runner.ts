@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { unlink } from "node:fs/promises";
 import path from "node:path";
 
 import { type Composition, type ExportResolution, iterateLayers } from "@crewcut/composition";
@@ -145,6 +146,8 @@ export async function queueRender(input: QueueRenderInput): Promise<{ renderId: 
 }
 
 const running = new Map<string, ReturnType<typeof spawn>>();
+/** Exports a person stopped: their worker's exit must not be recorded as a failure. */
+const cancelled = new Set<string>();
 
 const MAX_ACTIVE_RENDERS_PER_OWNER = Math.max(1, Number(process.env.CREWCUT_MAX_RENDERS_PER_USER ?? 2));
 /**
@@ -255,7 +258,14 @@ function spawnWorker(renderId: string, jobFile: string, owner: { userEmail: stri
   });
   child.on("exit", (code) => {
     running.delete(renderId);
+    // The job file was only this worker's input.
+    void unlink(jobFile).catch(() => undefined);
     startNextWaiting();
+    if (cancelled.delete(renderId)) {
+      // Whatever the worker had written so far is not a finished video.
+      void unlink(path.join(STORAGE_DIR, "renders", `${renderId}.mp4`)).catch(() => undefined);
+      return;
+    }
     if (code !== 0 && !finished) {
       void write({ status: "failed", error: (stderr || `Render worker exited with code ${code}`).slice(-2000) });
     }
@@ -267,6 +277,47 @@ function spawnWorker(renderId: string, jobFile: string, owner: { userEmail: stri
   });
 }
 
+/** True while this server process is running the export or holding it in its queue. */
+export function ownsRender(renderId: string): boolean {
+  return running.has(renderId) || waiting.some((job) => job.renderId === renderId);
+}
+
+/** Spawn mode: a quiet export this long has lost its worker (progress is written every few seconds). */
+const SPAWN_STALE_MINUTES = 10;
+/** Queue mode: workers retry a job that went quiet themselves; this is for one that used up its attempts. */
+const QUEUE_STALE_MINUTES = 45;
+
+/**
+ * Marks exports that can never finish as failed, so they stop showing
+ * "Exporting…" for ever. In spawn mode the worker is a child of the web
+ * server: a restart, deploy or sleeping container takes the worker and the
+ * in-memory queue with it, and the job's row would say "running" for good.
+ * Returns how many were closed.
+ */
+export async function failStaleRenders(): Promise<number> {
+  const R = schema.renderJobs;
+  const mode = renderMode();
+  const minutes = mode === "spawn" ? SPAWN_STALE_MINUTES : QUEUE_STALE_MINUTES;
+  const quiet = sql`(${R.updatedAt})::timestamptz < now() - (${minutes} * interval '1 minute')`;
+  const rows = await getDb()
+    .select({ id: R.id, ownerEmail: R.ownerEmail, orgId: R.orgId })
+    .from(R)
+    .where(mode === "spawn" ? and(inArray(R.status, ["queued", "running"]), quiet) : and(eq(R.status, "running"), quiet, sql`${R.attempts} >= 2`))
+    .limit(200);
+  let closed = 0;
+  for (const row of rows) {
+    if (ownsRender(row.id)) continue;
+    await runWithRequestContext({ userEmail: row.ownerEmail, ...(row.orgId ? { orgId: row.orgId } : {}) }, () =>
+      getDb()
+        .update(R)
+        .set({ status: "failed", error: "The export was interrupted before it finished (the server restarted). Export the video again.", updatedAt: new Date().toISOString() })
+        .where(and(eq(R.id, row.id), inArray(R.status, ["queued", "running"]))),
+    );
+    closed += 1;
+  }
+  return closed;
+}
+
 export function cancelRender(renderId: string): boolean {
   const queued = waiting.findIndex((job) => job.renderId === renderId);
   if (queued >= 0) {
@@ -275,6 +326,40 @@ export function cancelRender(renderId: string): boolean {
   }
   const child = running.get(renderId);
   if (!child) return false;
+  cancelled.add(renderId);
   child.kill();
   return true;
+}
+
+/** Finished exports kept per video; older ones are removed (a post that was published keeps its export). */
+const KEEP_EXPORTS_PER_VIDEO = Math.max(1, Number(process.env.CREWCUT_KEEP_EXPORTS ?? 5));
+
+/**
+ * Removes exports nobody can reach any more: all but the newest few finished
+ * exports of each video (the export dialog lists four), and the rows of
+ * exports that failed or were stopped more than a week ago. Without this,
+ * every export ever made stayed in storage for good.
+ */
+export async function pruneOldRenders(): Promise<number> {
+  const result = (await getDb().execute(sql`
+    select id, output_file, owner_email, org_id from (
+      select id, output_file, owner_email, org_id, status, created_at,
+             row_number() over (partition by video_id, status order by created_at desc, id desc) as position
+        from render_jobs
+       where status in ('done', 'failed', 'cancelled')
+    ) ranked
+    where ((status = 'done' and position > ${KEEP_EXPORTS_PER_VIDEO})
+        or (status <> 'done' and (created_at)::timestamptz < now() - interval '7 days'))
+      and not exists (select 1 from publish_jobs p where p.render_job_id = ranked.id)
+    limit 100`)) as unknown;
+  const rows = (Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? [])) as Array<{ id: string; output_file: string | null; owner_email: string; org_id: string | null }>;
+  // Imported here: blob-store imports nothing from this file, but keeps the module graph one-way at load.
+  const { removeFile } = await import("./blob-store.js");
+  for (const row of rows) {
+    await runWithRequestContext({ userEmail: row.owner_email, ...(row.org_id ? { orgId: row.org_id } : {}) }, async () => {
+      if (row.output_file) await removeFile("renders", row.output_file);
+      await getDb().delete(schema.renderJobs).where(eq(schema.renderJobs.id, row.id));
+    });
+  }
+  return rows.length;
 }

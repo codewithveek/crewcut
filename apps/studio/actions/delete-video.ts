@@ -7,6 +7,7 @@ import { getDb, schema } from "../server/db/index.js";
 import { assetsUsedElsewhere, deleteAssetFile } from "../server/lib/assets.js";
 import { requireHuman } from "../server/lib/identity.js";
 import { removeFile } from "../server/lib/blob-store.js";
+import { cancelRender } from "../server/lib/render-runner.js";
 import { loadVideo, requireOwner } from "../server/lib/store.js";
 
 /**
@@ -29,6 +30,8 @@ export default defineAction({
       db.select().from(schema.assets).where(eq(schema.assets.videoId, videoId)),
       db.select().from(schema.renderJobs).where(eq(schema.renderJobs.videoId, videoId)),
     ]);
+    // Exports still in progress stop here: nothing should keep rendering a video that's gone.
+    for (const render of renders) if (render.status === "queued" || render.status === "running") cancelRender(render.id);
     // Media another project still uses moves to the owner's library instead of being deleted.
     const shared = await assetsUsedElsewhere(assets.map((asset) => asset.id), videoId);
     if (shared.size) await db.update(schema.assets).set({ videoId: null }).where(inArray(schema.assets.id, [...shared]));
@@ -51,8 +54,8 @@ export default defineAction({
     await db.delete(schema.videos).where(eq(schema.videos.id, videoId));
     for (const asset of assets) if (!shared.has(asset.id)) await deleteAssetFile(asset);
     for (const render of renders) {
-      if (!render.outputFile) continue;
-      await removeFile("renders", render.outputFile);
+      // An export stopped midway has no recorded file yet, but may have left one behind.
+      await removeFile("renders", render.outputFile ?? `${render.id}.mp4`);
     }
     return { deleted: videoId, title: video.row.title };
   },

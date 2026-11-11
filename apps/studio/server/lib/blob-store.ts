@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile, unlink } from "node:fs/promises";
 
-import { builderFileUploadProvider, deleteUploadedFile, getActiveFileUploadProviderForRequest, uploadFile } from "@agent-native/core/file-upload";
+import { builderFileUploadProvider, deleteUploadedFile, ensureS3FileUploadProvider, getActiveFileUploadProviderForRequest, s3FileUploadProvider, uploadFile } from "@agent-native/core/file-upload";
 import { eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "../db/index.js";
@@ -128,8 +128,19 @@ export async function removeFile(area: StorageArea, fileName: string): Promise<v
   urlCache.delete(keyOf(area, fileName));
   const row = await storedRow(area, fileName);
   if (row) {
-    await deleteUploadedFile(row.provider, { url: row.url, ...(row.remoteId ? { id: row.remoteId } : {}) }).catch(() => false);
-    await getDb().delete(schema.storedFiles).where(eq(schema.storedFiles.key, row.key));
+    // The bucket provider is registered when the server starts; scripts and
+    // background jobs may get here first, and an unregistered provider would
+    // make the delete a silent no-op (the object would stay in the bucket).
+    if (row.provider === s3FileUploadProvider.id) ensureS3FileUploadProvider();
+    const removed = await deleteUploadedFile(row.provider, { url: row.url, ...(row.remoteId ? { id: row.remoteId } : {}) }).catch((error: unknown) => {
+      console.error(`[storage] could not delete ${row.key} from ${row.provider}:`, error instanceof Error ? error.message : error);
+      return false;
+    });
+    // The index row is the only record of where the object is: it goes only
+    // once the object has, so a failed delete can be retried instead of
+    // leaving a file nobody can find.
+    if (removed) await getDb().delete(schema.storedFiles).where(eq(schema.storedFiles.key, row.key));
+    else console.error(`[storage] ${row.key} is still in ${row.provider} storage (${row.remoteId ?? row.url}); its index row was kept so it can be removed later.`);
   }
   await unlink(storagePath(area, fileName)).catch(() => undefined);
 }

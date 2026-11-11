@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
@@ -79,15 +79,17 @@ async function runQueue(databaseUrl: string): Promise<void> {
           const now = Date.now();
           if (now - lastWrite < 1000) return;
           lastWrite = now;
-          void sql`UPDATE render_jobs SET progress = ${fraction}, stage = ${stage}, updated_at = now() WHERE id = ${job.id}`;
+          void sql`UPDATE render_jobs SET progress = ${fraction}, stage = ${stage}, updated_at = now() WHERE id = ${job.id} AND status = 'running'`;
         },
       });
-      await sql`UPDATE render_jobs SET status = 'done', progress = 1, stage = 'done', output_file = ${payload.outputFileName}, output_bytes = ${result.bytes}, error = NULL, updated_at = now() WHERE id = ${job.id}`;
+      const finished = await sql`UPDATE render_jobs SET status = 'done', progress = 1, stage = 'done', output_file = ${payload.outputFileName}, output_bytes = ${result.bytes}, error = NULL, updated_at = now() WHERE id = ${job.id} AND status = 'running' RETURNING id`;
+      // Stopped by the person while it rendered: it stays stopped, and its file goes.
+      if (finished.length === 0) await rm(path.join(STORAGE_DIR, "renders", payload.outputFileName), { force: true }).catch(() => undefined);
       console.log(`[worker] job ${job.id} done (${result.frames} frames)`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const status = job.attempts >= MAX_ATTEMPTS ? "failed" : "queued";
-      await sql`UPDATE render_jobs SET status = ${status}, error = ${message.slice(0, 2000)}, updated_at = now() WHERE id = ${job.id}`;
+      await sql`UPDATE render_jobs SET status = ${status}, error = ${message.slice(0, 2000)}, updated_at = now() WHERE id = ${job.id} AND status = 'running'`;
       console.error(`[worker] job ${job.id} ${status}: ${message}`);
     }
   }

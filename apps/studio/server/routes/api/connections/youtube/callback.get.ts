@@ -34,12 +34,28 @@ export default defineEventHandler(async (event) => {
     const channel = await new YouTubeClient({ getToken: async () => tokens.accessToken }).channel().catch(() => null);
     // Plans limit how many channels a workspace publishes to; reconnecting one already connected is always fine.
     const existing = await runWithRequestContext(ctx, () =>
-      getDb().select({ accountId: schema.connections.accountId }).from(schema.connections).where(and(eq(schema.connections.ownerEmail, payload.ownerEmail), eq(schema.connections.provider, "youtube"))),
+      getDb().select({ id: schema.connections.id, accountId: schema.connections.accountId, vaultKey: schema.connections.vaultKey }).from(schema.connections).where(and(eq(schema.connections.ownerEmail, payload.ownerEmail), eq(schema.connections.provider, "youtube"))),
     );
     const channels = new Set(existing.map((row) => row.accountId).filter(Boolean));
     const plan = await planFor({ email: payload.ownerEmail, orgId: payload.orgId });
     if (channel?.id && !channels.has(channel.id) && channels.size >= plan.channels) {
-      throw new Error(`${plan.name} publishes to ${plan.channels === 1 ? "one YouTube channel" : `${plan.channels} YouTube channels`}. Disconnect one first, or move to Studio for up to 5.`);
+      // The Connections page opens the plans for this instead of showing an error.
+      return redirect(`/connections?upgrade=channels&plan=${encodeURIComponent(plan.name)}`);
+    }
+    const done = `${payload.returnTo}${payload.returnTo.includes("?") ? "&" : "?"}connected=youtube`;
+    // Connecting a channel that's already connected renews that connection
+    // (new tokens, same row): it must never leave two rows for one channel,
+    // one of them holding tokens Google has since replaced.
+    const same = channel?.id ? existing.find((row) => row.accountId === channel.id) : undefined;
+    if (same && channel) {
+      await credentialVault({ userEmail: payload.ownerEmail, orgId: payload.orgId }).set(same.vaultKey, tokens);
+      await runWithRequestContext(ctx, () =>
+        getDb()
+          .update(schema.connections)
+          .set({ accountName: channel.title ?? "YouTube channel", scopes: tokens.scope ?? "", status: "healthy", statusDetail: channel.handle ?? "" })
+          .where(eq(schema.connections.id, same.id)),
+      );
+      return redirect(done);
     }
     const connectionId = newId("con");
     const vaultKey = `crewcut_youtube_${connectionId}`;
@@ -60,7 +76,7 @@ export default defineEventHandler(async (event) => {
         orgId: payload.orgId,
       }),
     );
-    return redirect(`${payload.returnTo}?connected=youtube`);
+    return redirect(done);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Connection failed";
     return redirect(`/connections?error=${encodeURIComponent(message.slice(0, 200))}`);
