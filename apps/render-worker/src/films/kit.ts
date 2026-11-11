@@ -176,7 +176,7 @@ export function mark(id: string, cx: number, cy: number, sizePx: number, at = 0)
 
 const STORAGE = path.resolve(process.env.CREWCUT_STORAGE_DIR ?? path.join(import.meta.dirname, "../../../../storage"));
 
-export function loadRecording(name: "take1" | "take2", sourceDir: string): Recording {
+export function loadRecording(name: string, sourceDir: string): Recording {
   const events = JSON.parse(readFileSync(path.join(sourceDir, name, "events.json"), "utf8")) as Omit<Recording, "assetId">;
   return { ...events, assetId: `film-${name}` };
 }

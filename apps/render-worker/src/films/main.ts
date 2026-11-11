@@ -5,6 +5,8 @@ import { parseArgs } from "node:util";
 import { type Composition, normalizeComposition, parseComposition } from "@crewcut/composition";
 
 import { demoFilm } from "./demo";
+import { autopilotLaunchFilm } from "./autopilot-launch";
+import { hackathonFilm } from "./hackathon";
 import { launchFilm } from "./launch";
 
 /**
@@ -15,7 +17,7 @@ import { launchFilm } from "./launch";
 async function main(): Promise<void> {
   const { values } = parseArgs({ options: { film: { type: "string", default: "launch" }, source: { type: "string" }, out: { type: "string", default: "storage/films" } } });
   if (!values.source) throw new Error("Pass --source <dir with take1/ take2/ and ../audio/vo.json>");
-  const films: Record<string, (source: string) => unknown> = { launch: launchFilm, demo: demoFilm };
+  const films: Record<string, (source: string) => unknown> = { launch: launchFilm, demo: demoFilm, hackathon: hackathonFilm, "autopilot-launch": autopilotLaunchFilm, "autopilot-demo": (source: string) => hackathonFilm(source, "demo") };
   const build = films[values.film!];
   if (!build) throw new Error(`Unknown film ${values.film}`);
   const composition: Composition = normalizeComposition(parseComposition(build(values.source)));

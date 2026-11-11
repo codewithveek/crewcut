@@ -66,7 +66,7 @@ interface Clip {
   layers: LayerInput[];
 }
 
-function promptBar(id: string, value: string, y: number, typeAt: number, staggerMs = 40): LayerInput[] {
+export function promptBar(id: string, value: string, y: number, typeAt: number, staggerMs = 40): LayerInput[] {
   return [
     rect(`${id}-bar`, { x: 69, y, w: 46, h: 8.4 }, SURFACE, { radius: 999, stroke: HAIRLINE, strokeWidth: 1.5, shadow: { color: "#00000080", blur: 50, x: 0, y: 18 }, keyframes: merge(rise(0, 30, 600)) }),
     { id: `${id}-spark`, type: "icon", icon: "sparkle", color: CUT, strokeWidth: 2, transform: { x: 49.4, y, width: 1.6, height: 2.8 }, keyframes: fadeIn(120, 300) } as LayerInput,
@@ -75,7 +75,7 @@ function promptBar(id: string, value: string, y: number, typeAt: number, stagger
 }
 
 /** A pointer that glides along `path` ([clip ms, x %, y %]) and presses at `clicks` (clip ms); optionally fades at `hideAt`. */
-function cursorLayer(id: string, path: Array<[number, number, number]>, clicks: number[] = [], hideAt?: number): LayerInput {
+export function cursorLayer(id: string, path: Array<[number, number, number]>, clicks: number[] = [], hideAt?: number): LayerInput {
   // Keyframe times are relative to the layer, which starts at the first point.
   const first = path[0]!;
   const t0 = first[0];
@@ -95,7 +95,7 @@ function cursorLayer(id: string, path: Array<[number, number, number]>, clicks: 
   } as LayerInput;
 }
 
-function ripple(id: string, x: number, y: number, at: number, size = 3): LayerInput {
+export function ripple(id: string, x: number, y: number, at: number, size = 3): LayerInput {
   return {
     id,
     type: "shape",
@@ -111,7 +111,7 @@ function ripple(id: string, x: number, y: number, at: number, size = 3): LayerIn
 }
 
 /** A product moment: the recording in its window, the camera, and a caption pill. */
-function moment(input: {
+export function moment(input: {
   id: string;
   recording: Recording;
   segments: Segment[];
