@@ -15,6 +15,8 @@ import {
  */
 export class PipelineError extends Error {
   override readonly name = "PipelineError";
+  /** Written for people: the app shows it as-is (a 409), not as "Internal server error". */
+  readonly statusCode = 409;
   constructor(
     readonly code: "not_ready" | "human_only" | "blocked" | "invalid" | "not_awaiting",
     message: string,
@@ -99,7 +101,7 @@ export function completeStage(
 export function approveStage(
   states: StageStates,
   stage: Stage,
-  options: { now: string; actor: Actor; note?: string },
+  options: { now: string; actor: Actor; note?: string; force?: boolean },
 ): StageStates {
   if (options.actor.kind !== "human") {
     throw new PipelineError("human_only", "Only a person can approve a stage.");
@@ -111,7 +113,8 @@ export function approveStage(
   if (status !== "awaiting_approval" && status !== "notified") {
     throw new PipelineError("not_awaiting", `The ${stage} stage has nothing waiting for approval (it is ${status}).`);
   }
-  assertCanStart(states, stage);
+  // force: the person's own click covers it even though earlier stages never ran (a video made in the editor).
+  if (!options.force) assertCanStart(states, stage);
   return touch(states, stage, { status: "approved", actor: options.actor.id, note: options.note }, options.now);
 }
 

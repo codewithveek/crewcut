@@ -38,14 +38,24 @@ export default defineAction({
     if (!render?.outputFile) throw new UserError("The exported file for this post is missing. Export the video again.");
 
     const finalPrivacy = privacy ?? (job.privacy as "private" | "unlisted" | "public");
-    await db.update(schema.publishJobs).set({ status: "uploading", privacy: finalPrivacy, approvedBy: who.email, approvedAt: nowIso(), error: null }).where(eq(schema.publishJobs.id, job.id));
-    await recordApproval(video, { stage: "publish", decision: "approved", subject: `${job.platform} (${finalPrivacy})`, actor: who });
-    if (video.stages.publish.status === "awaiting_approval") {
-      video.stages = approveStage(video.stages, "publish", { now: nowIso(), actor: { kind: "human", id: who.email } });
-      await saveStages(video.row.id, video.stages);
-    }
-
+    // Everything that can refuse runs before the post is marked as uploading, so a refusal never strands it.
     const copy = publishCopySchema.parse(JSON.parse(job.copy));
+    // Clicking Publish is the sign-off. Videos made in the editor never ran the earlier stages, so those don't hold it back.
+    const approvedStages =
+      video.stages.publish.status === "awaiting_approval" ? approveStage(video.stages, "publish", { now: nowIso(), actor: { kind: "human", id: who.email }, force: true }) : null;
+
+    await db.update(schema.publishJobs).set({ status: "uploading", privacy: finalPrivacy, approvedBy: who.email, approvedAt: nowIso(), error: null }).where(eq(schema.publishJobs.id, job.id));
+    try {
+      await recordApproval(video, { stage: "publish", decision: "approved", subject: `${job.platform} (${finalPrivacy})`, actor: who });
+      if (approvedStages) {
+        video.stages = approvedStages;
+        await saveStages(video.row.id, video.stages);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await db.update(schema.publishJobs).set({ status: "failed", error: message.slice(0, 2000) }).where(eq(schema.publishJobs.id, job.id));
+      throw error;
+    }
     // The upload outlives this request: re-establish the owner's context for its writes.
     const owner = { userEmail: video.row.ownerEmail, ...(video.row.orgId ? { orgId: video.row.orgId } : {}) };
     void runWithRequestContext(owner, async () => {

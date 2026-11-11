@@ -48,6 +48,22 @@ describe("orchestrator", () => {
     expect(states.publish.status).toBe("awaiting_approval");
   });
 
+  it("a post from the editor (earlier stages never ran) can be approved only with force", () => {
+    let states = startStage(initialStageStates(), "publish", { now: NOW, actor: agent, force: true });
+    states = completeStage(states, "publish", { policy: DEFAULT_GATE_POLICY, now: NOW, actor: agent });
+    const refusal = (() => {
+      try {
+        approveStage(states, "publish", { now: NOW, actor: human });
+      } catch (error) {
+        return error as PipelineError;
+      }
+    })();
+    expect(refusal?.code).toBe("not_ready");
+    expect(refusal?.statusCode).toBe(409);
+    expect(approveStage(states, "publish", { now: NOW, actor: human, force: true }).publish.status).toBe("approved");
+    expect(() => approveStage(states, "publish", { now: NOW, actor: agent, force: true })).toThrow(/Only a person/);
+  });
+
   it("blocked stages can't be approved; QA can send the script back", () => {
     let states = initialStageStates();
     states = completeStage(states, "qa", { policy: DEFAULT_GATE_POLICY, now: NOW, actor: agent, blockedReason: "1 unsupported claim" });
