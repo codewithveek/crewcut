@@ -54,8 +54,11 @@ export function htmlToText(html: string): { title: string; text: string } {
     .replace(/<li[^>]*>/gi, "• ")
     .replace(/<[^>]+>/g, " ")
     .replace(/&(#\d+|#x[\da-f]+|[a-z]+);/gi, (match, entity: string) => {
-      if (entity.startsWith("#x")) return String.fromCodePoint(Number.parseInt(entity.slice(2), 16));
-      if (entity.startsWith("#")) return String.fromCodePoint(Number(entity.slice(1)));
+      if (entity.startsWith("#")) {
+        // Pages contain junk like "&#99999999;": fromCodePoint throws on those.
+        const code = /^#x/i.test(entity) ? Number.parseInt(entity.slice(2), 16) : Number(entity.slice(1));
+        return Number.isInteger(code) && code > 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : " ";
+      }
       return ENTITIES[entity.toLowerCase()] ?? match;
     })
     .replace(/[ \t\f\v]+/g, " ")

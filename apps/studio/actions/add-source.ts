@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
 import { asUntrustedData, htmlToText, redactSecrets } from "../server/lib/content-safety.js";
+import { readTextCapped } from "../server/lib/http.js";
 import { loadVideo } from "../server/lib/store.js";
 import { newId, sha256 } from "../server/lib/storage.js";
 import { UserError } from "../server/lib/errors.js";
@@ -30,11 +31,20 @@ export default defineAction({
     let kind: "url" | "document" = "document";
     if (args.url) {
       kind = "url";
-      const response = await ssrfSafeFetch(args.url, { headers: { "user-agent": "Crewcut research (+https://github.com/codewithveek)", accept: "text/html,text/plain,application/json" }, signal: AbortSignal.timeout(15_000) });
+      if (!/^https?:\/\//i.test(args.url)) throw new UserError("Sources need a web address that starts with https:// or http://.");
+      let response: Response;
+      try {
+        response = await ssrfSafeFetch(args.url, { headers: { "user-agent": "Crewcut research (+https://github.com/codewithveek)", accept: "text/html,text/plain,application/json" }, signal: AbortSignal.timeout(15_000) });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        if (reason.startsWith("SSRF blocked")) throw new UserError("That address isn't on the public web, so it can't be used as a source.");
+        throw new UserError(`Couldn't reach ${new URL(args.url).hostname}${/timeout|aborted/i.test(reason) ? " (it took too long to answer)" : ""}. Check the address, or paste the text instead.`);
+      }
       if (!response.ok) throw new UserError(`Couldn't fetch ${args.url}: HTTP ${response.status}`);
       const length = Number(response.headers.get("content-length") ?? 0);
       if (length > MAX_BYTES) throw new UserError("That page is too large to use as a source (2 MB limit).");
-      const raw = (await response.text()).slice(0, MAX_BYTES);
+      // Reads at most the limit: a page without Content-Length can't fill memory.
+      const raw = await readTextCapped(response, MAX_BYTES);
       const type = response.headers.get("content-type") ?? "";
       if (type.includes("html")) {
         const parsed = htmlToText(raw);

@@ -7,7 +7,7 @@ import { billingReady, createCheckoutSession, productIdFor } from "../server/lib
 import { activeSubscription } from "../server/lib/billing/webhooks.js";
 import { workspaceOf } from "../server/lib/catalog.js";
 import { UserError } from "../server/lib/errors.js";
-import { requireHuman } from "../server/lib/identity.js";
+import { requireHuman, requireWorkspaceManager } from "../server/lib/identity.js";
 import { nowIso } from "../server/lib/json.js";
 import { PLANS } from "../server/lib/plans.js";
 import { newId } from "../server/lib/storage.js";
@@ -48,6 +48,8 @@ export default defineAction({
   run: async ({ item, interval, origin }, ctx) => {
     const who = requireHuman(ctx, "Paying for Crewcut");
     const isTopUp = item.startsWith("topup-");
+    // Anyone in a workspace may buy it credits; choosing its plan is for its owner and admins.
+    if (!isTopUp) await requireWorkspaceManager(who, "Choosing the plan");
     const ready = billingReady();
     if (isTopUp ? !ready.topUps : !ready.subscriptions) throw new UserError("Payments aren't switched on yet. Check back soon.", 503);
 

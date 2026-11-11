@@ -4,6 +4,7 @@ import { defineEventHandler, getQuery } from "h3";
 
 import { getDb, schema } from "../../../db/index.js";
 import { isAdmin, parsePayload, currentPayload, storeSharedFile } from "../../../lib/catalog.js";
+import { BodyTooLargeError, readBodyCapped } from "../../../lib/http.js";
 import { nowIso, toJson } from "../../../lib/json.js";
 import { sniffMedia } from "../../../lib/sniff.js";
 import { newId } from "../../../lib/storage.js";
@@ -34,8 +35,12 @@ export default defineEventHandler(async (event) => {
   if (!licence) return fail(400, "licence_required", "Say where the file comes from and under which licence, so every video that uses it can credit it.");
   const length = Number(event.req.headers.get("content-length") ?? 0);
   if (length > MAX_BYTES) return fail(413, "too_large", "Catalog audio is limited to 60 MB.");
-  const bytes = new Uint8Array(await event.req.arrayBuffer());
-  if (bytes.byteLength > MAX_BYTES) return fail(413, "too_large", "Catalog audio is limited to 60 MB.");
+  let bytes: Uint8Array;
+  try {
+    bytes = await readBodyCapped(event.req, MAX_BYTES);
+  } catch (error) {
+    return error instanceof BodyTooLargeError ? fail(413, "too_large", "Catalog audio is limited to 60 MB.") : fail(400, "upload_interrupted", "The upload was interrupted. Try again.");
+  }
   const type = sniffMedia(bytes);
   if (!type || (type.kind !== "audio" && type.ext !== "webm")) return fail(415, "unsupported", "Upload MP3, WAV, M4A or OGG audio.");
   const mime = type.kind === "audio" ? type.mime : "audio/webm";

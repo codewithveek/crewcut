@@ -20,6 +20,9 @@ export default defineAction({
     status: z.enum(["draft", "published"]).optional(),
     sort: z.number().int().min(0).max(10_000).optional(),
   }),
+  // Mini-apps can't call it: publishing a pack (status) is people-only, and a
+  // mini-app's call can pass for one made from the app.
+  toolCallable: false,
   run: async ({ packId, name, description, tier, status, sort }, ctx) => {
     const who = requireAdmin(ctx);
     if (status !== undefined) requireHuman(ctx, "Publishing or unpublishing a pack");

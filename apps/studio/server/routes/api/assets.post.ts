@@ -6,6 +6,7 @@ import { defineEventHandler, getQuery } from "h3";
 import { getDb, schema } from "../../db/index.js";
 import { toJson } from "../../lib/json.js";
 import { fileUrl, putFile } from "../../lib/blob-store.js";
+import { BodyTooLargeError, readBodyCapped } from "../../lib/http.js";
 import { sniffMedia as sniff } from "../../lib/sniff.js";
 import { newId } from "../../lib/storage.js";
 
@@ -52,8 +53,19 @@ export default defineEventHandler(async (event) => {
   if (Number(usage?.bytes ?? 0) + Math.max(length, 0) > QUOTA_BYTES) {
     return Response.json({ error: { code: "quota", message: `Uploads are limited to ${Math.round(QUOTA_BYTES / 1024 ** 3)} GB per account. Delete media you no longer use to make room.` } }, { status: 413 });
   }
-  const bytes = new Uint8Array(await event.req.arrayBuffer());
-  if (bytes.byteLength > MAX_BYTES) return Response.json({ error: { code: "too_large", message: "Files are limited to 100 MB." } }, { status: 413 });
+  // Stops reading at the limit: Content-Length can be missing or wrong (chunked uploads).
+  let bytes: Uint8Array;
+  try {
+    bytes = await readBodyCapped(event.req, MAX_BYTES);
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) return Response.json({ error: { code: "too_large", message: "Files are limited to 100 MB." } }, { status: 413 });
+    return Response.json({ error: { code: "upload_interrupted", message: "The upload was interrupted. Try again." } }, { status: 400 });
+  }
+  if (bytes.byteLength === 0) return Response.json({ error: { code: "empty", message: "That file is empty." } }, { status: 400 });
+  // The real size, now that it's known (the first check trusted Content-Length).
+  if (Number(usage?.bytes ?? 0) + bytes.byteLength > QUOTA_BYTES) {
+    return Response.json({ error: { code: "quota", message: `Uploads are limited to ${Math.round(QUOTA_BYTES / 1024 ** 3)} GB per account. Delete media you no longer use to make room.` } }, { status: 413 });
+  }
   const sniffed = sniff(bytes);
   if (!sniffed) return Response.json({ error: { code: "unsupported", message: "Upload WAV, MP3, M4A, OGG, MP4, WebM, PNG, JPEG, GIF or WebP." } }, { status: 415 });
   // A WebM recorded from the microphone is audio-only; the role says so.
