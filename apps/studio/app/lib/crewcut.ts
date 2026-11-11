@@ -43,18 +43,24 @@ export function askAgent(message: string, context?: Record<string, unknown>): vo
  * Resolves false when the run couldn't start (most often: no AI model connected).
  */
 export async function runAutopilot(videoId: string, resume = false): Promise<boolean> {
-  const result = await sendToAgentChatAndConfirm({
-    chatTarget: "local",
-    message: resume
-      ? `Continue autopilot for video ${videoId}: load the crewcut-autopilot skill, check where it got to with get-video, and carry on from there to an exported draft.`
-      : `Run autopilot for video ${videoId}: load the crewcut-autopilot skill and make the whole video, from ideas to an exported draft, without waiting for me.`,
-    context: JSON.stringify({ videoId, autopilot: true }),
-    submit: true,
-    newTab: true,
-    background: true,
-    openSidebar: false,
-  } as Parameters<typeof sendToAgentChatAndConfirm>[0], { timeoutMs: 20_000 });
-  return result.delivered;
+  const send = (openSidebar: boolean, timeoutMs: number) =>
+    sendToAgentChatAndConfirm({
+      chatTarget: "local",
+      message: resume
+        ? `Continue autopilot for video ${videoId}: load the crewcut-autopilot skill, check where it got to with get-video, and carry on from there to an exported draft.`
+        : `Run autopilot for video ${videoId}: load the crewcut-autopilot skill and make the whole video, from ideas to an exported draft, without waiting for me.`,
+      context: JSON.stringify({ videoId, autopilot: true }),
+      submit: true,
+      newTab: true,
+      background: true,
+      openSidebar,
+    } as Parameters<typeof sendToAgentChatAndConfirm>[0], { timeoutMs });
+  // The chat takes the run only once its panel has mounted. In a browser where
+  // the agent panel was never opened nothing is listening, so open it and send
+  // again (the person then sees the crew start) before calling it a failure.
+  const quiet = await send(false, 8_000);
+  if (quiet.delivered) return true;
+  return (await send(true, 25_000)).delivered;
 }
 
 /** Opens the agent with context attached and the composer ready for the person's request. */
