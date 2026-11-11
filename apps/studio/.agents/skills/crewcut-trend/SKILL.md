@@ -14,6 +14,8 @@ scope: runtime
 
 ## Steps
 
+0. Load this stage's actions in one call: `tool-search` with only `{"names": ["find-trends", "save-learning", "add-source"]}`. Send no other fields.
+
 1. `get-video` for the brief, then `save-learning` (no text) to read the workspace's learnings — ideas should extend what already works.
 2. Gather evidence from sources the person could open themselves:
    - Outlier videos in the niche (views far above their channel's median).

@@ -27,12 +27,19 @@ export const STAGE_PROMPTS: Record<Stage, (videoId: string) => string> = {
   analytics: (id) => `Get the first week's results for video ${id}, explain how it did, and note what to repeat next time.`,
 };
 
+/**
+ * Starts a crew task (a stage, a revision, a template video) in a chat of its
+ * own, so it never lands in whatever unrelated chat was open. A blank chat
+ * that's already open is reused instead of leaving an empty tab behind.
+ */
 export function askAgent(message: string, context?: Record<string, unknown>): void {
   sendToAgentChat({
     message,
     ...(context ? { context: JSON.stringify(context) } : {}),
     submit: true,
     openSidebar: true,
+    newTab: true,
+    reuseEmptyTab: true,
   } as Parameters<typeof sendToAgentChat>[0]);
 }
 
