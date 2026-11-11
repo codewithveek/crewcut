@@ -375,8 +375,36 @@ export async function compositionAt(videoId: string, version: number): Promise<C
   return row ? parseComposition(JSON.parse(row.body)) : null;
 }
 
-export async function saveComposition(video: VideoRecord, composition: Composition, label: string, actor: Identity = video.who): Promise<number> {
+/** True for the database's "this version already exists" refusal (the unique index on video + version). */
+export function isVersionConflict(error: unknown): boolean {
+  for (let cause: unknown = error, depth = 0; cause && depth < 5; depth += 1) {
+    const info = cause as { code?: unknown; message?: unknown; cause?: unknown };
+    if (info.code === "23505" || (typeof info.message === "string" && /compositions_video_version_unique|duplicate key value/i.test(info.message))) return true;
+    cause = info.cause;
+  }
+  return false;
+}
+
+/**
+ * Saves a composition as the video's next version. Versions are unique per
+ * video, so when someone else saved at the same moment the number is taken:
+ * by default this takes the next one (right for writes that replace the whole
+ * video: a restore, a fresh compose). An edit worked out from the previous
+ * version passes `onConflict: "fail"` and applies itself again on top of the
+ * other save instead (see editComposition), so neither is lost.
+ */
+export async function saveComposition(video: VideoRecord, composition: Composition, label: string, actor: Identity = video.who, options: { onConflict?: "next" | "fail" } = {}): Promise<number> {
   const validated = parseComposition(composition);
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await insertComposition(video, validated, label, actor);
+    } catch (error) {
+      if (options.onConflict === "fail" || attempt >= 4 || !isVersionConflict(error)) throw error;
+    }
+  }
+}
+
+async function insertComposition(video: VideoRecord, validated: Composition, label: string, actor: Identity): Promise<number> {
   const current = await getDb()
     .select({ version: schema.compositions.version })
     .from(schema.compositions)
@@ -396,7 +424,11 @@ export async function saveComposition(video: VideoRecord, composition: Compositi
     ownerEmail: video.row.ownerEmail,
     orgId: video.row.orgId,
   });
-  await updateVideo(video.row.id, { compositionVersion: version });
+  // Never backwards: of two saves finishing close together, the later version must win whichever write lands last.
+  await getDb()
+    .update(schema.videos)
+    .set({ compositionVersion: sql`greatest(${schema.videos.compositionVersion}, ${version})`, updatedAt: nowIso() })
+    .where(eq(schema.videos.id, video.row.id));
   return version;
 }
 

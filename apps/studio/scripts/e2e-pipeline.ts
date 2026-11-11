@@ -132,6 +132,13 @@ async function main(): Promise<void> {
   const history = await call<{ versions: Array<{ label: string; authorKind: string }> }>("get-composition", { videoId }, human);
   check(history.versions.some((entry) => entry.label.startsWith("Agent: Make the hook punchier") && entry.authorKind === "agent"), "agent edits are labelled as the agent's in history");
 
+  // Edits that arrive together (quick nudges in the editor, the agent and a person at once) must all land.
+  const together = [701, 702, 703, 704, 705, 706];
+  const landed = await Promise.all(together.map((value, index) => call<{ version: number }>("set-keyframe", { videoId, clipId: scene2.id, layerId: layer.id, property: "y", atMs: 100 + index * 100, value, easing: "linear" }, human)));
+  check(new Set(landed.map((entry) => entry.version)).size === together.length, "edits saved at the same moment each get their own version");
+  const afterTogether = JSON.stringify((await call<{ composition: unknown }>("get-composition", { videoId }, human)).composition);
+  check(together.every((value) => afterTogether.includes(`"value":${value}`)), "and none of them overwrites another");
+
   // 8. Variety guard, render job, publish gate.
   const variety = await call<{ tooSimilar: boolean; comparisons: unknown[] }>("check-sameness", { videoId }, human);
   check(variety.tooSimilar === false, "the variety guard runs (no look-alikes in a fresh workspace)");
@@ -232,6 +239,10 @@ async function checkCreditsAndBilling(): Promise<void> {
     await handleBachsEvent(subscription("customer.subscription.deleted", { status: "canceled" }));
     state = await credits();
     check(state.balance.plan === "free" && state.balance.monthly <= 100 && state.balance.topup === before + 300, "cancelling ends at Free, capped to Free's credits, bought credits kept");
+    // Deliveries aren't ordered: an "updated" event from before the cancellation arriving late must not bring the plan back.
+    await handleBachsEvent({ ...subscription("customer.subscription.updated"), created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString() });
+    state = await credits();
+    check(state.balance.plan === "free", "a late event from before the cancellation doesn't bring the plan back");
     await expectFailure(call("start-checkout", { item: "creator" }, agent), /needs a person|signed-in app UI/, "the agent can't start a payment");
 
     // Spending across both pools is recorded per pool.

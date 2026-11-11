@@ -175,13 +175,34 @@ export const useEditor = create<EditorState>((set, get) => {
     }, REFRESH_AFTER_SAVE_MS);
   }
 
+  /**
+   * Writes go to the server one at a time, in the order they were made.
+   * Quick edits (arrow-key nudges, a drag and then a click) used to be sent
+   * together: the server worked each out from the same starting point and
+   * one could overwrite the other. Each edit is still shown at once; only
+   * the sending waits its turn.
+   */
+  let writes: Promise<unknown> = Promise.resolve();
+  function inTurn<T>(run: () => Promise<T>): Promise<T> {
+    const turn = writes.then(run);
+    writes = turn.catch(() => undefined);
+    return turn;
+  }
+  /** A save failed while later edits were already on screen: what's shown may not match the server until we re-read. */
+  let resyncWhenIdle = false;
+
   async function save(label: string, run: () => Promise<{ version: number; composition?: Composition }>, previous: Composition): Promise<boolean> {
+    const videoId = get().videoId;
     set((state) => ({ saving: state.saving + 1 }));
     try {
-      const result = await run();
+      const result = await inTurn(run);
+      // The person opened another video while this was saving: it's saved, and not this screen's business.
+      if (get().videoId !== videoId) return true;
       set((state) => ({
         version: result.version,
-        ...(result.composition ? { composition: result.composition } : {}),
+        // Later edits are already applied on screen on top of this one. The server's copy of this
+        // edit alone would briefly undo them, so it's adopted only when nothing else is in flight.
+        ...(result.composition && state.saving === 1 && !state.previewBase ? { composition: result.composition } : {}),
         undoStack: [...state.undoStack, result.version],
         redoStack: [],
         lastSavedAt: Date.now(),
@@ -189,11 +210,20 @@ export const useEditor = create<EditorState>((set, get) => {
       refreshSoon();
       return true;
     } catch (error) {
-      set({ composition: previous });
-      toast.error(`${label}: ${errorMessage(error)}`);
+      if (get().videoId === videoId) {
+        // Alone, the edit is simply taken back. With later edits on top of it, taking it back
+        // would take those with it: keep the screen and re-read the truth once they've been sent.
+        if (get().saving === 1) set({ composition: previous });
+        else resyncWhenIdle = true;
+        toast.error(`${label}: ${errorMessage(error)}`);
+      }
       return false;
     } finally {
       set((state) => ({ saving: state.saving - 1 }));
+      if (resyncWhenIdle && get().saving === 0) {
+        resyncWhenIdle = false;
+        void get().refresh();
+      }
     }
   }
 
@@ -350,7 +380,9 @@ export const useEditor = create<EditorState>((set, get) => {
       const { videoId } = get();
       set((state) => ({ saving: state.saving + 1 }));
       try {
-        const result = await editorWrite<{ version: number; composition?: Composition }>("restore-composition-version", { videoId, version, returnFull: true });
+        // In turn with edits still being sent, so an undo never lands before the edit it follows.
+        const result = await inTurn(() => editorWrite<{ version: number; composition?: Composition }>("restore-composition-version", { videoId, version, returnFull: true }));
+        if (get().videoId !== videoId) return;
         set((state) => ({
           version: result.version,
           ...(result.composition ? { composition: result.composition } : {}),

@@ -67,13 +67,21 @@ function productIdOf(data: Data): string | undefined {
   return str(data.product_id) ?? str(obj(data.product).id) ?? str(obj(item.price).product_id) ?? str(item.product_id) ?? str(obj(item.product).id);
 }
 
-async function applySubscription(event: BachsEvent, deleted: boolean): Promise<string> {
+async function applySubscription(event: BachsEvent, deleted: boolean, fresh = false): Promise<string> {
   const data = event.data;
   const subscriptionId = str(data.subscription_id) ?? str(obj(data.subscription).subscription_id) ?? str(data.id);
   if (!subscriptionId) return "no subscription id";
   const workspace = await workspaceFor(data);
   if (!workspace) return `subscription ${subscriptionId}: no workspace (metadata.workspace or a known customer)`;
   await rememberCustomer(workspace, data);
+
+  // Deliveries aren't ordered: a late "updated" must not bring back a subscription a newer
+  // "deleted" already ended. State just read back from Bachs (`fresh`) is always the newest.
+  const eventAt = fresh ? nowIso() : (str(event.created_at) ?? nowIso());
+  const [known] = await getDb().select({ lastEventAt: schema.billingSubscriptions.lastEventAt }).from(schema.billingSubscriptions).where(eq(schema.billingSubscriptions.id, subscriptionId)).limit(1);
+  if (known?.lastEventAt && Number.isFinite(Date.parse(eventAt)) && Date.parse(eventAt) < Date.parse(known.lastEventAt)) {
+    return `subscription ${subscriptionId}: older event ignored (a newer one was already applied)`;
+  }
 
   const productId = productIdOf(data);
   const mapped = itemForProduct(productId);
@@ -90,6 +98,7 @@ async function applySubscription(event: BachsEvent, deleted: boolean): Promise<s
     productId: productId ?? "",
     currentPeriodEnd: str(data.current_period_end) ?? null,
     cancelAtPeriodEnd: data.cancel_at_period_end === true,
+    lastEventAt: eventAt,
     updatedAt: nowIso(),
   };
   await getDb().insert(schema.billingSubscriptions).values({ id: subscriptionId, ...values }).onConflictDoUpdate({ target: schema.billingSubscriptions.id, set: values });
@@ -116,7 +125,7 @@ async function applyInvoicePaid(event: BachsEvent): Promise<string> {
   const data: Data = { ...subscription, subscription_id: subscriptionId, metadata: { ...obj(event.data.metadata), ...obj(subscription.metadata) }, customer: { ...obj(event.data.customer), ...obj(subscription.customer) } };
   if (!str(data.current_period_start)) data.current_period_start = event.data.period_start;
   if (!str(data.current_period_end)) data.current_period_end = event.data.period_end;
-  return applySubscription({ ...event, data }, false);
+  return applySubscription({ ...event, data }, false, true);
 }
 
 async function applyPayment(event: BachsEvent): Promise<string> {

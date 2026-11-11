@@ -217,6 +217,30 @@ export default runMigrations(
       name: "crewcut-credit-period-source",
       sql: `ALTER TABLE credit_balances ADD COLUMN IF NOT EXISTS period_source TEXT NOT NULL DEFAULT 'calendar'`,
     },
+    {
+      // One row per video and version, so two edits saved at the same moment
+      // can't both become "version 12" (one of them was then lost). Videos
+      // that already have such twins keep them: the index is only made when
+      // there are none, and the app works as before without it.
+      version: 10,
+      name: "crewcut-composition-version-unique",
+      sql: {},
+      run: async (exec) => {
+        const { rows } = await exec.execute("SELECT count(*)::int AS twins FROM (SELECT 1 FROM compositions GROUP BY video_id, version HAVING count(*) > 1) t");
+        const twins = Number((rows[0] as { twins?: unknown } | undefined)?.twins ?? 0);
+        if (twins > 0) {
+          console.warn(`[db] ${twins} video version(s) were saved twice by simultaneous edits; versions stay non-unique until those are cleaned up.`);
+          return;
+        }
+        await exec.execute("CREATE UNIQUE INDEX IF NOT EXISTS compositions_video_version_unique ON compositions (video_id, version)");
+      },
+    },
+    {
+      // Webhooks can arrive out of order: remember how new the latest applied one was.
+      version: 11,
+      name: "crewcut-billing-event-order",
+      sql: `ALTER TABLE billing_subscriptions ADD COLUMN IF NOT EXISTS last_event_at TEXT`,
+    },
   ],
   { table: "crewcut_migrations" },
 );

@@ -23,6 +23,18 @@ export const AUTOPILOT_STALL_MS = 12 * 60 * 1000;
 /** Automatic resumes after a stall, before only the person can resume it. */
 export const AUTOPILOT_MAX_AUTO_RESUMES = 3;
 
+/** Crewcut AI credits one autopilot run may use before it stops and asks (CREWCUT_AUTOPILOT_BUDGET_CREDITS). Resuming starts a new allowance. */
+export const AUTOPILOT_BUDGET_CREDITS = Math.max(10, Number(process.env.CREWCUT_AUTOPILOT_BUDGET_CREDITS ?? 150));
+
+/** Credits a video has used on Crewcut AI since a moment (people's own keys cost no credits and don't count). */
+export async function autopilotCreditsSpent(videoId: string, since: string): Promise<number> {
+  const [row] = await getDb()
+    .select({ millicredits: sql<number>`coalesce(sum(${schema.aiUsage.millicredits}), 0)` })
+    .from(schema.aiUsage)
+    .where(sql`${schema.aiUsage.videoId} = ${videoId} and ${schema.aiUsage.source} = 'managed' and (${schema.aiUsage.createdAt})::timestamptz >= (${since})::timestamptz`);
+  return Number(row?.millicredits ?? 0) / 1000;
+}
+
 /** Every gate notifies; publish stays "approve" (the schema and gateFor enforce that). */
 export const AUTOPILOT_GATE_POLICY: GatePolicy = gatePolicySchema.parse({ trend: "notify", research: "notify", script: "notify", qa: "notify", motion: "notify", voice: "notify", analytics: "notify" });
 

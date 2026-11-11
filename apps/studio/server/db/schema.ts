@@ -430,6 +430,8 @@ export const billingSubscriptions = table("billing_subscriptions", {
   productId: text("product_id").notNull().default(""),
   currentPeriodEnd: text("current_period_end"),
   cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  /** When the latest event applied to this subscription was created at Bachs (events can arrive out of order). */
+  lastEventAt: text("last_event_at"),
   updatedAt: text("updated_at").notNull().default(now()),
 });
 

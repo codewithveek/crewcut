@@ -3,13 +3,15 @@ import { type Composition, clipEndMs, visualTracks } from "@crewcut/composition"
 import type { Stage } from "@crewcut/contracts";
 import { completeStage, runQa, startStage } from "@crewcut/pipeline";
 
-import { AUTOPILOT_GATE_POLICY, AUTOPILOT_MAX_QA_ROUNDS, autopilotDriving, readAutopilot, updateAutopilot, withDecision } from "./autopilot.js";
+import { AUTOPILOT_BUDGET_CREDITS, AUTOPILOT_GATE_POLICY, AUTOPILOT_MAX_QA_ROUNDS, autopilotCreditsSpent, autopilotDriving, readAutopilot, updateAutopilot, withDecision } from "./autopilot.js";
+import { UserError } from "./errors.js";
 import type { Identity } from "./identity.js";
 import { nowIso } from "./json.js";
 import {
   type VideoRecord,
   gatePolicyOf,
   getProject,
+  isVersionConflict,
   latestAudit,
   latestComposition,
   latestScript,
@@ -49,6 +51,19 @@ export async function finishStage(video: VideoRecord, stage: Stage, options: { n
   if (status === "notified") {
     const reason = onAutopilot ? `Autopilot, switched on by ${autopilot.startedBy ?? "the owner"}${options.note ? `: ${options.note}` : ""}` : (options.note ?? "No sign-off needed for this step");
     await recordApproval(video, { stage, decision: "notified", reason: reason.slice(0, 1000), actor: { ...video.who, kind: "agent", actorId: "agent" } });
+  }
+  // Hands-off doesn't mean open-ended: once a run has used its credit limit it stops and asks.
+  if (onAutopilot) {
+    const since = autopilot.lastResumeAt ?? autopilot.startedAt ?? video.row.createdAt;
+    const spent = await autopilotCreditsSpent(video.row.id, since).catch(() => 0);
+    if (spent >= AUTOPILOT_BUDGET_CREDITS) {
+      const next = await updateAutopilot(video.row.id, (state) =>
+        state.status === "running"
+          ? { ...withDecision(state, stage, `Stopped at the ${AUTOPILOT_BUDGET_CREDITS}-credit limit for one run.`), status: "needs_you", reason: `This video has used ${Math.round(spent)} AI credits, the limit for one autopilot run (${AUTOPILOT_BUDGET_CREDITS}). Have a look at it, then resume autopilot to let it carry on.` }
+          : state,
+      );
+      video.row = { ...video.row, autopilot: JSON.stringify(next) };
+    }
   }
   return status;
 }
@@ -144,12 +159,26 @@ export async function editComposition(
   label: string,
   edit: (composition: Composition) => Composition,
 ): Promise<{ version: number; composition: Composition }> {
-  const current = await latestComposition(video.row.id);
-  if (!current) throw new Error("This video has nothing to edit yet. Ask the motion director to create the draft video first.");
-  const next = edit(current.composition);
-  const version = await saveComposition(video, next, label);
-  return { version, composition: next };
+  // Two edits arriving together (quick edits in the editor, the agent and a
+  // person, two tabs) would both read the same latest version and one would
+  // overwrite the other. Versions are unique per video, so the loser of that
+  // race is refused by the database; it then re-reads and applies its edit on
+  // top of the winner's.
+  for (let attempt = 0; ; attempt += 1) {
+    const current = await latestComposition(video.row.id);
+    if (!current) throw new UserError("This video has nothing to edit yet. Ask the motion director to create the draft video first.");
+    const next = edit(current.composition);
+    try {
+      const version = await saveComposition(video, next, label, video.who, { onConflict: "fail" });
+      return { version, composition: next };
+    } catch (error) {
+      // Each round has one winner, so a burst of N edits needs up to N rounds; a short random wait spreads them out.
+      if (attempt >= 11 || !isVersionConflict(error)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 5 + Math.random() * 25 * (attempt + 1)));
+    }
+  }
 }
+
 
 /** A compact view of a composition for the agent (the full JSON is available via get-composition). */
 export function summarizeComposition(composition: Composition) {
