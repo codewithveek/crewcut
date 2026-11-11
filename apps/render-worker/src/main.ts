@@ -58,7 +58,7 @@ async function runQueue(databaseUrl: string): Promise<void> {
       UPDATE render_jobs SET status = 'running', locked_by = ${WORKER_ID}, locked_at = now(), attempts = attempts + 1, updated_at = now()
       WHERE id = (
         SELECT id FROM render_jobs
-        WHERE status = 'queued' OR (status = 'running' AND locked_at < now() - interval '30 minutes' AND attempts < ${MAX_ATTEMPTS})
+        WHERE status = 'queued' OR (status = 'running' AND locked_at::timestamptz < now() - interval '30 minutes' AND attempts < ${MAX_ATTEMPTS})
         ORDER BY created_at
         FOR UPDATE SKIP LOCKED
         LIMIT 1
@@ -71,7 +71,8 @@ async function runQueue(databaseUrl: string): Promise<void> {
     console.log(`[worker] job ${job.id} (attempt ${job.attempts})`);
     let lastWrite = 0;
     try {
-      const payload = renderJobPayloadSchema.parse(job.payload);
+      // payload is a text column (JSON): parse it before validating.
+      const payload = renderJobPayloadSchema.parse(typeof job.payload === "string" ? JSON.parse(job.payload) : job.payload);
       const result = await runRenderJob(payload, {
         storageDir: STORAGE_DIR,
         onProgress: ({ fraction, stage }) => {
