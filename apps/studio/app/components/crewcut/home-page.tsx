@@ -21,6 +21,7 @@ import { STAGE_LABELS, STAGE_PROMPTS, askAgent, errorMessage } from "@/lib/crewc
 import { cn } from "@/lib/utils";
 
 import { AUTOPILOT_HINT, launchAutopilot, useAutopilotList } from "./autopilot/autopilot";
+import { openUpgrade, showActionError, usePlan } from "./billing/upgrade";
 import { CreateProjectDialog } from "./dashboard/create-project";
 import { EmptyProjects, ProjectCard, ProjectGridSkeleton, ProjectRow } from "./dashboard/project-card";
 import { useLoadDemo, useVideoList } from "./dashboard/use-videos";
@@ -136,6 +137,8 @@ export function HomePage() {
   const settledSearch = useDebouncedValue(search.trim(), 250);
   const { videos: recent, assetUrls, total: matches, loading, refreshing } = useVideoList({ query: settledSearch, pageSize: settledSearch ? 12 : 8 });
   const start = useActionMutation("start-pipeline");
+  // Autopilot is a paid feature: the switch offers the plans instead of failing after "Make the video".
+  const { plan } = usePlan();
   const demo = useLoadDemo();
 
   // "Make it with agents" from the mobile nav lands here with ?focus=prompt.
@@ -160,7 +163,7 @@ export function HomePage() {
         if (await launchAutopilot(result.videoId)) toast.success("Autopilot is making your video", { description: "You can close this page. We'll show you when it's ready." });
       } else askAgent(STAGE_PROMPTS.trend(result.videoId), { videoId: result.videoId, idea: brief.trim() });
     } catch (error) {
-      toast.error(errorMessage(error));
+      showActionError(error);
     }
   }
 
@@ -250,7 +253,7 @@ export function HomePage() {
             />
             <div className="flex items-center gap-3">
               <label className="flex cursor-pointer items-center gap-2 text-[13px] font-medium text-ds-text" title={AUTOPILOT_HINT}>
-                <Switch label="Autopilot" checked={autopilot} onCheckedChange={setAutopilot} />
+                <Switch label="Autopilot" checked={autopilot} onCheckedChange={(on) => (on && plan && !plan.autopilot ? openUpgrade("autopilot") : setAutopilot(on))} />
                 Autopilot
               </label>
               <Button type="submit" disabled={brief.trim().length < 3 || start.isPending} className="pc-press">

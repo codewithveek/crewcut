@@ -426,7 +426,7 @@ async function checkCatalog(): Promise<void> {
   check(listed.templates.some((template) => template.id === draft.itemId && template.tier === "pro"), "once published, everyone sees it with its Pro tier");
   const pro = await call<{ videoId: string; tier: string }>("use-template", { templateId: draft.itemId, ratio: "1:1" }, other);
   check(pro.tier === "pro", "anyone can start from a Pro template");
-  await expectFailure(call("render-video", { videoId: pro.videoId }, other), /uses Pro content \(Orbit Pro template\)/, "exporting Pro content needs Pro, and the message names it once");
+  await expectFailure(call("render-video", { videoId: pro.videoId }, other), /uses Pro content: Orbit Pro template\./, "exporting Pro content needs Pro, and the message names it once");
   await expectFailure(call("set-workspace-plan", { workspace: other.userEmail, plan: "pro" }, agent), /needs a person|signed-in app UI/, "the agent can't hand out Pro");
   await call("set-workspace-plan", { workspace: other.userEmail, plan: "pro" }, human);
   const rendered = await call<{ renderId: string }>("render-video", { videoId: pro.videoId }, other);

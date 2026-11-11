@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ds";
 import { STAGE_LABELS, errorMessage, formatAgo, runAutopilot } from "@/lib/crewcut";
 
+import { showActionError } from "../billing/upgrade";
+
 export { runAutopilot };
 import { cn } from "@/lib/utils";
 
@@ -120,7 +122,7 @@ export function AutopilotPanel({ videoId, info, exportProgress, onChanged }: { v
       void queryClient.invalidateQueries({ queryKey: ["action", "list-autopilot"] });
       onChanged();
     } catch (error) {
-      toast.error(errorMessage(error));
+      showActionError(error);
     } finally {
       setBusy(false);
     }
@@ -220,7 +222,7 @@ export function StartAutopilotButton({ videoId, onStarted }: { videoId: string; 
           void queryClient.invalidateQueries({ queryKey: ["action", "list-autopilot"] });
           onStarted();
         } catch (error) {
-          toast.error(errorMessage(error));
+          showActionError(error);
         } finally {
           setBusy(false);
         }

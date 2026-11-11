@@ -30,7 +30,7 @@ export interface PlanInfo {
 
 interface CreditsData {
   workspace: string;
-  balance: { plan: PlanId; periodStart: string; periodEnd: string; monthly: number; topup: number; available: number; allowance: number; topupExpiresAt: string | null };
+  balance: { plan: PlanId; periodStart: string; periodEnd: string; monthly: number; topup: number; available: number; allowance: number; freeGrantElsewhere?: boolean; topupExpiresAt: string | null };
   usedThisPeriod: Array<{ stage: string; credits: number; calls: number }>;
   ledger: Array<{ id: string; at: string; kind: string; credits: number; note: string }>;
   subscription: { plan: PlanId; interval: Interval; status: string; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean } | null;
@@ -75,25 +75,25 @@ function CreditMeter({ balance }: { balance: CreditsData["balance"] }) {
         <p className="text-sm text-foreground">
           <span className="pc-display text-3xl tabular-nums">{Math.max(0, balance.available).toLocaleString()}</span> <span className="text-muted-foreground">credits left</span>
         </p>
-        <p className="text-xs text-muted-foreground">Refills to {balance.allowance.toLocaleString()} on {day(balance.periodEnd)}</p>
+        {balance.allowance > 0 ? <p className="text-xs text-muted-foreground">Refills to {balance.allowance.toLocaleString()} on {day(balance.periodEnd)}</p> : null}
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-ds-surface-3" role="meter" aria-valuemin={0} aria-valuemax={balance.allowance} aria-valuenow={monthlyLeft} aria-label="This month's credits left">
         <div className="h-full rounded-full bg-ds-accent transition-[width] duration-500" style={{ width: `${share * 100}%` }} />
       </div>
       <p className="text-xs text-muted-foreground">
-        {monthlyLeft.toLocaleString()} of this month's {balance.allowance.toLocaleString()}
+        {balance.freeGrantElsewhere ? "Your free monthly credits belong to your first workspace. This one runs on bought credits, a paid plan, or your own AI key." : `${monthlyLeft.toLocaleString()} of this month's ${balance.allowance.toLocaleString()}`}
         {balance.topup > 0 ? ` · ${balance.topup.toLocaleString()} bought, usable until ${day(balance.topupExpiresAt)}` : ""}
       </p>
     </div>
   );
 }
 
-export function PlanCards({ plans, current, interval, onPick, busy, actionLabel }: { plans: PlanInfo[]; current?: PlanId; interval: Interval; onPick?: (plan: PlanId) => void; busy?: boolean; actionLabel?: (plan: PlanInfo) => string | null }) {
+export function PlanCards({ plans, current, interval, onPick, busy, actionLabel, featured: featuredPlan = "creator", className }: { plans: PlanInfo[]; current?: PlanId; interval: Interval; onPick?: (plan: PlanId) => void; busy?: boolean; actionLabel?: (plan: PlanInfo) => string | null; featured?: PlanId; className?: string }) {
   return (
-    <div className="grid gap-3 md:grid-cols-3">
+    <div className={cn("grid gap-3", className ?? "md:grid-cols-3")}>
       {plans.map((plan) => {
         const isCurrent = plan.id === current;
-        const featured = plan.id === "creator";
+        const featured = plan.id === featuredPlan;
         const label = actionLabel?.(plan) ?? null;
         return (
           <article key={plan.id} className={cn("flex flex-col gap-3 rounded-ds-lg bg-ds-surface p-4 shadow-[inset_0_0_0_1px_var(--ds-hairline)]", featured && "shadow-[inset_0_0_0_1.5px_var(--ds-accent)]")}>
@@ -102,7 +102,7 @@ export function PlanCards({ plans, current, interval, onPick, busy, actionLabel 
                 <h3 className="pc-display text-lg text-foreground">{plan.name}</h3>
                 <p className="text-[13px] text-muted-foreground">{plan.tagline}</p>
               </div>
-              {isCurrent ? <span className="shrink-0 whitespace-nowrap rounded-full bg-ds-surface-2 px-2 py-0.5 text-[11px] font-medium text-ds-text-2">Your plan</span> : featured ? <span className="shrink-0 whitespace-nowrap rounded-full bg-ds-accent px-2 py-0.5 text-[11px] font-medium text-ds-on-accent">Most popular</span> : null}
+              {isCurrent ? <span className="shrink-0 whitespace-nowrap rounded-full bg-ds-surface-2 px-2 py-0.5 text-[11px] font-medium text-ds-text-2">Your plan</span> : featured ? <span className="shrink-0 whitespace-nowrap rounded-full bg-ds-accent px-2 py-0.5 text-[11px] font-medium text-ds-on-accent">{featuredPlan === "creator" ? "Most popular" : "Includes this"}</span> : null}
             </header>
             <p className="text-foreground">
               {plan.price.month === 0 ? (
@@ -199,7 +199,7 @@ export function BillingPage() {
       </Panel>
 
       <Panel title="Pay nothing for AI with your own keys" description="Add your own Anthropic, OpenAI, Google or ElevenLabs key and the crew uses it instead: no credits, billed by your provider.">
-        <Button size="sm" variant="outline" className="pc-press" onClick={() => navigate("/connections")}>
+        <Button size="sm" variant="outline" className="pc-press" onClick={() => navigate("/settings/connections")}>
           <IconKey className="size-4" /> Add a key
         </Button>
       </Panel>

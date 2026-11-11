@@ -7,7 +7,7 @@ import { planOf, proContentIn, workspaceOf } from "../server/lib/catalog.js";
 import { planFor } from "../server/lib/plan-limits.js";
 import { queueRender } from "../server/lib/render-runner.js";
 import { latestComposition, loadVideo } from "../server/lib/store.js";
-import { UserError } from "../server/lib/errors.js";
+import { UpgradeRequiredError, UserError } from "../server/lib/errors.js";
 
 export default defineAction({
   description:
@@ -25,7 +25,7 @@ export default defineAction({
     // Pro content can be used and edited by anyone; exporting it needs the workspace to have Pro.
     const pro = await proContentIn(current.composition);
     if (pro.length > 0 && (await planOf(workspaceOf({ email: video.row.ownerEmail, orgId: video.row.orgId }))) !== "pro") {
-      throw new UserError(`This video uses Pro content (${pro.join(", ")}). Exporting it needs Crewcut Pro for this workspace. Swap those parts for free ones to export now.`);
+      throw new UpgradeRequiredError("pro-content", `This video uses Pro content: ${pro.join(", ")}. Exporting it needs Creator or Studio; swap those parts for free ones to export on Free.`);
     }
     // Free exports are 720p at most and end on the Crewcut ending card (added
     // for this export only; the saved video doesn't change).

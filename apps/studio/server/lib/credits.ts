@@ -34,8 +34,58 @@ export interface CreditBalance {
   available: number;
   /** The plan's monthly grant. */
   allowance: number;
+  /** On Free: this workspace gets no monthly credits, because the person's free credits belong to their first workspace. */
+  freeGrantElsewhere: boolean;
   topupExpiresAt: string | null;
 }
+
+/*
+ * Free credits are per person, not per workspace: anyone can make new
+ * workspaces, and each one starting with a fresh 100 credits would be free
+ * credits without end. The grant goes to the first workspace a person made
+ * (their own space when they never made one); later ones start at zero until
+ * they're on a paid plan or buy a top-up.
+ */
+const FIRST_WORKSPACE_TTL_MS = 5 * 60 * 1000;
+const firstWorkspaceCache = new Map<string, { at: number; first: boolean }>();
+
+async function isFirstWorkspace(workspace: Workspace): Promise<boolean> {
+  const hit = firstWorkspaceCache.get(workspace);
+  if (hit && Date.now() - hit.at < FIRST_WORKSPACE_TTL_MS) return hit.first;
+  let first = true;
+  try {
+    const db = getDb();
+    if (workspace.startsWith("user:")) {
+      // A person's own space counts only while they have made no workspace.
+      const email = workspace.slice("user:".length);
+      const made = rowsOf(await db.execute(sql`select 1 from organizations where lower(created_by) = ${email} limit 1`));
+      first = made.length === 0;
+    } else {
+      const oldest = rowsOf(
+        await db.execute(sql`
+          select o.id from organizations o
+           where lower(o.created_by) = (select lower(created_by) from organizations where id = ${workspace})
+           order by o.created_at asc, o.id asc limit 1`),
+      );
+      // An organisation we can't find (or the only one its maker has) keeps the grant.
+      first = oldest.length === 0 || oldest[0]?.id === workspace;
+    }
+  } catch {
+    // No organisations table (local tools, tests) or it can't be read: never take credits away on a guess.
+    first = true;
+  }
+  firstWorkspaceCache.set(workspace, { at: Date.now(), first });
+  if (firstWorkspaceCache.size > 2000) firstWorkspaceCache.delete(firstWorkspaceCache.keys().next().value as string);
+  return first;
+}
+
+/** Whole credits a workspace is granted each period on a plan. */
+export async function allowanceCredits(plan: PlanId, workspace: Workspace): Promise<number> {
+  if (plan === "free" && !(await isFirstWorkspace(workspace))) return 0;
+  return PLANS[plan].monthlyCredits;
+}
+
+const rowsOf = (result: unknown) => (Array.isArray(result) ? result : ((result as { rows?: Array<Record<string, unknown>> }).rows ?? [])) as Array<Record<string, unknown>>;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const YEAR_MS = 365 * DAY_MS;
@@ -67,7 +117,7 @@ async function ledger(entry: { workspace: Workspace; kind: string; pool: "monthl
   return inserted.length > 0;
 }
 
-function toBalance(row: typeof schema.creditBalances.$inferSelect): CreditBalance {
+function toBalance(row: typeof schema.creditBalances.$inferSelect, allowance: number): CreditBalance {
   const plan = normalizePlan(row.plan);
   const topupLive = !row.topupExpiresAt || Date.parse(row.topupExpiresAt) > Date.now();
   const monthly = Math.floor(row.monthlyMillicredits / MILLI);
@@ -80,7 +130,8 @@ function toBalance(row: typeof schema.creditBalances.$inferSelect): CreditBalanc
     monthly,
     topup,
     available: Math.floor((row.monthlyMillicredits + (topupLive ? row.topupMillicredits : 0)) / MILLI),
-    allowance: PLANS[plan].monthlyCredits,
+    allowance,
+    freeGrantElsewhere: plan === "free" && allowance === 0,
     topupExpiresAt: row.topupExpiresAt,
   };
 }
@@ -93,7 +144,8 @@ function toBalance(row: typeof schema.creditBalances.$inferSelect): CreditBalanc
 export async function ensureBalance(workspace: Workspace): Promise<CreditBalance> {
   const db = getDb();
   const plan = await planIdOf(workspace);
-  const allowance = PLANS[plan].monthlyCredits * MILLI;
+  const granted = await allowanceCredits(plan, workspace);
+  const allowance = granted * MILLI;
   const now = nowIso();
   let [row] = await db.select().from(schema.creditBalances).where(eq(schema.creditBalances.workspace, workspace)).limit(1);
 
@@ -106,7 +158,7 @@ export async function ensureBalance(workspace: Workspace): Promise<CreditBalance
       .returning();
     if (created[0]) {
       await ledger({ workspace, kind: "grant", pool: "monthly", millicredits: allowance, ref: `grant:${workspace}:${now.slice(0, 10)}:${plan}`, note: `${PLANS[plan].name} monthly credits` });
-      return toBalance(created[0]);
+      return toBalance(created[0], granted);
     }
     [row] = await db.select().from(schema.creditBalances).where(eq(schema.creditBalances.workspace, workspace)).limit(1);
     if (!row) throw new Error("Could not read the credit balance.");
@@ -151,7 +203,7 @@ export async function ensureBalance(workspace: Workspace): Promise<CreditBalance
 
   // The plan changed during the period.
   if (normalizePlan(row.plan) !== plan) {
-    const oldAllowance = PLANS[normalizePlan(row.plan)].monthlyCredits * MILLI;
+    const oldAllowance = (await allowanceCredits(normalizePlan(row.plan), workspace)) * MILLI;
     const delta = allowance > oldAllowance ? allowance - oldAllowance : Math.min(0, allowance - row.monthlyMillicredits);
     const updated = await db
       .update(schema.creditBalances)
@@ -163,11 +215,10 @@ export async function ensureBalance(workspace: Workspace): Promise<CreditBalance
     if (!row) throw new Error("Could not read the credit balance.");
   }
 
-  return toBalance(row);
+  return toBalance(row, granted);
 }
 
 type Rows = { rows?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>;
-const rowsOf = (result: unknown) => (Array.isArray(result) ? result : ((result as { rows?: Array<Record<string, unknown>> }).rows ?? [])) as Array<Record<string, unknown>>;
 
 /**
  * Take `amount` millicredits: this period's grant first, then bought credits.
@@ -289,6 +340,9 @@ export async function recentLedger(workspace: Workspace, limit = 30) {
 export class OutOfCreditsError extends Error {
   override readonly name = "OutOfCreditsError";
   readonly statusCode = 402;
+  /** The app opens the upgrade dialog (top-ups and plans) for this code. */
+  readonly errorCode = "upgrade:credits";
+  readonly expected = true;
 }
 
 /** Throws when the workspace has nothing left to spend. */

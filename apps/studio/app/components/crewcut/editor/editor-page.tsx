@@ -18,6 +18,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 
+import { openUpgrade, showActionError } from "@/components/crewcut/billing/upgrade";
+
 import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, FieldRow, IconButton, Select, SkeletonLines, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ds";
 import { SaveTemplateDialog } from "./save-template";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -401,6 +403,8 @@ function useExportResolution(): [ExportResolution, (value: ExportResolution) => 
   return [value, choose];
 }
 
+/** "840 KB" or "12.4 MB": a short export never reads as 0.0 MB. */
+const fileSizeLabel = (bytes: number) => (bytes < 1048576 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1048576).toFixed(1)} MB`);
 const resolutionLabel = (id: ExportResolution | undefined) => EXPORT_RESOLUTIONS.find((entry) => entry.id === (id ?? DEFAULT_EXPORT_RESOLUTION))?.label ?? "1080p";
 
 interface ExportDialogProps {
@@ -423,14 +427,26 @@ function ExportDialogContent({ open, onOpenChange, platform, onPlatformChange, c
   const burnCaptions = useEditor((state) => state.burnCaptions);
   const [starting, setStarting] = useState(false);
   const [watching, setWatching] = useState<string | null>(null);
-  const [resolution, setResolution] = useExportResolution();
+  const [chosenResolution, setResolution] = useExportResolution();
+  // An export started earlier (before a reload, or from the board) keeps its progress bar moving too.
+  const [exportsRunning, setExportsRunning] = useState(false);
+  const query = useActionQuery("get-video", { videoId, include: ["renders"] } as never, { enabled: open, refetchInterval: open && (watching || exportsRunning) ? 1500 : false } as never);
+  const data = query.data as { renders?: RenderRow[]; exportLimits?: { plan: string; maxShortSide: number; endingRequired: boolean } } | undefined;
+  const allRenders = data?.renders ?? [];
+  const anyRunning = allRenders.some((render) => render.status === "queued" || render.status === "running");
+  useEffect(() => setExportsRunning(anyRunning), [anyRunning]);
+  // What the plan allows, shown before exporting (the server applies the same limits).
+  const limits = data?.exportLimits ?? null;
+  const maxShortSide = limits?.maxShortSide ?? Number.POSITIVE_INFINITY;
+  const allowedResolutions = EXPORT_RESOLUTIONS.filter((entry) => entry.shortSide <= maxShortSide);
+  const topResolution = allowedResolutions[allowedResolutions.length - 1];
+  const resolution: ExportResolution = allowedResolutions.some((entry) => entry.id === chosenResolution) ? chosenResolution : (topResolution?.id ?? chosenResolution);
+  const limited = Boolean(limits && (limits.endingRequired || allowedResolutions.length < EXPORT_RESOLUTIONS.length));
   const output = exportSize(composition.width, composition.height, resolution);
-  const query = useActionQuery("get-video", { videoId, include: ["renders"] } as never, { enabled: open, refetchInterval: open && watching ? 1500 : false } as never);
-  const allRenders = (query.data as { renders?: RenderRow[] } | undefined)?.renders ?? [];
   const renders = allRenders.slice(0, 4);
   const active = renders.find((render) => render.id === watching);
   useEffect(() => {
-    if (active && (active.status === "done" || active.status === "failed")) {
+    if (active && (active.status === "done" || active.status === "failed" || active.status === "cancelled")) {
       if (active.status === "done") toast.success(platform ? "Export finished: ready to publish" : "Your video is ready to download");
       setWatching(null);
     }
@@ -448,12 +464,22 @@ function ExportDialogContent({ open, onOpenChange, platform, onPlatformChange, c
       setWatching(result.renderId);
       void query.refetch();
     } catch (error) {
-      toast.error(errorMessage(error));
+      showActionError(error);
     } finally {
       setStarting(false);
     }
   };
   const flow = usePublishFlow({ videoId, composition, platform, renders: allRenders, exporting: starting || Boolean(watching), startExport: () => void start() });
+  const stop = async (renderId: string) => {
+    try {
+      await callAction("cancel-render" as never, { videoId, renderId } as never);
+      if (watching === renderId) setWatching(null);
+      toast("Export stopped");
+      void query.refetch();
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
+  };
   const download = async (renderId: string) => {
     try {
       const { url } = (await callAction("get-render-link" as never, { videoId, renderId, download: true } as never)) as { url: string };
@@ -505,10 +531,14 @@ function ExportDialogContent({ open, onOpenChange, platform, onPlatformChange, c
             label="Resolution"
             className="w-full"
             value={resolution}
-            onChange={(value) => setResolution(value as ExportResolution)}
+            onChange={(value) => {
+              const entry = EXPORT_RESOLUTIONS.find((candidate) => candidate.id === value);
+              if (entry && entry.shortSide > maxShortSide) return void openUpgrade("export-hd", { detail: entry.label });
+              setResolution(value as ExportResolution);
+            }}
             options={EXPORT_RESOLUTIONS.map((entry) => {
               const size = exportSize(composition.width, composition.height, entry.id);
-              return { value: entry.id, label: `${entry.label} · ${size.width}×${size.height}` };
+              return { value: entry.id, label: `${entry.label} · ${size.width}×${size.height}${entry.shortSide > maxShortSide ? " · Creator" : ""}` };
             })}
           />
         </FieldRow>
@@ -524,8 +554,25 @@ function ExportDialogContent({ open, onOpenChange, platform, onPlatformChange, c
         </FieldRow>
         {/* The ending is a clip on the timeline: this switch adds or removes it there, so the editor still shows exactly what exports. */}
         <FieldRow label="Ending">
-          <Switch label="Crewcut ending" checked={ending !== null} onCheckedChange={(on) => toggleEnding(on)} />
+          <Switch
+            label="Crewcut ending"
+            checked={ending !== null || Boolean(limits?.endingRequired)}
+            onCheckedChange={(on) => {
+              if (limits?.endingRequired && !on) return void openUpgrade("no-ending");
+              toggleEnding(on);
+            }}
+          />
         </FieldRow>
+        {limited && limits ? (
+          <p className="rounded-ds-sm bg-ds-surface-2 px-2.5 py-2 text-xs text-ds-text-2">
+            {limits.plan} exports go up to {topResolution?.label ?? "720p"}
+            {limits.endingRequired ? " and end with the Crewcut ending card" : ""}.{" "}
+            <button type="button" className="font-medium text-ds-text underline underline-offset-2" onClick={() => openUpgrade("export-hd")}>
+              See plans
+            </button>{" "}
+            for 4K{limits.endingRequired ? " and no ending card" : ""}.
+          </p>
+        ) : null}
         {renders.length ? (
           <div className="flex flex-col gap-1.5">
             <p className="ds-overline text-ds-text-3">Previous exports</p>
@@ -541,7 +588,7 @@ function ExportDialogContent({ open, onOpenChange, platform, onPlatformChange, c
                       <div className="h-full rounded-full bg-ds-accent transition-[width] duration-500" style={{ width: `${Math.max(3, Math.round((render.progress ?? 0) * 100))}%` }} />
                     </div>
                   ) : (
-                    <p className={cn("text-[11px]", render.status === "failed" ? "text-ds-danger" : "text-ds-text-3")}>{render.status === "failed" ? (render.error ?? "Failed") : render.status === "done" ? `Ready · ${resolutionLabel(render.resolution)} · ${((render.outputBytes ?? 0) / 1048576).toFixed(1)} MB` : render.status}</p>
+                    <p className={cn("text-[11px]", render.status === "failed" ? "text-ds-danger" : "text-ds-text-3")}>{render.status === "failed" ? (render.error ?? "The export failed. Try again.").split("\n")[0]?.slice(0, 160) : render.status === "cancelled" ? "Stopped" : render.status === "done" ? `Ready · ${resolutionLabel(render.resolution)} · ${fileSizeLabel(render.outputBytes ?? 0)}` : render.status}</p>
                   )}
                 </div>
                 {render.status === "done" ? (
@@ -549,7 +596,12 @@ function ExportDialogContent({ open, onOpenChange, platform, onPlatformChange, c
                     <IconDownload className="size-4" /> Download
                   </Button>
                 ) : render.status === "running" || render.status === "queued" ? (
-                  <span className="font-mono text-xs tabular text-ds-text-2">{Math.round((render.progress ?? 0) * 100)}%</span>
+                  <>
+                    <span className="font-mono text-xs tabular text-ds-text-2">{render.status === "queued" ? "Waiting" : `${Math.round((render.progress ?? 0) * 100)}%`}</span>
+                    <Button size="sm" variant="ghost" onClick={() => void stop(render.id)}>
+                      Stop
+                    </Button>
+                  </>
                 ) : null}
               </div>
             ))}

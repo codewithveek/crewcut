@@ -1,6 +1,6 @@
 import { workspaceOf } from "./catalog.js";
 import { planIdOf } from "./credits.js";
-import { UserError } from "./errors.js";
+import { UpgradeRequiredError } from "./errors.js";
 import { type PlanDefinition, PLANS } from "./plans.js";
 
 /**
@@ -16,6 +16,6 @@ export async function planFor(owner: { email: string; orgId: string | null }): P
 export async function requireAutopilot(owner: { email: string; orgId: string | null }): Promise<void> {
   const plan = await planFor(owner);
   if (!plan.autopilot) {
-    throw new UserError("Autopilot is part of Creator and Studio. Upgrade on the Plan page to have the crew make videos hands-off.", 402);
+    throw new UpgradeRequiredError("autopilot", "Autopilot is part of Creator and Studio. Upgrade on the Plan page to have the crew make videos hands-off.");
   }
 }

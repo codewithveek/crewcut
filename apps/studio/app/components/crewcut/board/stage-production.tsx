@@ -7,6 +7,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { STAGE_PROMPTS, askAgent, errorMessage, formatAgo, formatBytes } from "@/lib/crewcut";
+
+import { showActionError } from "../billing/upgrade";
 import { plainStageNote } from "@/lib/decisions";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +25,7 @@ function useRun<T extends string>(name: T, label: string) {
         toast.success(label);
         return result;
       } catch (error) {
-        toast.error(errorMessage(error));
+        showActionError(error);
         return null;
       }
     },
@@ -100,7 +102,7 @@ export function MotionStage({ state }: { state: VideoState }) {
                 await approve.mutateAsync({ videoId, stage: "motion" } as never);
                 toast.success("Video approved");
               } catch (error) {
-                toast.error(errorMessage(error));
+                showActionError(error);
               }
             }}
           >
@@ -138,6 +140,7 @@ export function VoiceStage({ state }: { state: VideoState }) {
 
 export function PublishStage({ state }: { state: VideoState }) {
   const render = useRun("render-video", "Export started");
+  const stopExport = useRun("cancel-render", "Export stopped");
   const publish = useActionMutation("publish-post", { uiOnly: true });
   const [privacy, setPrivacy] = useState<"private" | "unlisted" | "public">("private");
   const videoId = state.video.id;
@@ -171,6 +174,8 @@ export function PublishStage({ state }: { state: VideoState }) {
                 </div>
               ) : job.status === "done" ? (
                 <span className="flex-1 text-xs text-supported">Done · {formatBytes(job.outputBytes)}</span>
+              ) : job.status === "cancelled" ? (
+                <span className="flex-1 text-xs text-muted-foreground">Stopped</span>
               ) : (
                 <span className="flex-1 truncate text-xs text-unsupported" title={job.error ?? ""}>
                   Failed: {job.error?.split("\n")[0]}
@@ -178,6 +183,11 @@ export function PublishStage({ state }: { state: VideoState }) {
               )}
               <span className="text-xs text-muted-foreground">{formatAgo(job.createdAt)}</span>
               {job.status === "done" ? <RenderDownload videoId={videoId} renderId={job.id} /> : null}
+              {job.status === "running" || job.status === "queued" ? (
+                <Button size="sm" variant="outline" className="pc-press" disabled={stopExport.pending} onClick={() => void stopExport.run({ videoId, renderId: job.id })}>
+                  Stop
+                </Button>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -222,7 +232,7 @@ export function PublishStage({ state }: { state: VideoState }) {
                     await publish.mutateAsync({ publishJobId: job.id, privacy } as never);
                     toast.success("Uploading to YouTube…");
                   } catch (error) {
-                    toast.error(errorMessage(error));
+                    showActionError(error);
                   }
                 }}
               >
@@ -250,7 +260,7 @@ function RenderDownload({ videoId, renderId }: { videoId: string; renderId: stri
           const result = (await link.mutateAsync({ videoId, renderId } as never)) as { url: string };
           window.open(result.url, "_blank", "noopener");
         } catch (error) {
-          toast.error(errorMessage(error));
+          showActionError(error);
         }
       }}
     >

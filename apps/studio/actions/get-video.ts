@@ -8,6 +8,7 @@ import { z } from "zod";
 import { getDb, schema } from "../server/db/index.js";
 import { autopilotView } from "../server/lib/autopilot.js";
 import { parseJsonLoose } from "../server/lib/json.js";
+import { planFor } from "../server/lib/plan-limits.js";
 import { summarizeComposition } from "../server/lib/pipeline-ops.js";
 import {
   latestAudit,
@@ -60,6 +61,9 @@ export default defineAction({
       want("approvals") ? listApprovals(videoId) : [],
       want("insights") ? db.select().from(schema.insights).where(eq(schema.insights.videoId, videoId)).orderBy(desc(schema.insights.createdAt)).limit(20) : [],
     ]);
+    // What this video's workspace may export, so the export dialog can say it before the export starts.
+    const plan = want("renders") ? await planFor({ email: video.row.ownerEmail, orgId: video.row.orgId }) : null;
+    const exportLimits = plan ? { plan: plan.name, maxShortSide: plan.maxExportHeight, endingRequired: plan.endingRequired } : null;
     return {
       video: {
         id: video.row.id,
@@ -87,6 +91,7 @@ export default defineAction({
       qa,
       composition: compositionEntry ? { version: compositionEntry.version, label: compositionEntry.label, summary: summarizeComposition(compositionEntry.composition) } : null,
       sources: sources.map((source) => ({ id: source.id, kind: source.kind, title: source.title, url: source.url, publisher: source.publisher, length: source.content.length, retrievedAt: source.retrievedAt, redactions: source.redactions })),
+      ...(exportLimits ? { exportLimits } : {}),
       renders: renders.map((render) => ({ id: render.id, status: render.status, progress: render.progress, stage: render.stage, ratio: render.ratio, ...renderSize(render.payload), compositionVersion: render.compositionVersion, outputFile: render.outputFile, outputBytes: render.outputBytes, error: render.error, createdAt: render.createdAt })),
       publishJobs: publishes.map((job) => ({ ...job, copy: JSON.parse(job.copy) as unknown, warnings: JSON.parse(job.warnings) as string[] })),
       approvals,
