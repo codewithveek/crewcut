@@ -51,7 +51,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     priorityRenders: false,
     channels: 1,
     seats: 1,
-    features: ["The full editor and free templates", "100 AI credits a month (about 2–3 AI drafts)", "720p export with the Crewcut ending card", "Use your own AI keys at no credit cost", "Publish to one YouTube channel yourself"],
+    features: ["The full editor and free templates", "100 AI credits a month (about 2–3 AI drafts)", "Videos up to 10 minutes, exported in 720p with the Crewcut ending card", "Use your own AI keys at no credit cost", "Publish to one YouTube channel yourself"],
   },
   creator: {
     id: "creator",
@@ -66,7 +66,7 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     priorityRenders: false,
     channels: 1,
     seats: 1,
-    features: ["Autopilot: hands-off videos, from idea to export", "600 AI credits a month", "1080p to 4K export, ending card optional", "Every Pro template, track and sound", "Publish to YouTube from Crewcut"],
+    features: ["Autopilot: hands-off videos, from idea to export", "600 AI credits a month", "Videos up to 60 minutes, 1080p to 4K, ending card optional", "Every Pro template, track and sound", "Publish to YouTube from Crewcut"],
   },
   studio: {
     id: "studio",
@@ -81,9 +81,16 @@ export const PLANS: Record<PlanId, PlanDefinition> = {
     priorityRenders: true,
     channels: 5,
     seats: 5,
-    features: ["Everything in Creator", "2,000 AI credits a month", "Up to 5 people and 5 YouTube channels", "Priority exports", "Crewcut from your own tools (MCP and API)"],
+    features: ["Everything in Creator", "2,000 AI credits a month", "Videos up to 3 hours", "Up to 5 people and 5 YouTube channels", "Priority exports", "Crewcut from your own tools (MCP and API)"],
   },
 };
+
+/**
+ * Longest video each plan can export, in minutes. Exports share the render
+ * servers, so length is a plan limit like resolution is; the editor itself
+ * never stops a timeline growing.
+ */
+export const MAX_EXPORT_MINUTES: Record<PlanId, number> = { free: 10, creator: 60, studio: 180 };
 
 export function normalizePlan(value: string | null | undefined): PlanId {
   if (value === "creator" || value === "pro") return "creator";

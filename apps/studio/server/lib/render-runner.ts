@@ -93,6 +93,11 @@ export interface QueueRenderInput {
 export async function queueRender(input: QueueRenderInput): Promise<{ renderId: string; mode: RenderMode }> {
   const unsafe = unsafeMediaSources(input.composition);
   if (unsafe.length > 0) throw new UserError(`This video points at media that can't be exported (${unsafe.slice(0, 3).join(", ")}). Replace it with an upload.`);
+  // Exports share the server (one at a time by default): a many-hour video would hold up everyone else's.
+  const minutes = input.composition.durationMs / 60_000;
+  if (minutes > MAX_EXPORT_MINUTES) {
+    throw new UserError(`Exports can be up to ${MAX_EXPORT_MINUTES} minutes long, and this video is ${Math.ceil(minutes)}. Split it into parts and export each.`);
+  }
   const db = getDb();
   // One person can't fill the server with exports: a few at a time each.
   // Jobs that stopped reporting for 30 minutes don't count (a crashed worker).
@@ -140,7 +145,7 @@ export async function queueRender(input: QueueRenderInput): Promise<{ renderId: 
   const mode = renderMode();
   if (mode === "spawn") {
     const jobFile = await writeStorageFile("jobs", `${renderId}.json`, toJson(payload));
-    startOrWait({ renderId, jobFile, owner: { userEmail: input.video.row.ownerEmail, orgId: input.video.row.orgId }, priority: input.priority === true });
+    startOrWait({ renderId, jobFile, owner: { userEmail: input.video.row.ownerEmail, orgId: input.video.row.orgId }, priority: input.priority === true, durationMs: input.composition.durationMs });
   }
   return { renderId, mode };
 }
@@ -148,6 +153,20 @@ export async function queueRender(input: QueueRenderInput): Promise<{ renderId: 
 const running = new Map<string, ReturnType<typeof spawn>>();
 /** Exports a person stopped: their worker's exit must not be recorded as a failure. */
 const cancelled = new Set<string>();
+
+/** Longest video any plan can export (CREWCUT_MAX_EXPORT_MINUTES); each plan's own limit is in plans.ts. */
+const MAX_EXPORT_MINUTES = Math.max(1, Number(process.env.CREWCUT_MAX_EXPORT_MINUTES ?? 180));
+/** No export may run longer than this, whatever its length (CREWCUT_RENDER_TIMEOUT_MINUTES, default 12 hours). */
+const RENDER_TIMEOUT_CAP_MS = Math.max(5, Number(process.env.CREWCUT_RENDER_TIMEOUT_MINUTES ?? 720)) * 60_000;
+
+/**
+ * How long an export may run before it's stopped as stuck: eight times the
+ * video's length (a slow 4K render on two cores), never under half an hour,
+ * never over the cap. Others are waiting behind it.
+ */
+function renderTimeoutMs(durationMs: number): number {
+  return Math.min(RENDER_TIMEOUT_CAP_MS, Math.max(30 * 60_000, durationMs * 8));
+}
 
 const MAX_ACTIVE_RENDERS_PER_OWNER = Math.max(1, Number(process.env.CREWCUT_MAX_RENDERS_PER_USER ?? 2));
 /**
@@ -162,11 +181,13 @@ interface WaitingRender {
   jobFile: string;
   owner: { userEmail: string; orgId: string | null };
   priority?: boolean;
+  /** The video's length, which sets how long the export may run. */
+  durationMs: number;
 }
 const waiting: WaitingRender[] = [];
 
 function startOrWait(job: WaitingRender): void {
-  if (running.size < MAX_PARALLEL_RENDERS) spawnWorker(job.renderId, job.jobFile, job.owner);
+  if (running.size < MAX_PARALLEL_RENDERS) spawnWorker(job.renderId, job.jobFile, job.owner, renderTimeoutMs(job.durationMs));
   // Stays "queued" in the database until a slot frees up; priority exports go ahead of the others.
   else if (job.priority) {
     const firstOrdinary = waiting.findIndex((entry) => !entry.priority);
@@ -178,7 +199,7 @@ function startOrWait(job: WaitingRender): void {
 function startNextWaiting(): void {
   while (running.size < MAX_PARALLEL_RENDERS && waiting.length > 0) {
     const next = waiting.shift() as WaitingRender;
-    spawnWorker(next.renderId, next.jobFile, next.owner);
+    spawnWorker(next.renderId, next.jobFile, next.owner, renderTimeoutMs(next.durationMs));
   }
 }
 
@@ -215,7 +236,7 @@ function jobWriter(renderId: string, owner: { userEmail: string; orgId: string |
   };
 }
 
-function spawnWorker(renderId: string, jobFile: string, owner: { userEmail: string; orgId: string | null }): void {
+function spawnWorker(renderId: string, jobFile: string, owner: { userEmail: string; orgId: string | null }, timeoutMs: number): void {
   const workerMain = path.join(WORKSPACE_ROOT, "apps", "render-worker", "src", "main.ts");
   const child = spawn(process.execPath, ["--import", "tsx", workerMain, "--job-file", jobFile], {
     cwd: path.join(WORKSPACE_ROOT, "apps", "render-worker"),
@@ -229,6 +250,12 @@ function spawnWorker(renderId: string, jobFile: string, owner: { userEmail: stri
   let stderr = "";
   let finished = false;
   void write({ status: "running", stage: "starting", lockedBy: `spawn:${child.pid ?? "?"}` });
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    child.kill();
+  }, timeoutMs);
+  timeout.unref?.();
   child.stdout?.on("data", (chunk: Buffer) => {
     buffer += chunk.toString("utf8");
     let newline = buffer.indexOf("\n");
@@ -257,6 +284,7 @@ function spawnWorker(renderId: string, jobFile: string, owner: { userEmail: stri
     stderr = (stderr + chunk.toString("utf8")).slice(-4000);
   });
   child.on("exit", (code) => {
+    clearTimeout(timeout);
     running.delete(renderId);
     // The job file was only this worker's input.
     void unlink(jobFile).catch(() => undefined);
@@ -266,11 +294,17 @@ function spawnWorker(renderId: string, jobFile: string, owner: { userEmail: stri
       void unlink(path.join(STORAGE_DIR, "renders", `${renderId}.mp4`)).catch(() => undefined);
       return;
     }
+    if (timedOut && !finished) {
+      void unlink(path.join(STORAGE_DIR, "renders", `${renderId}.mp4`)).catch(() => undefined);
+      void write({ status: "failed", error: `The export ran for more than ${Math.round(timeoutMs / 60_000)} minutes and was stopped. Try a lower resolution or a shorter video.` });
+      return;
+    }
     if (code !== 0 && !finished) {
       void write({ status: "failed", error: (stderr || `Render worker exited with code ${code}`).slice(-2000) });
     }
   });
   child.on("error", (error) => {
+    clearTimeout(timeout);
     running.delete(renderId);
     startNextWaiting();
     void write({ status: "failed", error: `Couldn't start the render worker: ${error.message}` });

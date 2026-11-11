@@ -9,6 +9,7 @@ import { getDb, schema } from "../server/db/index.js";
 import { autopilotView } from "../server/lib/autopilot.js";
 import { parseJsonLoose } from "../server/lib/json.js";
 import { planFor } from "../server/lib/plan-limits.js";
+import { MAX_EXPORT_MINUTES } from "../server/lib/plans.js";
 import { summarizeComposition } from "../server/lib/pipeline-ops.js";
 import {
   latestAudit,
@@ -63,7 +64,7 @@ export default defineAction({
     ]);
     // What this video's workspace may export, so the export dialog can say it before the export starts.
     const plan = want("renders") ? await planFor({ email: video.row.ownerEmail, orgId: video.row.orgId }) : null;
-    const exportLimits = plan ? { plan: plan.name, maxShortSide: plan.maxExportHeight, endingRequired: plan.endingRequired } : null;
+    const exportLimits = plan ? { plan: plan.name, maxShortSide: plan.maxExportHeight, maxMinutes: MAX_EXPORT_MINUTES[plan.id], endingRequired: plan.endingRequired } : null;
     return {
       video: {
         id: video.row.id,

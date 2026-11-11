@@ -19,7 +19,7 @@ export class UserError extends Error {
  * HTTP 402 with a code naming the feature, so the app opens the upgrade
  * dialog for that feature instead of showing an error.
  */
-export type UpgradeFeature = "export-hd" | "no-ending" | "autopilot" | "pro-content" | "channels" | "credits";
+export type UpgradeFeature = "export-length" | "export-hd" | "no-ending" | "autopilot" | "pro-content" | "channels" | "credits";
 
 export class UpgradeRequiredError extends UserError {
   override readonly name = "UpgradeRequiredError";

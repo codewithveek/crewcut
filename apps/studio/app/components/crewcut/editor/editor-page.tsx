@@ -128,6 +128,7 @@ function isTyping(target: EventTarget | null): boolean {
 /** Keyboard: CapCut/NLE shortcuts. No animation on keyboard-driven actions. */
 function useEditorKeys() {
   const shuttle = useRef<{ rate: number; frame: number | null }>({ rate: 0, frame: null });
+  const nudge = useRef<number | null>(null);
   useEffect(() => {
     const stopShuttle = () => {
       if (shuttle.current.frame !== null) cancelAnimationFrame(shuttle.current.frame);
@@ -148,6 +149,14 @@ function useEditorKeys() {
     const onKey = (event: KeyboardEvent) => {
       if (isTyping(event.target) || event.defaultPrevented) return;
       if ((event.target as HTMLElement | null)?.closest?.("[role=menu],[role=dialog],[role=listbox]")) return;
+      // Someone moving through the controls with the keyboard presses Space to use the one in focus
+      // (a button, a switch); it must not start playback instead. A control that only has focus
+      // because it was just clicked doesn't count, so Space still plays after clicking a tool.
+      const onControl = (event.target as HTMLElement | null)?.closest?.("button,a[href],summary,[role=button],[role=switch],[role=checkbox],[role=tab],[role=slider]")?.matches(":focus-visible") === true;
+      // Undo, copy and paste (with Ctrl or Cmd) still work from a focused control; plain keys belong to the control.
+      if (onControl && !(event.metaKey || event.ctrlKey)) return;
+      // Alt with a letter is the browser's or the system's shortcut; only Alt+arrows (nudge) is ours.
+      if (event.altKey && !event.key.startsWith("Arrow")) return;
       const state = useEditor.getState();
       const composition = state.composition;
       if (!composition) return;
@@ -155,6 +164,8 @@ function useEditorKeys() {
       const key = event.key.toLowerCase();
       if (mod) {
         const handled = (() => {
+          // Text highlighted on the page (an error message, a caption): copy that, not the clip.
+          if ((key === "c" || key === "x") && window.getSelection()?.toString()) return false;
           if (key === "z") return void (event.shiftKey ? state.redo() : state.undo()), true;
           if (key === "y") return void state.redo(), true;
           if (key === "c") return copySelection(), true;
@@ -176,7 +187,15 @@ function useEditorKeys() {
         const dx = key === "arrowleft" ? -step : key === "arrowright" ? step : 0;
         const dy = key === "arrowup" ? -step : key === "arrowdown" ? step : 0;
         const { layer, clip } = selection;
-        void run("Nudge", transformOps(clip, layer, { x: layer.transform.x + (dx / composition.width) * 100, y: layer.transform.y + (dy / composition.height) * 100 }));
+        // Shown at once; saved as ONE step shortly after the last press, so holding the key
+        // doesn't fill the history with a version per pixel.
+        const ops = transformOps(clip, layer, { x: layer.transform.x + (dx / composition.width) * 100, y: layer.transform.y + (dy / composition.height) * 100 });
+        state.preview(ops);
+        if (nudge.current) window.clearTimeout(nudge.current);
+        nudge.current = window.setTimeout(() => {
+          nudge.current = null;
+          void run("Nudge", ops);
+        }, 350);
         return;
       }
       switch (key) {
@@ -271,6 +290,17 @@ function useEditorKeys() {
       window.removeEventListener("keydown", onKey);
       stopShuttle();
     };
+  }, []);
+
+  // Closing or reloading the tab while edits are still being sent would lose them: ask first.
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (useEditor.getState().saving === 0) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
   }, []);
 }
 
@@ -431,7 +461,7 @@ function ExportDialogContent({ open, onOpenChange, platform, onPlatformChange, c
   // An export started earlier (before a reload, or from the board) keeps its progress bar moving too.
   const [exportsRunning, setExportsRunning] = useState(false);
   const query = useActionQuery("get-video", { videoId, include: ["renders"] } as never, { enabled: open, refetchInterval: open && (watching || exportsRunning) ? 1500 : false } as never);
-  const data = query.data as { renders?: RenderRow[]; exportLimits?: { plan: string; maxShortSide: number; endingRequired: boolean } } | undefined;
+  const data = query.data as { renders?: RenderRow[]; exportLimits?: { plan: string; maxShortSide: number; maxMinutes?: number; endingRequired: boolean } } | undefined;
   const allRenders = data?.renders ?? [];
   const anyRunning = allRenders.some((render) => render.status === "queued" || render.status === "running");
   useEffect(() => setExportsRunning(anyRunning), [anyRunning]);
@@ -565,7 +595,7 @@ function ExportDialogContent({ open, onOpenChange, platform, onPlatformChange, c
         </FieldRow>
         {limited && limits ? (
           <p className="rounded-ds-sm bg-ds-surface-2 px-2.5 py-2 text-xs text-ds-text-2">
-            {limits.plan} exports go up to {topResolution?.label ?? "720p"}
+            {limits.plan} exports go up to {limits.maxMinutes ? `${limits.maxMinutes} minutes and ` : ""}{topResolution?.label ?? "720p"}
             {limits.endingRequired ? " and end with the Crewcut ending card" : ""}.{" "}
             <button type="button" className="font-medium text-ds-text underline underline-offset-2" onClick={() => openUpgrade("export-hd")}>
               See plans

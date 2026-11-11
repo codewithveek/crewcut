@@ -21,7 +21,7 @@ import { type PlanInfo, PlanCards } from "./billing-page";
  * into this dialog and everything else into the usual toast.
  */
 
-export type UpgradeFeature = "export-hd" | "no-ending" | "autopilot" | "pro-content" | "channels" | "credits" | "plans";
+export type UpgradeFeature = "export-length" | "export-hd" | "no-ending" | "autopilot" | "pro-content" | "channels" | "credits" | "plans";
 
 type PaidPlan = "creator" | "studio";
 
@@ -33,6 +33,11 @@ interface Pitch {
 }
 
 const PITCHES: Record<UpgradeFeature, Pitch> = {
+  "export-length": {
+    plan: "creator",
+    title: () => "Export longer videos",
+    body: "Free exports videos up to 10 minutes, Creator up to 60 minutes and Studio up to 3 hours. Your video is safe either way: you can keep editing it on any plan.",
+  },
   "export-hd": {
     plan: "creator",
     title: (detail) => `Export in ${detail ?? "4K"} with Creator`,
@@ -125,6 +130,7 @@ interface CreditsData {
   billingReady: { subscriptions: boolean; topUps: boolean };
   plans: PlanDetails[];
   topUps: ReadonlyArray<{ id: string; credits: number; price: number }>;
+  typicalDraftCredits?: number;
 }
 
 /** The workspace's plan and what it includes; `plan` is null until it has loaded (never guess a limit). */

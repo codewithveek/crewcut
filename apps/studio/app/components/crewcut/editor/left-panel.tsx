@@ -328,6 +328,10 @@ export function VoiceRecorder({ onAdded }: { onAdded?: () => void }) {
   const [elapsed, setElapsed] = useState(0);
   const [level, setLevel] = useState(0);
   const [blob, setBlob] = useState<Blob | null>(null);
+  // One link per recording, released when it is replaced or the panel closes. Making it during render gave the
+  // player a new address on every redraw (restarting playback) and never released the old ones.
+  const blobUrl = useMemo(() => (blob ? URL.createObjectURL(blob) : null), [blob]);
+  useEffect(() => () => void (blobUrl ? URL.revokeObjectURL(blobUrl) : undefined), [blobUrl]);
   const recorder = useRef<MediaRecorder | null>(null);
   const cleanup = useRef<() => void>(() => undefined);
   useEffect(() => () => cleanup.current(), []);
@@ -402,7 +406,7 @@ export function VoiceRecorder({ onAdded }: { onAdded?: () => void }) {
         </Button>
       ) : status === "ready" || status === "saving" ? (
         <div className="flex flex-wrap justify-center gap-2">
-          {blob ? <audio controls src={URL.createObjectURL(blob)} className="h-9 w-full max-w-[240px]" /> : null}
+          {blobUrl ? <audio controls src={blobUrl} className="h-9 w-full max-w-[240px]" /> : null}
           <Button variant="ghost" onClick={() => (setBlob(null), setStatus("idle"))} disabled={status === "saving"}>
             Discard
           </Button>

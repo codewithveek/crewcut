@@ -3,6 +3,7 @@ import { resolveCredential } from "@agent-native/core/credentials";
 import { scriptLines } from "@crewcut/contracts";
 import { type LineAudio, applyNarration } from "@crewcut/pipeline";
 import { ElevenLabsVoiceProvider } from "@crewcut/voice";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
@@ -10,6 +11,7 @@ import { accessContext } from "../server/lib/identity.js";
 import { toJson } from "../server/lib/json.js";
 import { beginStage, finishStage } from "../server/lib/pipeline-ops.js";
 import { latestComposition, latestScript, loadVideo, saveComposition } from "../server/lib/store.js";
+import { deleteAssetFile } from "../server/lib/assets.js";
 import { putFile } from "../server/lib/blob-store.js";
 import { newId } from "../server/lib/storage.js";
 import { lineAudioFor } from "../server/lib/voice-ops.js";
@@ -18,6 +20,30 @@ import { recordAiUsage } from "../server/lib/ai/usage.js";
 import { workspaceOf } from "../server/lib/catalog.js";
 import { assertCredits } from "../server/lib/credits.js";
 import { voiceCostMicros, voiceOperatorKey } from "../server/lib/voice-billing.js";
+
+/** Versions back that keep their voice files, so undo and "restore version" still have audio. */
+const KEEP_VOICE_FOR_VERSIONS = 20;
+
+/**
+ * Every re-voice made a new file per line and left the earlier ones in
+ * storage for good. This removes the takes that none of the video's latest
+ * versions use any more; anything a recent version still plays is kept.
+ */
+async function removeOldVoiceTakes(videoId: string): Promise<number> {
+  const db = getDb();
+  const [takes, versions] = await Promise.all([
+    db.select().from(schema.assets).where(and(eq(schema.assets.videoId, videoId), eq(schema.assets.kind, "voice"))),
+    db.select({ body: schema.compositions.body }).from(schema.compositions).where(eq(schema.compositions.videoId, videoId)).orderBy(desc(schema.compositions.version)).limit(KEEP_VOICE_FOR_VERSIONS),
+  ]);
+  const inUse = versions.map((entry) => entry.body).join("\n");
+  // Only takes this action made (they carry the script line they voice); recordings people made themselves stay.
+  const stale = takes.filter((take) => take.provenance.includes('"lineId"') && !inUse.includes(`asset:${take.id}`));
+  for (const take of stale) {
+    await db.delete(schema.assets).where(eq(schema.assets.id, take.id));
+    await deleteAssetFile(take);
+  }
+  return stale.length;
+}
 
 export default defineAction({
   description:
@@ -111,6 +137,7 @@ export default defineAction({
     const emphasis = new Map(scriptEntry.script.beats.flatMap((beat) => beat.lines.map((line) => [line.id, line.emphasis] as const)));
     const composition = applyNarration(compositionEntry.composition, lineAudio, { emphasis });
     const version = await saveComposition(video, composition, apiKey ? `Voice: ${synthesized} lines (ElevenLabs)` : "Re-time narration (estimated voice)");
+    if (synthesized > 0) await removeOldVoiceTakes(videoId).catch((error: unknown) => console.warn(`[voice] ${videoId}: could not clear earlier takes:`, error));
     const status = await finishStage(video, "voice", {
       note: apiKey ? `${synthesized} lines voiced with ElevenLabs` : "No voice connected yet, so timing is estimated. Connect ElevenLabs in Settings to record the voice-over.",
     });

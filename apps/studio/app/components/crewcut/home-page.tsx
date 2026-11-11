@@ -138,7 +138,7 @@ export function HomePage() {
   const { videos: recent, assetUrls, total: matches, loading, refreshing } = useVideoList({ query: settledSearch, pageSize: settledSearch ? 12 : 8 });
   const start = useActionMutation("start-pipeline");
   // Autopilot is a paid feature: the switch offers the plans instead of failing after "Make the video".
-  const { plan } = usePlan();
+  const { plan, data: credits } = usePlan();
   const demo = useLoadDemo();
 
   // "Make it with agents" from the mobile nav lands here with ?focus=prompt.
@@ -271,6 +271,12 @@ export function HomePage() {
               "Ideas → research → script → fact-check → animation → voice → publish → results. You approve each key step, and every claim links to its source."
             )}
           </p>
+          {/* What it will cost, before starting: the usual credits for a draft next to what's left. */}
+          {credits?.typicalDraftCredits ? (
+            <p className="ds-caption text-ds-text-3">
+              A draft usually takes about {credits.typicalDraftCredits} AI credits; you have {Math.max(0, credits.balance.available).toLocaleString()}. Your own AI key costs none.
+            </p>
+          ) : null}
         </form>
       </section>
 

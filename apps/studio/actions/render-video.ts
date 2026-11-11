@@ -5,6 +5,7 @@ import { z } from "zod";
 import { autopilotDriving, readAutopilot, updateAutopilot, withDecision } from "../server/lib/autopilot.js";
 import { planOf, proContentIn, workspaceOf } from "../server/lib/catalog.js";
 import { planFor } from "../server/lib/plan-limits.js";
+import { MAX_EXPORT_MINUTES } from "../server/lib/plans.js";
 import { queueRender } from "../server/lib/render-runner.js";
 import { latestComposition, loadVideo } from "../server/lib/store.js";
 import { UpgradeRequiredError, UserError } from "../server/lib/errors.js";
@@ -30,6 +31,14 @@ export default defineAction({
     // Free exports are 720p at most and end on the Crewcut ending card (added
     // for this export only; the saved video doesn't change).
     const plan = await planFor({ email: video.row.ownerEmail, orgId: video.row.orgId });
+    // Length is a plan limit: a longer video can still be made and edited, just not exported on this plan.
+    const minutes = current.composition.durationMs / 60_000;
+    const allowed = MAX_EXPORT_MINUTES[plan.id];
+    if (minutes > allowed) {
+      const reason = `${plan.name} exports videos up to ${allowed} minutes, and this one is ${Math.ceil(minutes)}.`;
+      if (plan.id === "studio") throw new UserError(`${reason} Split it into parts and export each.`);
+      throw new UpgradeRequiredError("export-length", `${reason} ${plan.id === "free" ? "Creator exports up to 60 minutes and Studio up to 3 hours." : "Studio exports up to 3 hours."}`);
+    }
     const limits: string[] = [];
     let size: ExportResolution | undefined = resolution;
     const shortSideOf = (id: ExportResolution | undefined) => EXPORT_RESOLUTIONS.find((entry) => entry.id === id)?.shortSide ?? 1080;

@@ -30,10 +30,23 @@ export default defineAction({
       db.select().from(schema.billingSubscriptions).where(eq(schema.billingSubscriptions.workspace, workspace)).orderBy(desc(schema.billingSubscriptions.updatedAt)).limit(1),
     ]);
     const sub = subscription[0];
+    // What one AI draft has cost this workspace so far (the average per video), so people can see it before they start.
+    const [typical] = await db
+      .select({ millicredits: sql<number>`coalesce(avg(total), 0)`, videos: sql<number>`count(*)` })
+      .from(
+        db
+          .select({ total: sql<number>`sum(${schema.aiUsage.millicredits})`.as("total") })
+          .from(schema.aiUsage)
+          .where(and(eq(schema.aiUsage.workspace, workspace), eq(schema.aiUsage.source, "managed"), sql`${schema.aiUsage.videoId} is not null`))
+          .groupBy(schema.aiUsage.videoId)
+          .as("per_video"),
+      );
     const credits = (milli: number) => Math.round((milli / MILLI) * 10) / 10;
     return {
       workspace,
       balance,
+      /** Credits a draft usually takes here; a general figure until this workspace has made a few. */
+      typicalDraftCredits: Number(typical?.videos ?? 0) >= 2 ? Math.max(1, Math.round(Number(typical?.millicredits ?? 0) / MILLI)) : 40,
       usedThisPeriod: byStage.map((row) => ({ stage: row.kind === "voice" ? "voice" : row.stage, credits: credits(Number(row.millicredits)), calls: Number(row.calls) })),
       ledger: ledger.map((row) => ({ id: row.id, at: row.createdAt, kind: row.kind, credits: credits(row.millicredits), note: row.note })),
       subscription: sub ? { plan: sub.plan, interval: sub.billingInterval, status: sub.status, currentPeriodEnd: sub.currentPeriodEnd, cancelAtPeriodEnd: sub.cancelAtPeriodEnd } : null,
