@@ -13,7 +13,6 @@ import {
   RealtimeVoiceModeProvider,
   useRealtimeVoiceModeOptional,
 } from "@agent-native/toolkit/app/chat/composer";
-import { isSettingsPathname } from "@agent-native/toolkit/app/settings";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 
@@ -33,6 +32,7 @@ import { cn } from "@/lib/utils";
 // AgentSidebar already lazy-loads its own panel.
 import { AgentInspector } from "./AgentInspector";
 import { AutopilotWatchdog } from "@/components/crewcut/autopilot/autopilot";
+import { UpgradeDialogHost } from "@/components/crewcut/billing/upgrade";
 
 import { AppRail } from "./AppRail";
 import { MobileAppBar } from "./MobileAppBar";
@@ -87,6 +87,8 @@ export function Layout({ children }: LayoutProps) {
       <EndVoiceChatOutsideChat />
       {/* Autopilot: resumes stalled runs and says when a video is ready, on any page. */}
       <AutopilotWatchdog />
+      {/* One upgrade dialog for the whole app: any paid feature opens it with its own headline. */}
+      <UpgradeDialogHost />
       <LayoutShell>{children}</LayoutShell>
     </RealtimeVoiceModeProvider>
   );
@@ -97,9 +99,9 @@ function LayoutShell({ children }: LayoutProps) {
   const t = useT();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isChatRoute = isChatPathname(location.pathname);
-  // Settings brings its own navigation, header, and agent toggle, so it
-  // renders full width.
-  const settingsOwnsChrome = isSettingsPathname(location.pathname);
+  // Settings is a Crewcut page like any other now (components/crewcut/settings):
+  // it keeps the app's rail and phone navigation instead of taking the whole screen.
+  const settingsOwnsChrome = false;
   const chatHomeHandoffActive = useAgentChatHomeHandoff({
     storageKey: "chat",
     activePath: location.pathname,

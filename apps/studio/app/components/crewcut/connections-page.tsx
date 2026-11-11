@@ -1,7 +1,6 @@
 import { useActionMutation, useActionQuery } from "@agent-native/core/client/hooks";
-import { openAgentSettings } from "@agent-native/toolkit/app/shared";
-import { IconBrandYoutube, IconCheck, IconKey, IconPlugConnected, IconRefresh, IconUnlink } from "@tabler/icons-react";
-import { useEffect } from "react";
+import { IconBrandYoutube, IconPlugConnected, IconRefresh, IconUnlink } from "@tabler/icons-react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
@@ -9,13 +8,15 @@ import { Button } from "@/components/ui/button";
 import { errorMessage, formatAgo } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
+import { openUpgrade } from "./billing/upgrade";
+import { type OwnKeyProvider, OwnKeyDialog, OwnKeyPicker, ProviderMark } from "./own-keys";
 import { Panel, SkeletonLines } from "./primitives";
 
 interface ConnectionsData {
   accounts: Array<{ id: string; provider: string; accountName: string; scopes: string[]; status: string; statusDetail: string; lastUsedAt: string | null; createdAt: string }>;
   platforms: Array<{ id: string; label: string; supported: boolean; auditNote: string; limitNote: string }>;
   youtubeConfigured: boolean;
-  providers: Array<{ id: string; kind: "model" | "voice"; name: string; key: string; note: string; ownKey: boolean }>;
+  providers: OwnKeyProvider[];
   crewcutAi: { models: boolean; voice: boolean };
 }
 
@@ -39,8 +40,12 @@ export function ConnectionsPage() {
     const error = params.get("error");
     if (connected) toast.success(`${connected === "youtube" ? "YouTube" : connected} connected`);
     if (error) toast.error(error);
-    if (connected || error) setParams({}, { replace: true });
+    // The plan's channel limit was reached while connecting: offer the plan that lifts it.
+    const upgrade = params.get("upgrade");
+    if (upgrade === "channels") openUpgrade("channels");
+    if (connected || error || upgrade) setParams({}, { replace: true });
   }, [params, setParams]);
+  const [keyFor, setKeyFor] = useState<OwnKeyProvider | null>(null);
 
   async function startYouTube() {
     try {
@@ -147,6 +152,7 @@ export function ConnectionsPage() {
             ? "The crew runs on Crewcut AI and uses your credits. Add your own key for any provider below and the crew uses it instead: it goes straight to that provider, costs no credits, and they bill you."
             : "Add a key for any provider below and the crew uses it: it goes straight to that provider and they bill you. Keys are stored encrypted."
         }
+        actions={data ? <OwnKeyPicker providers={data.providers} onPick={setKeyFor} /> : null}
       >
         {!data ? (
           <SkeletonLines count={3} />
@@ -161,33 +167,40 @@ export function ConnectionsPage() {
                 {data.crewcutAi.voice ? "" : " (add an ElevenLabs key for narration)"}
               </span>
             </p>
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {data.providers.map((provider) => (
-                <li key={provider.key} className="flex flex-col gap-2 rounded-xl border border-border p-4">
-                  <div className="flex items-center gap-2">
-                    <IconKey className="size-4 text-muted-foreground" />
-                    <p className="font-medium text-foreground">{provider.name}</p>
-                    {provider.ownKey ? (
-                      <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-supported">
-                        <IconCheck className="size-3.5" /> Your key
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {provider.note} {provider.ownKey ? "Used instead of Crewcut AI; no credits." : provider.kind === "voice" ? (data.crewcutAi.voice ? "Without it, voice-overs use Crewcut's and cost credits." : "") : ""}
-                  </p>
-                  <Button size="sm" variant="outline" className="pc-press self-start" onClick={() => openAgentSettings("secrets")}>
-                    {provider.ownKey ? "Manage key" : `Add ${provider.key}`}
-                  </Button>
-                </li>
-              ))}
-            </ul>
+            {data.providers.some((provider) => provider.ownKey) ? (
+              <ul className="flex flex-col gap-2">
+                {data.providers
+                  .filter((provider) => provider.ownKey)
+                  .map((provider) => (
+                    <li key={provider.id} className="flex items-center gap-3 rounded-xl border border-border p-3">
+                      <ProviderMark id={provider.id} name={provider.name} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[14px] font-medium text-foreground">{provider.name}</p>
+                        <p className="text-xs text-muted-foreground">{provider.kind === "voice" ? "Your key: voice-overs cost no credits." : "Your key: used instead of Crewcut AI, no credits."}</p>
+                      </div>
+                      <Button size="sm" variant="outline" className="pc-press shrink-0" onClick={() => setKeyFor(provider)}>
+                        Manage
+                      </Button>
+                    </li>
+                  ))}
+              </ul>
+            ) : (
+              <p className="rounded-xl border border-dashed border-border p-4 text-[13px] text-muted-foreground">
+                No keys of your own yet. {data.crewcutAi.models ? "That's fine: the crew runs on Crewcut AI. Add a key only if you'd rather pay a provider directly." : "Add one to start working with the crew."}
+              </p>
+            )}
             <p className="mt-3 text-[11px] text-muted-foreground">
-              With several keys, pick which model the crew uses in agent settings. <span className="whitespace-nowrap">Usage and credits: the Plan page.</span>
+              With several keys, pick which one the crew uses under{" "}
+              <a href="/settings/model" className="underline underline-offset-2">
+                AI model
+              </a>
+              . <span className="whitespace-nowrap">Usage and credits: Plan &amp; credits.</span>
             </p>
           </>
         )}
       </Panel>
+
+      <OwnKeyDialog provider={keyFor} onClose={() => setKeyFor(null)} onChanged={() => void query.refetch()} />
 
       <Panel title="Platforms" description="What each platform requires before public posting works, and the limits the publish agent checks before exporting.">
         <ul className="flex flex-col divide-y divide-border">

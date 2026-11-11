@@ -30,13 +30,13 @@ export const PRIMARY_NAV: readonly NavItem[] = [
   { to: "/templates", label: "Templates", title: "Templates", icon: IconTemplate, match: (path) => path.startsWith("/templates") },
   { to: "/assets", label: "Assets", title: "Assets", icon: IconPhoto, match: (path) => path.startsWith("/assets") },
   { to: NEW_CHAT_PATH, label: "Chats", title: "Chats with the agent", icon: IconMessageCircle, match: isChatPathname },
-  { to: "/connections", label: "Connect", title: "Connections", icon: IconPlugConnected, match: (path) => path.startsWith("/connections") },
+  { to: "/settings/connections", label: "Connect", title: "Connections", icon: IconPlugConnected, match: (path) => path.startsWith("/connections") || path.startsWith("/settings/connections") },
   { to: "/extensions", label: "Mini-apps", title: "Mini-apps", icon: IconApps, match: (path) => path.startsWith("/extensions") },
 ];
 
 export const SECONDARY_NAV: readonly NavItem[] = [
-  { to: "/billing", label: "Plan", title: "Plan & credits", icon: IconCreditCard, match: (path) => path.startsWith("/billing") },
-  { to: "/settings", label: "Settings", title: "Settings", icon: IconSettings, match: (path) => path.startsWith("/settings") || path.startsWith("/team") },
+  { to: "/settings/plan", label: "Plan", title: "Plan & credits", icon: IconCreditCard, match: (path) => path.startsWith("/billing") || path.startsWith("/settings/plan") },
+  { to: "/settings", label: "Settings", title: "Settings", icon: IconSettings, match: (path) => (path.startsWith("/settings") && !path.startsWith("/settings/plan") && !path.startsWith("/settings/connections")) || path.startsWith("/team") },
 ];
 
 /** Shown only to catalog admins (see useCatalogAccess). */
@@ -58,6 +58,7 @@ export function isCrewcutPage(pathname: string): boolean {
     pathname.startsWith("/connections") ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/billing") ||
+    pathname.startsWith("/settings") ||
     (pathname.startsWith("/videos/") && !isEditorPath(pathname))
   );
 }
