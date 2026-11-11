@@ -34,4 +34,20 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     return getContainer(env.APP).fetch(request);
   },
+
+  /**
+   * Once a day (see "triggers" in wrangler.jsonc): wake the app. The container
+   * sleeps when nobody visits, and jobs that must run on a schedule only run
+   * while it's awake: the 30-day YouTube authorisation check and the deletion
+   * of revoked accounts' data that the Privacy Policy promises, closing
+   * interrupted exports, and telling the operator about data requests.
+   */
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      getContainer(env.APP)
+        .fetch(new Request("https://crewcut.internal/api/health"))
+        .then((response) => console.log(`[cron] app woken: ${response.status}`))
+        .catch((error: unknown) => console.error("[cron] could not wake the app:", error)),
+    );
+  },
 } satisfies ExportedHandler<Env>;

@@ -1,4 +1,5 @@
 import { failStaleRenders, pruneOldRenders } from "../lib/render-runner.js";
+import { notifyNewPrivacyRequests } from "../lib/privacy-requests.js";
 import { failStaleUploads } from "../lib/youtube.js";
 
 /**
@@ -29,6 +30,8 @@ async function sweep(): Promise<void> {
     if (sweeps % PRUNE_EVERY === 0) {
       const pruned = await pruneOldRenders();
       if (pruned) console.info(`[job-reaper] removed ${pruned} old export(s).`);
+      // People's data requests (copy, deletion): the operator hears about each one once.
+      await notifyNewPrivacyRequests().catch((error: unknown) => console.warn("[job-reaper] could not check data requests:", error instanceof Error ? error.message : error));
     }
     sweeps += 1;
   } catch (error) {

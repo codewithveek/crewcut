@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 
+import { PrivacyRequestsSection } from "./privacy-requests";
 import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, IconButton, Segmented, Select } from "@/components/ds";
 import { errorMessage, formatAgo } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
@@ -23,7 +24,7 @@ import { useCatalogAccess } from "./use-catalog-access";
  */
 
 type Kind = "template" | "music" | "sound";
-type Tab = Kind | "packs" | "workspaces" | "costs";
+type Tab = Kind | "packs" | "workspaces" | "costs" | "requests";
 
 interface Summary {
   type: "builtin" | "data" | "audio";
@@ -82,6 +83,7 @@ const TABS: ReadonlyArray<{ value: Tab; label: string }> = [
   { value: "packs", label: "Packs" },
   { value: "workspaces", label: "Workspaces" },
   { value: "costs", label: "AI costs" },
+  { value: "requests", label: "Data requests" },
 ];
 
 async function act(name: string, args: Record<string, unknown>, success?: string): Promise<boolean> {
@@ -119,7 +121,9 @@ export function AdminPage() {
       <div className="ds-no-scrollbar -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <Segmented ariaLabel="Section" value={tab} onChange={setTab} options={TABS} />
       </div>
-      {tab === "costs" ? (
+      {tab === "requests" ? (
+        <PrivacyRequestsSection />
+      ) : tab === "costs" ? (
         <AiCostsSection />
       ) : !catalog ? (
         <div className="flex flex-col gap-2" aria-busy="true">

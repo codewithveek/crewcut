@@ -10,6 +10,8 @@
   // getcrewcut.app serves the app; the workers.dev address keeps working too.
   "routes": [{ "pattern": "getcrewcut.app", "custom_domain": true }],
   "workers_dev": true,
+  // Wakes the app once a day so its scheduled jobs run even with no visitors (see worker.ts).
+  "triggers": { "crons": ["17 3 * * *"] },
   "containers": [
     {
       "class_name": "CrewcutApp",

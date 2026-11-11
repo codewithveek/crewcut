@@ -242,9 +242,31 @@ function PageSkeletonGeneric() {
   );
 }
 
+/** Settings: the page list beside the open page, as the real one is laid out (components/crewcut/settings). */
+function SettingsSkeleton() {
+  return (
+    <Shell>
+      <div className="mx-auto flex w-full max-w-6xl">
+        <div className="hidden w-60 shrink-0 flex-col gap-2 border-e border-ds-border px-3 pt-8 md:flex">
+          <B className="mb-3 h-5 w-24 rounded-full" />
+          {Array.from({ length: 9 }, (_, index) => (
+            <B key={index} className="h-9 rounded-ds-md" />
+          ))}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-4 px-4 pt-5 md:px-8 md:pt-8">
+          <B className="h-7 w-48 rounded-full" />
+          {Array.from({ length: 3 }, (_, index) => (
+            <B key={index} className="h-[120px] rounded-ds-lg" />
+          ))}
+        </div>
+      </div>
+    </Shell>
+  );
+}
+
 /**
- * The loading shell for a path, or null to keep the framework's own (chat,
- * settings and other framework pages already get a matching one).
+ * The loading shell for a path, or null to keep the framework's own (chat and
+ * other framework pages already get a matching one).
  */
 export function pageSkeletonForPath(pathname: string): ReactNode | null {
   const path = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
@@ -254,6 +276,7 @@ export function pageSkeletonForPath(pathname: string): ReactNode | null {
   if (path === "/assets") return <ListPageSkeleton assets />;
   if (path === "/templates") return <ListPageSkeleton assets />;
   if (/^\/videos\/[^/]+$/.test(path)) return <BoardSkeleton />;
-  if (/^\/videos\/[^/]+\/proof/.test(path) || path === "/connections") return <PageSkeletonGeneric />;
+  if (/^\/videos\/[^/]+\/proof/.test(path)) return <PageSkeletonGeneric />;
+  if (path === "/settings" || path.startsWith("/settings/") || path === "/connections" || path === "/billing" || path === "/team") return <SettingsSkeleton />;
   return null;
 }

@@ -1,4 +1,17 @@
 const messages = {
+  // Crewcut's wording for a few of the framework's settings texts (these replace its defaults).
+  agentChat: {
+    settingsShell: {
+      account: {
+        nameDescription: "How the crew and your teammates refer to you.",
+      },
+    },
+    settingsModel: {
+      emptyTitle: "Use your own AI provider",
+      emptyDescription: "The crew already runs on Crewcut AI and your credits. Add a provider key only if you'd rather pay that provider directly; it then costs no credits.",
+      emptyDescriptionBuilder: "The crew already runs on Crewcut AI and your credits. Add a provider key only if you'd rather pay that provider directly; it then costs no credits.",
+    },
+  },
   composer: {
     removeAttachment: "Remove {{name}}",
     removeReference: "Remove {{name}} reference",
