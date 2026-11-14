@@ -27,6 +27,8 @@ const NUMERIC_DEFAULTS: Record<AnimatableProperty, number> = {
   clipBottom: 0,
   clipLeft: 0,
   progress: 1,
+  focusX: 50,
+  focusY: 50,
 };
 
 export function baseValue(transform: Transform, property: AnimatableProperty): number {
@@ -75,6 +77,8 @@ export function resolveLayerTransform(layer: Layer | LeafLayer, layerLocalMs: nu
     clipBottom: clamp(value("clipBottom"), 0, 100),
     clipLeft: clamp(value("clipLeft"), 0, 100),
     progress: clamp(value("progress"), 0, 1),
+    focusX: clamp(value("focusX"), 0, 100),
+    focusY: clamp(value("focusY"), 0, 100),
   };
   if (layer.ambient) {
     const ambient = ambientOffset(layer.ambient, layerLocalMs, `${seed}:${layer.id}`);

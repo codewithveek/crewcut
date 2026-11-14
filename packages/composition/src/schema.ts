@@ -88,6 +88,8 @@ export const ANIMATABLE_PROPERTIES = [
   "clipBottom",
   "clipLeft",
   "progress",
+  "focusX",
+  "focusY",
 ] as const;
 export const animatablePropertySchema = z.enum(ANIMATABLE_PROPERTIES);
 export type AnimatableProperty = (typeof ANIMATABLE_PROPERTIES)[number];
@@ -138,6 +140,13 @@ export const transformSchema = z.object({
   clipLeft: z.number().min(0).max(100).default(0),
   /** 0..1, drives charts, typewriter and draw-on effects. */
   progress: z.number().min(0).max(1).default(1),
+  /**
+   * Photos and videos that fill their box ("cover"): which part stays in view
+   * when the picture is cropped, % across and down the picture (50 = middle).
+   * Keyframed by auto reframe to follow the subject.
+   */
+  focusX: z.number().min(0).max(100).optional(),
+  focusY: z.number().min(0).max(100).optional(),
 });
 export type Transform = z.infer<typeof transformSchema>;
 

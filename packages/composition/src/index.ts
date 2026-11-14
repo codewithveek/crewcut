@@ -21,3 +21,6 @@ export * from "./templates";
 export * from "./ending";
 export * from "./transitions";
 export * from "./beats";
+export * from "./brand";
+export * from "./thumbnail";
+export * from "./reframe";
