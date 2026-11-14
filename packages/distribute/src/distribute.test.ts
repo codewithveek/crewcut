@@ -13,7 +13,7 @@ import {
   signState,
   verifyState,
 } from "./oauth";
-import { YouTubeClient, YouTubeError, bytesSource, parseYouTubeError } from "./youtube";
+import { YouTubeClient, YouTubeError, bytesSource, ctrFraction, parseYouTubeError } from "./youtube";
 
 const client = { clientId: "cid", clientSecret: "secret", redirectUri: "https://app.test/api/connections/youtube/callback" };
 const SECRET = "test-state-secret-0123456789";
@@ -82,6 +82,34 @@ describe("youtube", () => {
     expect(adapted.text).toContain("Sources:");
     expect(adapted.text).toContain("#motion");
     expect(adapted.tags).toEqual(["motion", "design"]);
+  });
+
+  it("reads click-through as a fraction whether YouTube sends a percent or a fraction", () => {
+    expect(ctrFraction(4.2, 10_000, 400)).toBeCloseTo(0.042);
+    // 0.8 as a fraction would mean 8,000 clicks for 120 views: it was 0.8%.
+    expect(ctrFraction(0.8, 10_000, 120)).toBeCloseTo(0.008);
+    expect(ctrFraction(0.05, 10_000, 600)).toBeCloseTo(0.05);
+    expect(ctrFraction(0, 10_000, 600)).toBe(0);
+    expect(ctrFraction(Number.NaN, 10_000, 600)).toBe(0);
+    expect(ctrFraction(250, 10, 10)).toBe(1);
+  });
+
+  it("reads metrics, and still returns them when YouTube refuses the reach query", async () => {
+    const respond = (refuseReach: boolean) =>
+      vi.fn(async (url: string) => {
+        const metrics = new URL(url).searchParams.get("metrics") ?? "";
+        if (metrics.startsWith("views")) return Response.json({ rows: [[500, 40, 55, 3, 20]] });
+        if (metrics === "audienceWatchRatio") return Response.json({ rows: [[0, 1], [0.5, 0.6]] });
+        if (refuseReach) return Response.json({ error: { message: "Unknown identifier" } }, { status: 400 });
+        return Response.json({ rows: [[12_000, 3.5]] });
+      });
+    const client = (fetchImpl: ReturnType<typeof respond>) => new YouTubeClient({ getToken: async () => "t", fetchImpl: fetchImpl as unknown as typeof fetch });
+    const withReach = await client(respond(false)).metrics("vid", { startDate: "2026-11-01", endDate: "2026-11-08" });
+    expect(withReach).toMatchObject({ views: 500, impressions: 12_000, averagePercentViewed: 0.55 });
+    expect(withReach.ctr).toBeCloseTo(0.035);
+    const refused = await client(respond(true)).metrics("vid", { startDate: "2026-11-01", endDate: "2026-11-08" });
+    expect(refused).toMatchObject({ views: 500, impressions: 0, ctr: 0 });
+    expect(refused.retention).toHaveLength(2);
   });
 
   it("parses quota errors as non-retryable", async () => {

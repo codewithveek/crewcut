@@ -282,8 +282,26 @@ export class YouTubeClient {
     const [views = 0, averageViewDuration = 0, averageViewPercentage = 0, subscribersGained = 0, likes = 0] = totalsBody.rows?.[0] ?? [];
     const retentionResponse = await this.authorized(query({ metrics: "audienceWatchRatio", dimensions: "elapsedVideoTimeRatio" }), { method: "GET" });
     const retentionBody = retentionResponse.ok ? ((await retentionResponse.json()) as { rows?: number[][] }) : { rows: [] };
+    // Thumbnail impressions and click-through: asked for on their own, because
+    // YouTube refuses them for some channels and queries; then they stay 0.
+    let impressions = 0;
+    let ctr = 0;
+    try {
+      const reach = await this.authorized(query({ metrics: "videoThumbnailImpressions,videoThumbnailImpressionsClickRate" }), { method: "GET" });
+      if (reach.ok) {
+        const [shown = 0, rate = 0] = ((await reach.json()) as { rows?: number[][] }).rows?.[0] ?? [];
+        impressions = Math.max(0, Math.round(shown));
+        ctr = ctrFraction(rate, impressions, views);
+      } else {
+        await reach.body?.cancel().catch(() => undefined);
+      }
+    } catch {
+      // Reach data is optional.
+    }
     return metricsSchema.parse({
       views,
+      impressions,
+      ctr,
       averageViewDurationSec: averageViewDuration,
       averagePercentViewed: averageViewPercentage / 100,
       subscribersGained,
@@ -291,6 +309,20 @@ export class YouTubeClient {
       retention: (retentionBody.rows ?? []).map(([at = 0, ratio = 0]) => ({ at, ratio: Math.min(3, ratio) })),
     });
   }
+}
+
+/**
+ * YouTube's click-through rate as a fraction (0.042 = 4.2%). The API docs
+ * don't say whether it sends a percent or a fraction, and a small percent
+ * (0.8) looks like a large fraction. Clicks on the thumbnail become views, so
+ * impressions × rate can't be far above the views: when the fraction reading
+ * would mean more clicks than half again the views, it was a percent.
+ */
+export function ctrFraction(rate: number, impressions: number, views: number): number {
+  if (!Number.isFinite(rate) || rate <= 0) return 0;
+  if (rate > 1) return Math.min(1, rate / 100);
+  if (impressions > 0 && impressions * rate > Math.max(views, 1) * 1.5) return rate / 100;
+  return rate;
 }
 
 function rangeEnd(range: string | null): number {
