@@ -10,6 +10,7 @@ import { getDb, schema } from "../db/index.js";
 import { UserError } from "./errors.js";
 import { toJson } from "./json.js";
 import { resolveFileUrls } from "./blob-store.js";
+import { RENDER_LINK_HOURS } from "./media-links.js";
 import { STORAGE_DIR, WORKSPACE_ROOT, newId, writeStorageFile } from "./storage.js";
 import type { VideoRecord } from "./store.js";
 
@@ -90,6 +91,28 @@ export interface QueueRenderInput {
   priority?: boolean;
 }
 
+/**
+ * The media files a render of this composition reads. Only this video's files
+ * and its owner's media: an asset id typed into a composition never pulls
+ * someone else's file into a render. Bucket links outlive a wait in the queue
+ * (the worker downloads them when it starts); local files stay local.
+ */
+export async function renderAssetFiles(video: { id: string; ownerEmail: string }, composition: Composition): Promise<Array<{ id: string; fileName: string; url?: string }>> {
+  const assetIds = referencedAssetIds(composition);
+  if (assetIds.length === 0) return [];
+  const A = schema.assets;
+  const assets = await getDb()
+    .select()
+    .from(A)
+    .where(and(inArray(A.id, assetIds), or(eq(A.videoId, video.id), eq(A.ownerEmail, video.ownerEmail))));
+  const urls = await resolveFileUrls("assets", assets.map((asset) => asset.fileName), { minHours: RENDER_LINK_HOURS });
+  // Signed local links (/api/media/…) stay local files; remote URLs are fetched by the worker.
+  return assets.map((asset) => {
+    const url = urls.get(asset.fileName);
+    return { id: asset.id, fileName: asset.fileName, ...(url && /^https?:/.test(url) ? { url } : {}) };
+  });
+}
+
 export async function queueRender(input: QueueRenderInput): Promise<{ renderId: string; mode: RenderMode }> {
   const unsafe = unsafeMediaSources(input.composition);
   if (unsafe.length > 0) throw new UserError(`This video points at media that can't be exported (${unsafe.slice(0, 3).join(", ")}). Replace it with an upload.`);
@@ -109,27 +132,10 @@ export async function queueRender(input: QueueRenderInput): Promise<{ renderId: 
     throw new UserError(`${MAX_ACTIVE_RENDERS_PER_OWNER} exports are already in progress. Wait for one to finish, then export again.`);
   }
   const renderId = newId("rnd");
-  const assetIds = referencedAssetIds(input.composition);
-  // Only this video's files and its owner's library: an asset id typed into a
-  // composition never pulls someone else's file into a render.
-  const A = schema.assets;
-  const assets = assetIds.length
-    ? await db
-        .select()
-        .from(A)
-        .where(and(inArray(A.id, assetIds), or(eq(A.videoId, input.video.row.id), eq(A.ownerEmail, input.video.row.ownerEmail))))
-    : [];
   const payload = {
     jobId: renderId,
     composition: input.composition,
-    assetFiles: await (async () => {
-      const urls = await resolveFileUrls("assets", assets.map((asset) => asset.fileName));
-      // Signed local links (/api/media/…) stay local files; remote URLs are fetched by the worker.
-      return assets.map((asset) => {
-        const url = urls.get(asset.fileName);
-        return { id: asset.id, fileName: asset.fileName, ...(url && /^https?:/.test(url) ? { url } : {}) };
-      });
-    })(),
+    assetFiles: await renderAssetFiles(input.video.row, input.composition),
     options: { reducedMotion: input.reducedMotion, burnCaptions: input.burnCaptions, ...(input.resolution ? { resolution: input.resolution } : {}) },
     outputFileName: `${renderId}.mp4`,
   };

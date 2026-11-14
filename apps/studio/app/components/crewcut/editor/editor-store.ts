@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { create } from "zustand";
 
 import { errorMessage } from "@/lib/crewcut";
+import { linkExpiresAt } from "@/lib/media-links";
 import { TAB_ID } from "@/lib/tab-id";
 
 export const PLAYBACK_RATES: readonly number[] = [0.25, 0.5, 1, 1.5, 2];
@@ -156,8 +157,7 @@ function keepValidUrls(current: Record<string, string>, incoming: Record<string,
   const merged = { ...incoming };
   for (const [id, url] of Object.entries(current)) {
     if (!(id in incoming)) continue;
-    const expires = Number(/[?&]exp=(\d+)/.exec(url)?.[1] ?? Number.POSITIVE_INFINITY);
-    if (expires > soon) merged[id] = url;
+    if (linkExpiresAt(url) > soon) merged[id] = url;
   }
   return merged;
 }

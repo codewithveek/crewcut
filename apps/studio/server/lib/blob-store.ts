@@ -1,10 +1,14 @@
-import { existsSync } from "node:fs";
-import { readFile, unlink } from "node:fs/promises";
+import { createWriteStream, existsSync } from "node:fs";
+import { mkdir, readFile, rename, rm, unlink } from "node:fs/promises";
+import path from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 import { builderFileUploadProvider, deleteUploadedFile, ensureS3FileUploadProvider, getActiveFileUploadProviderForRequest, s3FileUploadProvider, uploadFile } from "@agent-native/core/file-upload";
 import { eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "../db/index.js";
+import { type StoredObject, viewableUrl } from "./media-links.js";
 import { type StorageArea, signMediaUrl, storagePath, writeStorageFile } from "./storage.js";
 
 /**
@@ -23,8 +27,10 @@ import { type StorageArea, signMediaUrl, storagePath, writeStorageFile } from ".
  * moves files to Builder just because Builder is connected for models). The stored_files table records where each remote
  * file is; callers only ever ask for a file's URL by area + file name.
  *
- * Note: Agent-Native's S3/R2 provider serves files from the bucket's public
- * base URL (long, unguessable keys), unlike local storage's expiring links.
+ * Agent-Native's S3/R2 provider stores each file under the bucket's public
+ * base URL. Files in the deployment's own bucket are handed out as presigned
+ * links that expire (media-links.ts), so the bucket can be private; local
+ * files get expiring /api/media links.
  */
 export type StorageMode = "local" | "remote" | "auto";
 
@@ -49,24 +55,29 @@ async function remoteProvider(): Promise<Provider | null> {
 const keyOf = (area: StorageArea, fileName: string) => `${area}/${fileName}`;
 
 /**
- * Remote URLs by storage key. Uploads use stable URLs and file names never
- * point at different bytes, so a known URL stays right until the file is
- * removed. Only hits are cached: a miss may be uploaded by another server.
- * Saves a database round trip on almost every read that returns media.
+ * Where remote files are, by storage key. Uploads use stable URLs and file
+ * names never point at different bytes, so a known row stays right until the
+ * file is removed. Only hits are cached: a miss may be uploaded by another
+ * server. Saves a database round trip on almost every read that returns media.
  */
 const URL_CACHE_MAX = 5000;
-const urlCache = new Map<string, string>();
+const urlCache = new Map<string, StoredObject>();
 
-function rememberUrl(key: string, url: string): void {
+function rememberUrl(key: string, row: StoredObject): void {
   urlCache.delete(key);
-  urlCache.set(key, url);
+  urlCache.set(key, { provider: row.provider, url: row.url, remoteId: row.remoteId });
   if (urlCache.size > URL_CACHE_MAX) urlCache.delete(urlCache.keys().next().value as string);
 }
 
 export interface StoredFile {
   provider: string;
-  /** Remote URL, or null when the file is on local disk (use fileUrl for a signed link). */
+  /** The address the file was stored under, or null when it is on local disk. Hand people fileUrl's link, never this. */
   url: string | null;
+}
+
+export interface LinkOptions {
+  /** How long a bucket link must keep working (hours, default 6). Local links always last 15–30 minutes. */
+  minHours?: number;
 }
 
 /** Stores bytes in the active backend. `keepLocal` also keeps a disk copy (render inputs, regenerable library files). */
@@ -84,38 +95,40 @@ export async function putFile(area: StorageArea, fileName: string, bytes: Uint8A
   }
   const row = { key: keyOf(area, fileName), area, fileName, provider: result.provider, url: result.url, remoteId: result.id ?? null, mime, bytes: bytes.byteLength };
   await getDb().insert(schema.storedFiles).values(row).onConflictDoUpdate({ target: schema.storedFiles.key, set: { provider: row.provider, url: row.url, remoteId: row.remoteId, mime, bytes: row.bytes } });
-  rememberUrl(row.key, row.url);
+  rememberUrl(row.key, row);
   if (options.keepLocal) await writeStorageFile(area, fileName, bytes);
   return { provider: result.provider, url: result.url };
 }
 
-/** URLs for many files at once: the remote URL when stored remotely, else a signed local link. */
-export async function resolveFileUrls(area: Exclude<StorageArea, "jobs">, fileNames: readonly string[]): Promise<Map<string, string>> {
+/** Links for many files at once: an expiring bucket link (or the stored address) when stored remotely, else a signed local link. */
+export async function resolveFileUrls(area: Exclude<StorageArea, "jobs">, fileNames: readonly string[], options: LinkOptions = {}): Promise<Map<string, string>> {
   const unique = [...new Set(fileNames)];
   const urls = new Map<string, string>();
   if (unique.length === 0) return urls;
+  const remote = new Map<string, StoredObject>();
   const unknown: string[] = [];
   for (const name of unique) {
     const cached = urlCache.get(keyOf(area, name));
-    if (cached) urls.set(name, cached);
+    if (cached) remote.set(name, cached);
     else unknown.push(name);
   }
   if (unknown.length > 0) {
     const rows = await getDb()
-      .select({ key: schema.storedFiles.key, fileName: schema.storedFiles.fileName, url: schema.storedFiles.url })
+      .select({ key: schema.storedFiles.key, fileName: schema.storedFiles.fileName, provider: schema.storedFiles.provider, url: schema.storedFiles.url, remoteId: schema.storedFiles.remoteId })
       .from(schema.storedFiles)
       .where(inArray(schema.storedFiles.key, unknown.map((name) => keyOf(area, name))));
     for (const row of rows) {
-      urls.set(row.fileName, row.url);
-      rememberUrl(row.key, row.url);
+      remote.set(row.fileName, row);
+      rememberUrl(row.key, row);
     }
   }
+  await Promise.all([...remote].map(async ([name, row]) => urls.set(name, await viewableUrl(row, options))));
   for (const name of unique) if (!urls.has(name)) urls.set(name, signMediaUrl(area, name));
   return urls;
 }
 
-export async function fileUrl(area: Exclude<StorageArea, "jobs">, fileName: string): Promise<string> {
-  return (await resolveFileUrls(area, [fileName])).get(fileName) ?? signMediaUrl(area, fileName);
+export async function fileUrl(area: Exclude<StorageArea, "jobs">, fileName: string, options: LinkOptions = {}): Promise<string> {
+  return (await resolveFileUrls(area, [fileName], options)).get(fileName) ?? signMediaUrl(area, fileName);
 }
 
 async function storedRow(area: StorageArea, fileName: string) {
@@ -151,9 +164,18 @@ export async function localCopy(area: StorageArea, fileName: string): Promise<st
   if (existsSync(target)) return target;
   const row = await storedRow(area, fileName);
   if (!row) throw new Error(`File ${area}/${fileName} is not stored on this host or remotely`);
-  const response = await fetch(row.url);
-  if (!response.ok) throw new Error(`Couldn't download ${area}/${fileName} (${response.status})`);
-  await writeStorageFile(area, fileName, new Uint8Array(await response.arrayBuffer()));
+  const response = await fetch(await viewableUrl(row, { minHours: 1 }));
+  if (!response.ok || !response.body) throw new Error(`Couldn't download ${area}/${fileName} (${response.status})`);
+  // Streamed to disk (renders can be gigabytes), and renamed into place only once complete.
+  await mkdir(path.dirname(target), { recursive: true });
+  const partial = `${target}.part-${process.pid}-${Date.now().toString(36)}`;
+  try {
+    await pipeline(Readable.fromWeb(response.body as never), createWriteStream(partial));
+    await rename(partial, target);
+  } catch (error) {
+    await rm(partial, { force: true }).catch(() => undefined);
+    throw error;
+  }
   return target;
 }
 
