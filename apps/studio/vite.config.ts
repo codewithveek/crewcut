@@ -39,6 +39,14 @@ export default defineConfig({
     ...reactRouterPlugins(),
     ...agentNativePlugins({
       ssrStubs: ["shiki"],
+      // Agent-Native loads undici with a computed import (its SSRF-safe fetch,
+      // used for every bucket upload and link import), which the server
+      // build can't see. It is resolved at runtime, so undici is also a direct
+      // dependency in package.json: pnpm only links it into this app's
+      // node_modules that way. Without it every upload fails in production
+      // with "SSRF protection is unavailable". traceDeps keeps it if the build
+      // ever copies its dependencies into .output.
+      nitro: { traceDeps: ["undici"] },
     }),
   ],
 });
