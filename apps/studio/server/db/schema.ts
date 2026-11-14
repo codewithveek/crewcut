@@ -144,6 +144,26 @@ export const assets = table("assets", {
 });
 
 /**
+ * What is said in a media file, word by word (speech-to-text), so captioning
+ * the same file again, in any video, costs nothing. One row per stored file:
+ * files never change once stored.
+ */
+export const transcripts = table("transcripts", {
+  /** The asset's stored file name (asset ids can be copied between videos; files can't change). */
+  fileName: text("file_name").primaryKey(),
+  assetId: text("asset_id").notNull(),
+  provider: text("provider").notNull(),
+  model: text("model").notNull(),
+  language: text("language"),
+  /** WordTiming[] JSON in the file's own time (ms). */
+  words: text("words").notNull(),
+  /** How much audio was transcribed, for the cost record. */
+  durationMs: integer("duration_ms").notNull().default(0),
+  createdAt: text("created_at").notNull().default(now()),
+  ...ownableColumns(),
+});
+
+/**
  * Where a stored file actually lives when it is not on this host's disk:
  * Agent-Native's file storage (Builder, S3, Cloudflare R2, MinIO…). Keyed by
  * "<area>/<fileName>", the same names local storage uses.
@@ -217,6 +237,26 @@ export const catalogItemVersions = table("catalog_item_versions", {
   payload: text("payload").notNull(),
   publishedBy: text("published_by").notNull().default(""),
   publishedAt: text("published_at").notNull().default(now()),
+});
+
+/**
+ * A video's title and thumbnail options (the thumbnail & title lab), which
+ * ones are chosen, and what went out when it was published, so later videos
+ * can be scored against what worked. Packaging JSON: server/lib/packaging.ts.
+ */
+export const videoPackaging = table("video_packaging", {
+  videoId: text("video_id").primaryKey(),
+  body: text("body").notNull().default("{}"),
+  updatedAt: text("updated_at").notNull().default(now()),
+  ...ownableColumns(),
+});
+
+/** A workspace's brand kit (colours, fonts, logo): BrandKit JSON from @crewcut/composition. */
+export const brandKits = table("brand_kits", {
+  workspace: text("workspace").primaryKey(),
+  kit: text("kit").notNull().default("{}"),
+  updatedBy: text("updated_by").notNull().default(""),
+  updatedAt: text("updated_at").notNull().default(now()),
 });
 
 /** Free or Pro, per workspace (an organisation id, or "user:<email>" for a personal workspace). */

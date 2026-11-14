@@ -162,4 +162,6 @@ export async function deleteAssetFile(row: AssetRow): Promise<void> {
   // asset rows across projects and templates; only a project's own uploads are removed.
   if (/^(lib|tpl|cat)-/.test(row.fileName)) return;
   await removeFile("assets", row.fileName);
+  // What was said in it goes with it.
+  await getDb().delete(schema.transcripts).where(eq(schema.transcripts.fileName, row.fileName));
 }

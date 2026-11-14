@@ -241,6 +241,28 @@ export default runMigrations(
       name: "crewcut-billing-event-order",
       sql: `ALTER TABLE billing_subscriptions ADD COLUMN IF NOT EXISTS last_event_at TEXT`,
     },
+    {
+      // Speech-to-text results per stored file, for captions from speech.
+      version: 12,
+      name: "crewcut-transcripts",
+      sql: `CREATE TABLE IF NOT EXISTS transcripts (
+        file_name TEXT PRIMARY KEY, asset_id TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL, language TEXT, words TEXT NOT NULL,
+        duration_ms INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT now(), ${OWNABLE})`,
+    },
+    {
+      // One brand kit per workspace (colours, fonts, logo).
+      version: 13,
+      name: "crewcut-brand-kits",
+      sql: `CREATE TABLE IF NOT EXISTS brand_kits (
+        workspace TEXT PRIMARY KEY, kit TEXT NOT NULL DEFAULT '{}', updated_by TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT now())`,
+    },
+    {
+      // The thumbnail & title lab: options per video and what was published.
+      version: 14,
+      name: "crewcut-video-packaging",
+      sql: `CREATE TABLE IF NOT EXISTS video_packaging (
+        video_id TEXT PRIMARY KEY, body TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL DEFAULT now(), ${OWNABLE})`,
+    },
   ],
   { table: "crewcut_migrations" },
 );

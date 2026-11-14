@@ -11,7 +11,8 @@ export interface UsageRecord {
   ownerEmail: string;
   orgId: string | null;
   source: UsageSource;
-  kind: "llm" | "voice";
+  /** llm: model calls (tokens) · voice: voice-overs (units = characters) · transcription: speech-to-text (units = seconds of audio). */
+  kind: "llm" | "voice" | "transcription";
   provider: string;
   model: string;
   inputTokens?: number;
@@ -65,7 +66,7 @@ export async function recordAiUsage(record: UsageRecord): Promise<number> {
         createdAt: nowIso(),
       });
     if (millicredits > 0) {
-      const what = record.kind === "voice" ? "Voice-over" : `AI (${record.model})`;
+      const what = record.kind === "voice" ? "Voice-over" : record.kind === "transcription" ? "Captions from speech" : `AI (${record.model})`;
       await spendCredits(workspace, millicredits, `usage:${id}`, `${what}${record.stage ? ` · ${record.stage}` : ""}`);
     }
   } catch (error) {

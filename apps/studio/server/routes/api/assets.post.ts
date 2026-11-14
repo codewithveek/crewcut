@@ -1,18 +1,16 @@
 import { getSession, runWithRequestContext } from "@agent-native/core/server";
 import { assertAccess } from "@agent-native/core/sharing";
-import { and, eq, sql } from "drizzle-orm";
 import { defineEventHandler, getQuery } from "h3";
 
 import { getDb, schema } from "../../db/index.js";
 import { toJson } from "../../lib/json.js";
 import { fileUrl, putFile } from "../../lib/blob-store.js";
 import { BodyTooLargeError, readBodyCapped } from "../../lib/http.js";
+import { QUOTA_BYTES, QUOTA_MESSAGE, ownerMediaBytes } from "../../lib/quota.js";
 import { sniffMedia as sniff } from "../../lib/sniff.js";
 import { newId } from "../../lib/storage.js";
 
 const MAX_BYTES = 100 * 1024 * 1024;
-/** Uploads each owner may keep in total (CREWCUT_STORAGE_QUOTA_MB, default 5 GB), so one account can't fill the disk. */
-const QUOTA_BYTES = Math.max(1, Number(process.env.CREWCUT_STORAGE_QUOTA_MB ?? 5120)) * 1024 * 1024;
 
 type VideoRow = typeof schema.videos.$inferSelect;
 
@@ -44,14 +42,9 @@ export default defineEventHandler(async (event) => {
   if (length > MAX_BYTES) return Response.json({ error: { code: "too_large", message: "Files are limited to 100 MB." } }, { status: 413 });
   // Uploads count against the owner of where they land (the video's owner, or the uploader's library).
   const owner = video?.ownerEmail ?? email;
-  const [usage] = await runWithRequestContext(context, () =>
-    getDb()
-      .select({ bytes: sql<number>`coalesce(sum(${schema.assets.bytes}), 0)` })
-      .from(schema.assets)
-      .where(and(eq(schema.assets.ownerEmail, owner), sql`${schema.assets.fileName} not like 'lib-%' and ${schema.assets.fileName} not like 'tpl-%' and ${schema.assets.fileName} not like 'cat-%'`)),
-  );
-  if (Number(usage?.bytes ?? 0) + Math.max(length, 0) > QUOTA_BYTES) {
-    return Response.json({ error: { code: "quota", message: `Uploads are limited to ${Math.round(QUOTA_BYTES / 1024 ** 3)} GB per account. Delete media you no longer use to make room.` } }, { status: 413 });
+  const used = await runWithRequestContext(context, () => ownerMediaBytes(owner));
+  if (used + Math.max(length, 0) > QUOTA_BYTES) {
+    return Response.json({ error: { code: "quota", message: QUOTA_MESSAGE } }, { status: 413 });
   }
   // Stops reading at the limit: Content-Length can be missing or wrong (chunked uploads).
   let bytes: Uint8Array;
@@ -63,8 +56,8 @@ export default defineEventHandler(async (event) => {
   }
   if (bytes.byteLength === 0) return Response.json({ error: { code: "empty", message: "That file is empty." } }, { status: 400 });
   // The real size, now that it's known (the first check trusted Content-Length).
-  if (Number(usage?.bytes ?? 0) + bytes.byteLength > QUOTA_BYTES) {
-    return Response.json({ error: { code: "quota", message: `Uploads are limited to ${Math.round(QUOTA_BYTES / 1024 ** 3)} GB per account. Delete media you no longer use to make room.` } }, { status: 413 });
+  if (used + bytes.byteLength > QUOTA_BYTES) {
+    return Response.json({ error: { code: "quota", message: QUOTA_MESSAGE } }, { status: 413 });
   }
   const sniffed = sniff(bytes);
   if (!sniffed) return Response.json({ error: { code: "unsupported", message: "Upload WAV, MP3, M4A, OGG, MP4, WebM, PNG, JPEG, GIF or WebP." } }, { status: 415 });
