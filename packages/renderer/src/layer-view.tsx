@@ -113,8 +113,8 @@ export function LayerView({ layer, parentLocalMs, parentDurationMs, parentStartF
       <ColorMatrix id={matrixId(layer.id)} matrix={colorBalanceMatrix(layer.adjust)} />
       {layer.type === "text" ? <TextLayerView layer={layer} localMs={localMs} /> : null}
       {layer.type === "shape" ? <ShapeLayerView layer={layer} /> : null}
-      {layer.type === "image" ? <ImageLayerView layer={layer} /> : null}
-      {layer.type === "video" ? <VideoLayerView layer={layer} layerStartFrame={layerStartFrame} /> : null}
+      {layer.type === "image" ? <ImageLayerView layer={layer} focus={[transform.focusX, transform.focusY]} /> : null}
+      {layer.type === "video" ? <VideoLayerView layer={layer} layerStartFrame={layerStartFrame} focus={[transform.focusX, transform.focusY]} /> : null}
       {layer.type === "code" ? <CodeLayerView layer={layer} progress={transform.progress} /> : null}
       {layer.type === "chart" ? <ChartLayerView layer={layer} progress={transform.progress} boxWidth={boxWidth || context.width * 0.1} boxHeight={boxHeight || context.width * 0.1} /> : null}
       {layer.type === "icon" ? <IconLayerView layer={layer} /> : null}

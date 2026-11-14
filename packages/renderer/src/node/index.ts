@@ -253,7 +253,7 @@ export class RemotionRenderBackend implements RenderBackend {
   }
 }
 
-/** Renders one frame to PNG (thumbnails and QA stills at transition midpoints). */
+/** Renders one frame to PNG, or JPEG (thumbnails and QA stills at transition midpoints). */
 export async function renderFrame(request: {
   composition: Composition;
   assetUrls: Record<string, string>;
@@ -263,10 +263,16 @@ export async function renderFrame(request: {
   bundleDir?: string;
   /** Output scale (0.25 = quarter size): contact sheets and thumbnails. */
   scale?: number;
+  /** Default png. */
+  imageFormat?: "png" | "jpeg";
+  /** 1–100, JPEG only (default 88). */
+  jpegQuality?: number;
+  /** Render options, e.g. { burnCaptions: false }. */
+  options?: Record<string, unknown>;
 }): Promise<string> {
   const { renderStill, selectComposition } = await import("@remotion/renderer");
   const serveUrl = await bundleRenderer(request.bundleDir ? { outDir: request.bundleDir } : {});
-  const inputProps = { composition: request.composition, assetUrls: request.assetUrls, options: {} };
+  const inputProps = { composition: request.composition, assetUrls: request.assetUrls, options: request.options ?? {} };
   const composition = await selectComposition({ serveUrl, id: VIDEO_COMPOSITION_ID, inputProps, browserExecutable: request.browserExecutable ?? null, logLevel: "error" });
   await mkdir(path.dirname(request.outputPath), { recursive: true });
   await renderStill({
@@ -275,7 +281,8 @@ export async function renderFrame(request: {
     inputProps,
     frame: Math.min(composition.durationInFrames - 1, Math.max(0, Math.round((request.atMs / 1000) * composition.fps))),
     output: request.outputPath,
-    imageFormat: "png",
+    imageFormat: request.imageFormat ?? "png",
+    ...(request.imageFormat === "jpeg" ? { jpegQuality: Math.min(100, Math.max(1, Math.round(request.jpegQuality ?? 88))) } : {}),
     ...(request.scale ? { scale: request.scale } : {}),
     browserExecutable: request.browserExecutable ?? null,
     logLevel: "error",

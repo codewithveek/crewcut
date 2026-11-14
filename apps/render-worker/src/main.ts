@@ -5,7 +5,7 @@ import { parseArgs } from "node:util";
 
 import postgres from "postgres";
 
-import { type RenderJobPayload, renderJobPayloadSchema, runRenderJob } from "./job";
+import { type RenderJobPayload, renderJobPayloadSchema, runRenderJob, runStillJob, stillJobPayloadSchema } from "./job";
 
 /**
  * Render worker. Two modes:
@@ -13,6 +13,8 @@ import { type RenderJobPayload, renderJobPayloadSchema, runRenderJob } from "./j
  *   FOR UPDATE SKIP LOCKED, renders, and writes progress back.
  * - --job-file <path> (local dev, spawned by the studio): renders one job and
  *   prints JSON progress lines on stdout.
+ * - --still-file <path> (spawned by the studio): renders one still picture
+ *   (a thumbnail) and prints a JSON "done" or "failed" line.
  */
 const STORAGE_DIR = path.resolve(process.env.CREWCUT_STORAGE_DIR ?? path.join(process.cwd(), "storage"));
 const WORKER_ID = `${os.hostname()}:${process.pid}`;
@@ -96,8 +98,23 @@ async function runQueue(databaseUrl: string): Promise<void> {
   await sql.end();
 }
 
+async function runStillFile(filePath: string): Promise<void> {
+  const payload = stillJobPayloadSchema.parse(JSON.parse(await readFile(filePath, "utf8")));
+  try {
+    const result = await runStillJob(payload, { storageDir: STORAGE_DIR });
+    emit({ type: "done", jobId: payload.jobId, outputFileName: payload.outputFileName, ...result });
+  } catch (error) {
+    emit({ type: "failed", jobId: payload.jobId, error: error instanceof Error ? error.message : String(error) });
+    process.exitCode = 1;
+  }
+}
+
 async function main(): Promise<void> {
-  const { values } = parseArgs({ options: { "job-file": { type: "string" } } });
+  const { values } = parseArgs({ options: { "job-file": { type: "string" }, "still-file": { type: "string" } } });
+  if (values["still-file"]) {
+    await runStillFile(values["still-file"]);
+    return;
+  }
   if (values["job-file"]) {
     await runJobFile(values["job-file"]);
     return;

@@ -91,7 +91,10 @@ function MissingMedia({ label }: { label: string }) {
   );
 }
 
-export function ImageLayerView({ layer }: { layer: ImageLayer }) {
+/** CSS object-position for a cropped picture's focus (% across, % down). */
+const focusCss = (focus: readonly [number, number] | undefined) => (focus ? `${focus[0].toFixed(2)}% ${focus[1].toFixed(2)}%` : undefined);
+
+export function ImageLayerView({ layer, focus }: { layer: ImageLayer; focus?: readonly [number, number] }) {
   const { resolveSrc, scale } = useFrameContext();
   const src = resolveSrc(layer.src);
   if (!src) return <MissingMedia label={layer.alt ?? "Image"} />;
@@ -99,12 +102,12 @@ export function ImageLayerView({ layer }: { layer: ImageLayer }) {
     <Img
       src={src}
       alt={layer.alt ?? ""}
-      style={{ width: "100%", height: "100%", objectFit: layer.fit, borderRadius: layer.radius * scale, display: "block" }}
+      style={{ width: "100%", height: "100%", objectFit: layer.fit, objectPosition: focusCss(focus), borderRadius: layer.radius * scale, display: "block" }}
     />
   );
 }
 
-export function VideoLayerView({ layer, layerStartFrame }: { layer: VideoLayer; layerStartFrame: number }) {
+export function VideoLayerView({ layer, layerStartFrame, focus }: { layer: VideoLayer; layerStartFrame: number; focus?: readonly [number, number] }) {
   const { resolveSrc, scale } = useFrameContext();
   const trackMuted = useContext(TrackMutedContext);
   const { fps } = useVideoConfig();
@@ -118,7 +121,7 @@ export function VideoLayerView({ layer, layerStartFrame }: { layer: VideoLayer; 
         playbackRate={layer.playbackRate}
         volume={trackMuted ? 0 : layer.volume}
         muted={trackMuted || layer.volume === 0}
-        style={{ width: "100%", height: "100%", objectFit: layer.fit, borderRadius: layer.radius * scale }}
+        style={{ width: "100%", height: "100%", objectFit: layer.fit, objectPosition: focusCss(focus), borderRadius: layer.radius * scale }}
       />
     </Sequence>
   );
