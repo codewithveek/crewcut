@@ -9,6 +9,7 @@ import { gatewayConfig } from "../server/lib/ai/gateway.js";
 import { availableModels } from "../server/lib/ai/models.js";
 import { accessContext, identity } from "../server/lib/identity.js";
 import { voiceOperatorKey } from "../server/lib/voice-billing.js";
+import { youtubePublicUploads } from "../server/lib/youtube.js";
 
 /** Providers people can bring their own key for. Their key goes straight to the provider and costs no credits. */
 const OWN_KEY_PROVIDERS = [
@@ -48,6 +49,7 @@ export default defineAction({
       })),
       platforms: Object.values(PLATFORM_SPECS).map((spec) => ({ id: spec.id, label: spec.label, supported: spec.supported, auditNote: spec.auditNote, limitNote: spec.limitNote })),
       youtubeConfigured: Boolean(process.env.YOUTUBE_CLIENT_ID),
+      youtubePublicUploads: youtubePublicUploads(),
       providers: OWN_KEY_PROVIDERS.map((provider, index) => ({ ...provider, ownKey: own[index] ?? false })),
       crewcutAi: { models: crewcutModels.length > 0, voice: Boolean(voiceOperatorKey()) },
     };

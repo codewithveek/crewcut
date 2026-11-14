@@ -9,6 +9,17 @@ import { appOrigin, credentialVault, youtubeOAuthClient } from "./vault.js";
 
 export type ConnectionRow = typeof schema.connections.$inferSelect;
 
+/**
+ * Whether uploads can be unlisted or public. Google keeps every upload from an
+ * API project that hasn't passed its YouTube API Services audit private, so
+ * until the operator sets CREWCUT_YOUTUBE_PUBLIC_UPLOADS (after the audit),
+ * Crewcut uploads as private and says so instead of offering a choice that
+ * YouTube would ignore.
+ */
+export function youtubePublicUploads(): boolean {
+  return /^(1|true)$/i.test(process.env.CREWCUT_YOUTUBE_PUBLIC_UPLOADS?.trim() ?? "");
+}
+
 export async function youtubeConnectionFor(ownerEmail: string): Promise<ConnectionRow | null> {
   const [row] = await getDb()
     .select()

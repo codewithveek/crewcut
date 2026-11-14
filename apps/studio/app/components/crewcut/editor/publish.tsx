@@ -31,6 +31,8 @@ export function PlatformIcon({ platform, className }: { platform: PublishPlatfor
 interface ConnectionsData {
   accounts: Array<{ id: string; provider: string; accountName: string; status: string }>;
   youtubeConfigured: boolean;
+  /** Google's YouTube API audit has passed: uploads can be unlisted or public. */
+  youtubePublicUploads?: boolean;
 }
 
 /** Connected platforms we can publish to (one entry per platform, healthy or expiring accounts only). */
@@ -132,6 +134,10 @@ export function usePublishFlow({ videoId, composition, platform, renders, export
   const [jobId, setJobId] = useState<string | null>(null);
   const [writing, setWriting] = useState<string | null>(null);
   const publish = useActionMutation("publish-post", { uiOnly: true });
+  // Until Google's audit has passed YouTube keeps every upload private, so that's the only choice offered.
+  const connections = useActionQuery("list-connections", {} as never);
+  const publicUploads = Boolean((connections.data as ConnectionsData | undefined)?.youtubePublicUploads);
+  const uploadPrivacy: Privacy = publicUploads ? privacy : "private";
   const active = platform !== null;
   const watching = Boolean(jobId) || Boolean(writing);
   const query = useActionQuery("get-video", { videoId, include: ["publish"] } as never, { enabled: active, refetchInterval: active && watching ? 2000 : false } as never);
@@ -181,10 +187,10 @@ export function usePublishFlow({ videoId, composition, platform, renders, export
         platform: platform === "youtube" && isShort(composition) ? "youtube_shorts" : platform,
         renderId: latestDone.id,
         copy: { title: title.trim(), description, hashtags: draft?.copy.hashtags ?? [], keywords: draft?.copy.keywords ?? [], sources: draft?.copy.sources ?? [] },
-        privacy,
+        privacy: uploadPrivacy,
       } as never)) as { publishJobId: string };
       filledFrom.current = prepared.publishJobId;
-      await publish.mutateAsync({ publishJobId: prepared.publishJobId, privacy } as never);
+      await publish.mutateAsync({ publishJobId: prepared.publishJobId, privacy: uploadPrivacy } as never);
       setJobId(prepared.publishJobId);
       void query.refetch();
     } catch (error) {
@@ -207,6 +213,7 @@ export function usePublishFlow({ videoId, composition, platform, renders, export
     setDescription,
     privacy,
     setPrivacy,
+    publicUploads,
     submitting,
     job,
     writing: Boolean(writing),
@@ -254,7 +261,7 @@ export function PublishBody({ flow, composition, version }: { flow: PublishFlow;
         {done ? <PlatformIcon platform={flow.platform ?? "youtube"} className="size-10" /> : <IconLoader2 className="size-8 text-ds-text-2 motion-safe:animate-spin" />}
         <div>
           <p className="text-sm font-semibold text-ds-text">{done ? `Published to ${label}` : `Uploading to ${label}…`}</p>
-          <p className="mt-1 text-xs text-ds-text-3">{done ? `Posted as ${flow.job.privacy}. YouTube may take a few minutes to process it.` : "You can close this; the upload keeps going."}</p>
+          <p className="mt-1 text-xs text-ds-text-3">{done ? `Posted as ${flow.job.privacy}. ${flow.job.privacy === "private" && !flow.publicUploads ? "Make it public in YouTube Studio when you're ready. " : ""}YouTube may take a few minutes to process it.` : "You can close this; the upload keeps going."}</p>
         </div>
         {done && flow.job.url ? (
           <Button asChild size="sm" variant="outline">
@@ -324,21 +331,27 @@ export function PublishBody({ flow, composition, version }: { flow: PublishFlow;
       </Button>
 
       <FieldRow label="Visibility">
-        <Segmented
-          ariaLabel="Visibility"
-          value={flow.privacy}
-          onChange={flow.setPrivacy}
-          options={[
-            { value: "private", label: "Private", title: "Only you" },
-            { value: "unlisted", label: "Unlisted", title: "Anyone with the link" },
-            { value: "public", label: "Public", title: "Everyone" },
-          ]}
-        />
+        {flow.publicUploads ? (
+          <Segmented
+            ariaLabel="Visibility"
+            value={flow.privacy}
+            onChange={flow.setPrivacy}
+            options={[
+              { value: "private", label: "Private", title: "Only you" },
+              { value: "unlisted", label: "Unlisted", title: "Anyone with the link" },
+              { value: "public", label: "Public", title: "Everyone" },
+            ]}
+          />
+        ) : (
+          <span className="text-xs font-medium text-ds-text">Private</span>
+        )}
       </FieldRow>
-      <p className="text-[11px] leading-relaxed text-ds-text-3">
-        {flow.platform === "youtube" && isShort(composition) ? "Goes up as a YouTube Short. " : ""}
-        YouTube keeps uploads private until Google has verified this app.
-      </p>
+      {(flow.platform === "youtube" && isShort(composition)) || !flow.publicUploads ? (
+        <p className="text-[11px] leading-relaxed text-ds-text-3">
+          {flow.platform === "youtube" && isShort(composition) ? "Goes up as a YouTube Short. " : ""}
+          {flow.publicUploads ? "" : "For now YouTube keeps uploads from Crewcut private. Make it public in YouTube Studio after it's uploaded."}
+        </p>
+      ) : null}
       {flow.job?.status === "failed" ? <p className="text-xs text-ds-danger">{flow.job.error ?? "The upload failed."} Try again.</p> : null}
     </div>
   );

@@ -12,7 +12,7 @@ import { loadVideo, recordApproval, requireOwner, saveStages, updateVideo } from
 import { localCopy } from "../server/lib/blob-store.js";
 import { readPackaging, savePackaging, traitsOf } from "../server/lib/packaging.js";
 import { thumbnailPicture } from "../server/lib/thumbnails.js";
-import { fileVideoSource, uploadsInFlight, youtubeClientFor, youtubeConnectionFor } from "../server/lib/youtube.js";
+import { fileVideoSource, uploadsInFlight, youtubeClientFor, youtubeConnectionFor, youtubePublicUploads } from "../server/lib/youtube.js";
 import { approveStage } from "@crewcut/pipeline";
 import { runWithRequestContext } from "@agent-native/core/server";
 import { UserError } from "../server/lib/errors.js";
@@ -41,7 +41,9 @@ export default defineAction({
     const [render] = await db.select().from(schema.renderJobs).where(eq(schema.renderJobs.id, job.renderJobId)).limit(1);
     if (!render?.outputFile) throw new UserError("The exported file for this post is missing. Export the video again.");
 
-    const finalPrivacy = privacy ?? (job.privacy as "private" | "unlisted" | "public");
+    const requestedPrivacy = privacy ?? (job.privacy as "private" | "unlisted" | "public");
+    // Until Google's audit has passed, YouTube makes every upload private: ask for that, so the post records what really happens.
+    const finalPrivacy = youtubePublicUploads() ? requestedPrivacy : "private";
     // Everything that can refuse runs before the post is marked as uploading, so a refusal never strands it.
     const copy = publishCopySchema.parse(JSON.parse(job.copy));
     // Clicking Publish is the sign-off. Videos made in the editor never ran the earlier stages, so those don't hold it back.
@@ -74,7 +76,7 @@ export default defineAction({
         const youtube = youtubeClientFor(connection);
         const source = await fileVideoSource(await localCopy("renders", render.outputFile as string));
         // The thumbnail chosen in the lab. Shorts can't take a custom thumbnail through the API.
-        const notes: string[] = [];
+        const notes: string[] = requestedPrivacy === finalPrivacy ? [] : ["Uploaded as private: YouTube keeps uploads from Crewcut private for now. Make it public in YouTube Studio."];
         const packaging = await readPackaging(video.row.id);
         const chosen = packaging.chosenThumbnailId ? packaging.thumbnails.find((option) => option.id === packaging.chosenThumbnailId) : undefined;
         let thumbnail: { bytes: Uint8Array; mime: string } | undefined;
@@ -99,7 +101,8 @@ export default defineAction({
         });
         await db
           .update(schema.publishJobs)
-          .set({ status: "published", platformPostId: result.videoId, url: result.url, warnings: toJson([...result.warnings, ...notes]) })
+          // The privacy YouTube actually applied, which can differ from the one asked for.
+          .set({ status: "published", platformPostId: result.videoId, url: result.url, privacy: privacySchema.safeParse(result.privacyStatus).data ?? finalPrivacy, warnings: toJson([...result.warnings, ...notes]) })
           .where(eq(schema.publishJobs.id, job.id));
         // What went out, so later videos are scored against how it did.
         const latest = await readPackaging(video.row.id);

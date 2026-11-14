@@ -26,7 +26,7 @@ export default defineAction({
   run: async (args, ctx) => {
     const video = await loadVideo(args.videoId, ctx, "editor");
     const spec = PLATFORM_SPECS[args.platform];
-    if (!spec.supported) throw new UserError(`${spec.label} publishing isn't wired in this build yet (${spec.auditNote}).`);
+    if (!spec.supported) throw new UserError(`Crewcut can't post to ${spec.label} yet. Export the video and upload it in ${spec.label}.`);
     const db = getDb();
     const [render] = await db
       .select()

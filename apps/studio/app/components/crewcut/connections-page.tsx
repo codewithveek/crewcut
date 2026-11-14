@@ -1,5 +1,18 @@
 import { useActionMutation, useActionQuery } from "@agent-native/core/client/hooks";
-import { IconBrandYoutube, IconPlugConnected, IconRefresh, IconUnlink } from "@tabler/icons-react";
+import {
+  IconBrandBluesky,
+  IconBrandFacebook,
+  IconBrandInstagram,
+  IconBrandLinkedin,
+  IconBrandPinterest,
+  IconBrandThreads,
+  IconBrandTiktok,
+  IconBrandX,
+  IconBrandYoutube,
+  IconPlugConnected,
+  IconRefresh,
+  IconUnlink,
+} from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
@@ -16,6 +29,8 @@ interface ConnectionsData {
   accounts: Array<{ id: string; provider: string; accountName: string; scopes: string[]; status: string; statusDetail: string; lastUsedAt: string | null; createdAt: string }>;
   platforms: Array<{ id: string; label: string; supported: boolean; auditNote: string; limitNote: string }>;
   youtubeConfigured: boolean;
+  /** Google's YouTube API audit has passed: uploads can be unlisted or public. */
+  youtubePublicUploads?: boolean;
   providers: OwnKeyProvider[];
   crewcutAi: { models: boolean; voice: boolean };
 }
@@ -69,7 +84,11 @@ export function ConnectionsPage() {
 
       <Panel
         title="Publishing accounts"
-        description="Publishing always needs your click. Uploads go up private until you choose otherwise."
+        description={
+          data && !data.youtubePublicUploads
+            ? "Publishing always needs your click. For now YouTube keeps uploads from Crewcut private."
+            : "Publishing always needs your click. Uploads go up private until you choose otherwise."
+        }
         actions={
           <Button size="sm" className="pc-press" onClick={() => void startYouTube()} disabled={connect.isPending}>
             <IconBrandYoutube className="size-4" />
@@ -82,7 +101,7 @@ export function ConnectionsPage() {
         ) : data.accounts.length === 0 ? (
           <p className="text-[13px] text-muted-foreground">
             No accounts yet.{" "}
-            {data.youtubeConfigured ? "Connect YouTube to publish privately and read analytics." : import.meta.env.DEV ? "Developer note: set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in apps/studio/.env to connect YouTube." : "YouTube isn't available here yet. It's on our side; nothing for you to set up."}
+            {data.youtubeConfigured ? "Connect YouTube to publish and read how your videos do." : import.meta.env.DEV ? "Developer note: set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in apps/studio/.env to connect YouTube." : "YouTube isn't available here yet. It's on our side; nothing for you to set up."}
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
@@ -202,25 +221,90 @@ export function ConnectionsPage() {
 
       <OwnKeyDialog provider={keyFor} onClose={() => setKeyFor(null)} onChanged={() => void query.refetch()} />
 
-      <Panel title="Platforms" description="What each platform requires before public posting works, and the limits the publish agent checks before exporting.">
-        <ul className="flex flex-col divide-y divide-border">
-          {(data?.platforms ?? []).map((platform) => (
-            <li key={platform.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:gap-4">
-              <div className="flex w-40 shrink-0 items-center gap-2">
-                <IconPlugConnected className={cn("size-4", platform.supported ? "text-supported" : "text-muted-foreground")} />
-                <span className="text-[13px] font-medium text-foreground">{platform.label}</span>
-              </div>
-              <div className="min-w-0 flex-1 text-xs text-muted-foreground">
-                <p>{platform.auditNote}</p>
-                <p className="mt-0.5">{platform.limitNote}</p>
-              </div>
-              <span className={cn("shrink-0 self-start rounded-full px-2 py-0.5 text-[11px]", platform.supported ? "bg-supported/15 text-supported" : "bg-muted text-muted-foreground")}>
-                {platform.supported ? "Available" : "Phase 1"}
-              </span>
-            </li>
-          ))}
-        </ul>
+      <Panel title="Where Crewcut can post" description="Crewcut uploads for you when you click Publish. More platforms are on the way.">
+        {!data ? <SkeletonLines count={2} /> : <PostingPlatforms data={data} connecting={connect.isPending} onConnect={() => void startYouTube()} />}
       </Panel>
     </div>
+  );
+}
+
+const PLATFORM_ICONS: Record<string, typeof IconBrandX> = {
+  tiktok: IconBrandTiktok,
+  instagram_reels: IconBrandInstagram,
+  facebook_reels: IconBrandFacebook,
+  x: IconBrandX,
+  linkedin: IconBrandLinkedin,
+  threads: IconBrandThreads,
+  pinterest: IconBrandPinterest,
+  bluesky: IconBrandBluesky,
+};
+
+type YouTubeState = "connected" | "attention" | "disconnected" | "unavailable";
+
+const YOUTUBE_BADGE: Record<YouTubeState, { label: string; tone: string }> = {
+  connected: { label: "Connected", tone: "bg-supported/15 text-supported" },
+  attention: { label: "Needs reconnecting", tone: "bg-weak/15 text-weak" },
+  disconnected: { label: "Not connected", tone: "bg-muted text-muted-foreground" },
+  unavailable: { label: "Not available here", tone: "bg-muted text-muted-foreground" },
+};
+
+/**
+ * Where publishing works today (YouTube, with this person's own state) and
+ * the platforms that are coming. The platforms' audit and quota notes are for
+ * the publish agent, not for people, so they aren't shown here.
+ */
+function PostingPlatforms({ data, connecting, onConnect }: { data: ConnectionsData; connecting: boolean; onConnect: () => void }) {
+  const account = data.accounts.find((item) => item.provider === "youtube" && item.status !== "revoked");
+  const state: YouTubeState = !data.youtubeConfigured ? "unavailable" : !account ? "disconnected" : account.status === "failed" ? "attention" : "connected";
+  const badge = YOUTUBE_BADGE[state];
+  const comingSoon = data.platforms.filter((platform) => !platform.supported);
+
+  return (
+    <>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="flex min-w-0 flex-1 gap-3">
+          <IconBrandYoutube className="size-6 shrink-0 text-[#ff3d3d]" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[14px] font-medium text-foreground">YouTube</p>
+              <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", badge.tone)}>{badge.label}</span>
+            </div>
+            {state === "unavailable" ? (
+              <p className="mt-0.5 text-xs text-muted-foreground">YouTube isn't available here yet. It's on our side; nothing for you to set up.</p>
+            ) : (
+              <>
+                <p className="mt-0.5 text-xs text-muted-foreground">Videos and Shorts. Vertical or square videos up to 3 minutes go up as Shorts.</p>
+                {data.youtubePublicUploads ? null : (
+                  <p className="mt-0.5 text-xs text-muted-foreground">For now YouTube keeps uploads from Crewcut private. Make them public in YouTube Studio.</p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+        {state === "disconnected" || state === "attention" ? (
+          <Button size="sm" variant={state === "attention" ? "outline" : "default"} className="pc-press ml-9 shrink-0 self-start sm:ml-0" onClick={onConnect} disabled={connecting}>
+            {state === "attention" ? "Reconnect" : "Connect"}
+          </Button>
+        ) : null}
+      </div>
+
+      {comingSoon.length > 0 ? (
+        <div className="mt-4 border-t border-border pt-4">
+          <p className="text-[13px] font-medium text-foreground">Coming soon</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Crewcut can't post to these yet. Export a vertical (9:16) video, which all of them accept, and upload it in their app.</p>
+          <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {comingSoon.map((platform) => {
+              const Icon = PLATFORM_ICONS[platform.id] ?? IconPlugConnected;
+              return (
+                <li key={platform.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-border px-3 py-2 text-[13px] text-foreground">
+                  <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="truncate">{platform.label}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </>
   );
 }
