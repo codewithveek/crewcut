@@ -288,6 +288,23 @@ function MediaSection({ clip, layer }: { clip: VisualClip; layer: Extract<Layer,
       <FieldRow label="Fit">
         <Segmented ariaLabel="Fit" size="sm" value={layer.fit} onChange={(fit) => commit(fit === "cover" ? "Fill frame" : "Fit frame", [{ op: "update-layer", clipId: clip.id, layerId: layer.id, patch: { fit } }])} options={[{ value: "contain", label: "Fit" }, { value: "cover", label: "Fill" }]} />
       </FieldRow>
+      {layer.type === "video" ? (
+        <FieldRow label="Crop">
+          <Button size="sm" variant="outline" className="pc-press" title="Fill the box and move the crop to keep the subject in view (analysed in your browser)" onClick={() => void import("./reframe-command").then(({ autoReframe }) => autoReframe({ clipId: clip.id, layerId: layer.id }))}>
+            Follow the subject
+          </Button>
+          {layer.keyframes.focusX?.length || layer.keyframes.focusY?.length || (layer.transform.focusX ?? 50) !== 50 || (layer.transform.focusY ?? 50) !== 50 ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="pc-press"
+              onClick={() => commit("Centre crop", [{ op: "update-layer", clipId: clip.id, layerId: layer.id, patch: { transform: { focusX: 50, focusY: 50 }, keyframes: { focusX: [], focusY: [] } } }])}
+            >
+              Centre
+            </Button>
+          ) : null}
+        </FieldRow>
+      ) : null}
       <SliderField label="Corners" value={layer.radius} min={0} max={200} step={1} unit="px" onChange={(radius) => preview([{ op: "update-layer", clipId: clip.id, layerId: layer.id, patch: { radius } }])} onCommit={(radius) => commit("Corner radius", [{ op: "update-layer", clipId: clip.id, layerId: layer.id, patch: { radius } }])} />
       <FieldRow label="Background">
         <ColorField label="Clip background" allowNone value={typeof clip.background === "string" ? clip.background : undefined} onChange={(background) => commit("Background", [{ op: "update-clip", clipId: clip.id, patch: { background } }])} />

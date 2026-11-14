@@ -46,6 +46,7 @@ const STAGE_LABELS: Record<string, string> = {
   qa: "Fact-check",
   motion: "Animation",
   voice: "Voice-over",
+  captions: "Captions from speech",
   publish: "Publish",
   analytics: "Results",
   edit: "Editing with the crew",
@@ -173,7 +174,7 @@ export function BillingPage() {
     <div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-5 px-4 pb-10 pt-5 sm:px-8 sm:pt-9">
       <header className="flex flex-col gap-1">
         <h1 className="ds-title text-ds-text sm:text-2xl">Plan & credits</h1>
-        <p className="text-[13px] text-ds-text-2">Credits pay for Crewcut AI: the crew's thinking and AI voice-overs. Editing, templates and exports never use them.</p>
+        <p className="text-[13px] text-ds-text-2">Credits pay for Crewcut AI: the crew's thinking, AI voice-overs and captions from speech. Editing, templates and exports never use them.</p>
       </header>
 
       <Panel

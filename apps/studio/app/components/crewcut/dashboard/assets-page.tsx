@@ -5,6 +5,7 @@ import {
   IconCloudUpload,
   IconDots,
   IconDownload,
+  IconLink,
   IconLoader2,
   IconMusic,
   IconPencil,
@@ -43,6 +44,7 @@ import { useListParams } from "@/hooks/use-list-params";
 import { errorMessage, formatBytes } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
+import { LinkImportDialog } from "../editor/link-import";
 import { formatDuration } from "./use-videos";
 
 export interface AssetItem {
@@ -110,6 +112,7 @@ export function AssetsPage() {
   const scope = list.sort;
   const setScope = list.setSort;
   const [uploading, setUploading] = useState<string[]>([]);
+  const [linkOpen, setLinkOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
@@ -181,10 +184,17 @@ export function AssetsPage() {
           <h1 className="ds-title text-ds-text sm:text-2xl">Assets</h1>
           <p className="mt-0.5 text-[13px] text-ds-text-2">Images, video and audio you can drop into any project.</p>
         </div>
-        <Button onClick={() => inputRef.current?.click()} className="pc-press shrink-0">
-          <IconUpload className="size-4" />
-          Upload
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="ghost" onClick={() => setLinkOpen(true)} className="pc-press">
+            <IconLink className="size-4" />
+            From a link
+          </Button>
+          <Button onClick={() => inputRef.current?.click()} className="pc-press">
+            <IconUpload className="size-4" />
+            Upload
+          </Button>
+        </div>
+        <LinkImportDialog open={linkOpen} onOpenChange={setLinkOpen} videoId={null} onImported={() => void query.refetch()} />
         <input
           ref={inputRef}
           type="file"

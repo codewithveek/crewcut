@@ -1,12 +1,14 @@
 import { callAction, useActionMutation, useActionQuery } from "@agent-native/core/client/hooks";
 import { type Composition } from "@crewcut/composition";
-import { IconBrandYoutubeFilled, IconChevronDown, IconExternalLink, IconLoader2, IconRefresh, IconSparkles, IconUpload } from "@tabler/icons-react";
+import { IconBrandYoutubeFilled, IconChevronDown, IconExternalLink, IconLoader2, IconPhotoStar, IconRefresh, IconSparkles, IconUpload } from "@tabler/icons-react";
 import { type ComponentType, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, FieldRow, Segmented } from "@/components/ds";
 import { STAGE_PROMPTS, askAgent, errorMessage, formatAgo } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
+
+import { PackagingLabDialog, usePackaging } from "./packaging-lab";
 
 /**
  * Publishing from the editor: "Publish to YouTube" sits next to Export (top
@@ -136,6 +138,15 @@ export function usePublishFlow({ videoId, composition, platform, renders, export
   const jobs = ((query.data as { publishJobs?: PublishJob[] } | undefined)?.publishJobs ?? []).filter((job) => job.platform.startsWith(platform ?? "-"));
   const job = jobId ? (jobs.find((entry) => entry.id === jobId) ?? null) : null;
   const draft = jobs.find((entry) => entry.status === "awaiting_approval" || entry.status === "failed") ?? null;
+  const packaging = usePackaging(videoId, active).data;
+  const chosenTitle = packaging?.titles.find((option) => option.chosen)?.text ?? null;
+  const chosenThumbnail = packaging?.thumbnails.find((option) => option.chosen) ?? null;
+
+  // The title chosen in the lab, unless a prepared post or the person already set one.
+  useEffect(() => {
+    if (!chosenTitle || draft) return;
+    setTitle((current) => (current === composition.title.slice(0, 100) ? chosenTitle.slice(0, 100) : current));
+  }, [chosenTitle, draft, composition.title]);
 
   // A post the assistant prepared (now, or earlier on the board) fills the form once.
   const filledFrom = useRef<string | null>(null);
@@ -188,10 +199,51 @@ export function usePublishFlow({ videoId, composition, platform, renders, export
     askAgent(STAGE_PROMPTS.publish(videoId), { videoId });
   };
 
-  return { platform, title, setTitle, description, setDescription, privacy, setPrivacy, submitting, job, writing: Boolean(writing), askAssistant, latestDone, running, exporting, startExport, submit, reset: () => setJobId(null) };
+  return {
+    platform,
+    title,
+    setTitle,
+    description,
+    setDescription,
+    privacy,
+    setPrivacy,
+    submitting,
+    job,
+    writing: Boolean(writing),
+    askAssistant,
+    latestDone,
+    running,
+    exporting,
+    startExport,
+    submit,
+    reset: () => setJobId(null),
+    thumbnail: chosenThumbnail ? { headline: chosenThumbnail.headline } : null,
+  };
 }
 
 export type PublishFlow = ReturnType<typeof usePublishFlow>;
+
+/** Which thumbnail goes out, and the way to the lab. */
+function ThumbnailRow({ flow, composition }: { flow: PublishFlow; composition: Composition }) {
+  const [labOpen, setLabOpen] = useState(false);
+  const short = flow.platform === "youtube_shorts" || isShort(composition);
+  return (
+    <div className="flex items-center gap-3 rounded-ds-md bg-ds-surface-2 px-3 py-2">
+      <IconPhotoStar className="size-4 shrink-0 text-ds-text-2" />
+      <p className="min-w-0 flex-1 text-xs text-ds-text-2">
+        {short
+          ? "Shorts use a frame you pick in the YouTube app."
+          : flow.thumbnail
+            ? `Thumbnail: ${flow.thumbnail.headline ? `“${flow.thumbnail.headline.replace(/\*/g, "")}”` : "the chosen frame"}, from the lab.`
+            : "No thumbnail chosen: YouTube picks a frame."}
+      </p>
+      <Button size="sm" variant="ghost" className="pc-press shrink-0" onClick={() => setLabOpen(true)}>
+        Thumbnail & title lab
+      </Button>
+      <PackagingLabDialog open={labOpen} onOpenChange={setLabOpen} />
+    </div>
+  );
+}
 
 export function PublishBody({ flow, composition, version }: { flow: PublishFlow; composition: Composition; version: number }) {
   const label = PUBLISH_PLATFORMS[flow.platform ?? ""]?.label ?? "your channel";
@@ -265,6 +317,7 @@ export function PublishBody({ flow, composition, version }: { flow: PublishFlow;
           className="w-full resize-y rounded-ds-xs bg-ds-surface-2 px-2.5 py-2 text-[13px] leading-relaxed text-ds-text shadow-[inset_0_0_0_1px_var(--ds-hairline)] outline-none placeholder:text-ds-text-3 focus:shadow-[inset_0_0_0_1.5px_var(--ds-accent)]"
         />
       </label>
+      <ThumbnailRow flow={flow} composition={composition} />
       <Button size="sm" variant="ghost" className="pc-press self-start" disabled={flow.writing} onClick={flow.askAssistant}>
         {flow.writing ? <IconLoader2 className="size-4 motion-safe:animate-spin" /> : <IconSparkles className="size-4" />}
         {flow.writing ? "The assistant is writing it…" : "Write it with the assistant"}

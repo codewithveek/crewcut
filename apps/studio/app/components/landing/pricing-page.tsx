@@ -18,7 +18,7 @@ const CREDIT_USES: Array<{ what: string; credits: string }> = [
 const FAQ: Array<{ q: string; a: string }> = [
   {
     q: "What are credits?",
-    a: "Credits pay for Crewcut AI: the crew's thinking and AI voice-overs, run on our accounts. Every plan gets a fresh batch each month, and the Plan page shows what's left and what used it.",
+    a: "Credits pay for Crewcut AI: the crew's thinking, AI voice-overs and captions from speech, run on our accounts. Every plan gets a fresh batch each month, and the Plan page shows what's left and what used it.",
   },
   {
     q: "Can I use my own AI keys?",

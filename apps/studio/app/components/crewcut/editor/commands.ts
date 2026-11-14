@@ -1,3 +1,4 @@
+import { appPath } from "@agent-native/core/client/api-path";
 import { callAction } from "@agent-native/core/client/hooks";
 import {
   type AnyClip,
@@ -30,6 +31,7 @@ import {
 import { SHORT_FORM_CAPTIONS, buildCaptionCues, estimateWordTimings } from "@crewcut/voice";
 import { toast } from "sonner";
 
+import { showActionError } from "@/components/crewcut/billing/upgrade";
 import { errorMessage } from "@/lib/crewcut";
 
 import { useEditor } from "./editor-store";
@@ -375,6 +377,61 @@ export async function generateCaptionsFromNarration(): Promise<void> {
   if (ok) toast.success("Captions generated from the narration");
 }
 
+let branding = false;
+
+/** Restyles the open video with the workspace's brand kit (one undoable step on the server). */
+export async function applyBrandKit(): Promise<void> {
+  const { videoId } = state();
+  if (!videoId || branding) return;
+  branding = true;
+  const toastId = toast.loading("Applying your brand kit…");
+  try {
+    const result = (await callAction("apply-brand-kit" as never, { videoId } as never)) as { applied: string[] };
+    toast.success(`Brand kit applied: ${result.applied.join(", ")}`, { id: toastId, description: "Undo brings the old look back." });
+    await state().refresh();
+  } catch (error) {
+    toast.dismiss(toastId);
+    const message = errorMessage(error);
+    if (/no brand kit/i.test(message)) {
+      toast.message("You don't have a brand kit yet", { description: "Set your colours, fonts and logo in Settings → Brand kit.", action: { label: "Open", onClick: () => window.location.assign(appPath("/settings/brand")) } });
+    } else showActionError(error);
+  } finally {
+    branding = false;
+  }
+}
+
+let transcribing = false;
+
+/**
+ * Captions from what is said in the video's own clips (speech-to-text on the
+ * server). Without a target: every clip people can hear; with one: that clip.
+ */
+export async function captionsFromSpeech(target: { clipId?: string; layerId?: string } = {}): Promise<void> {
+  const { videoId } = state();
+  if (!videoId || transcribing) return;
+  transcribing = true;
+  const toastId = toast.loading("Listening to what's said in the video…");
+  try {
+    const result = (await callAction("caption-from-speech" as never, { videoId, ...target } as never)) as
+      | { captioned: true; cues: number; clips: number; language?: string }
+      | { captioned: false; message: string };
+    if (!result.captioned) {
+      toast.message(result.message, { id: toastId });
+      return;
+    }
+    toast.success(`${result.cues} caption${result.cues === 1 ? "" : "s"} from speech`, {
+      id: toastId,
+      description: `${result.clips} clip${result.clips === 1 ? "" : "s"}${result.language ? ` · ${result.language.toUpperCase()}` : ""}. Undo brings the old captions back.`,
+    });
+    await state().refresh();
+  } catch (error) {
+    toast.dismiss(toastId);
+    showActionError(error);
+  } finally {
+    transcribing = false;
+  }
+}
+
 export function applyTransition(clipId: string, transition: Transition | null): void {
   void run(transition ? `Transition: ${TRANSITION_CATALOG[transition.type]?.label ?? transition.type}` : "Remove transition", [{ op: "set-transition", clipId, transition }]).then((ok) => ok && offerTransitionForAll(clipId));
 }
@@ -562,7 +619,14 @@ export function applyMotion(clipId: string, layerIds: string[], presetId: string
 }
 
 export function setFormat(ratio: AspectRatio): void {
-  void run(`Format ${ratio}`, [{ op: "set-format", ratio }]);
+  void run(`Format ${ratio}`, [{ op: "set-format", ratio }]).then(async (ok) => {
+    if (!ok) return;
+    // A new shape crops videos that filled the old one: offer to follow their subject.
+    const { reframeTargets, autoReframe } = await import("./reframe-command");
+    const { composition, assetUrls } = state();
+    if (!composition || reframeTargets(composition, assetUrls).length === 0) return;
+    toast.message(`Now ${ratio}.`, { description: "Auto reframe fills the frame with your videos and follows their subject.", action: { label: "Auto reframe", onClick: () => void autoReframe() }, duration: 12_000 });
+  });
 }
 
 export function toggleTrack(track: Track, key: "hidden" | "locked" | "muted"): void {

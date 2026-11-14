@@ -146,7 +146,8 @@ export const privacyDoc: LegalDoc = {
               <strong>Your AI model provider:</strong> the replies its models send back to the crew.
             </li>
             <li>
-              <strong>ElevenLabs:</strong> the voice-over and music audio it generates for your videos.
+              <strong>ElevenLabs:</strong> the voice-over and music audio it generates for your videos, and the words it hears in clips you
+              ask to caption, with their timings.
             </li>
             <li>
               <strong>Pexels:</strong> the stock photos and clips you choose, with the photographer&rsquo;s name and the licence details.
@@ -379,8 +380,13 @@ export const privacyDoc: LegalDoc = {
               ["Timescale, Inc. (on Amazon Web Services)", "Hosts our database", "Account details, content records, conversations, usage records"],
               [
                 "ElevenLabs, Inc.",
-                "Generates voice-overs when you ask for them (with our key, unless you add your own)",
-                "The text to be spoken and the voice you chose",
+                "Generates voice-overs, and transcribes speech when you ask for captions from speech (with our key, unless you add your own)",
+                "The text to be spoken and the voice you chose; for captions, the audio of the media file being captioned",
+              ],
+              [
+                "Google LLC (YouTube Data API)",
+                "Searches public YouTube videos when the crew looks for video ideas (on our own API key, not your YouTube account)",
+                "The search words the crew sends, from our servers. No account details or content of yours.",
               ],
               [
                 "Pexels (part of Canva)",
@@ -402,6 +408,12 @@ export const privacyDoc: LegalDoc = {
           <p>
             When you connect your AI model provider, ElevenLabs with your own key, or YouTube, we send them what is needed to do what you ask, as
             described in sections 5 and 6. Their own terms and privacy policies apply.
+          </p>
+          <H3>Importing from a link</H3>
+          <p>
+            When you (or the crew) import media from a web address, our servers download it from that site; the site sees our server, not you.
+            When the address is a web page, the pictures on it are previewed straight from that site, so your browser sends it your IP address,
+            as when you visit the page.
           </p>
           <H3>Mini-apps</H3>
           <p>

@@ -66,7 +66,7 @@ const PITCHES: Record<UpgradeFeature, Pitch> = {
   credits: {
     plan: "creator",
     title: () => "You're out of AI credits",
-    body: "Credits pay for the crew's thinking and AI voice-overs. Top up now, or move to a plan with more every month. Your own AI key always costs no credits.",
+    body: "Credits pay for the crew's thinking, AI voice-overs and captions from speech. Top up now, or move to a plan with more every month. Your own AI key always costs no credits.",
   },
   plans: {
     plan: "creator",

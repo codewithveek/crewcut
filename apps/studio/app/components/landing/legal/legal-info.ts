@@ -14,7 +14,7 @@ export const LEGAL = {
 } as const;
 
 /** Shown as "Last updated" and used as the effective date. */
-export const LEGAL_UPDATED = { iso: "2026-11-09", label: "9 November 2026" } as const;
+export const LEGAL_UPDATED = { iso: "2026-11-11", label: "11 November 2026" } as const;
 
 export type LegalSlug = "privacy" | "terms" | "cookies" | "acceptable-use";
 

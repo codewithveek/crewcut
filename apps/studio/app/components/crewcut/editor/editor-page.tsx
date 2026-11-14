@@ -10,6 +10,9 @@ import {
   IconGitBranch,
   IconLink,
   IconLoader2,
+  IconPalette,
+  IconPhotoStar,
+  IconFocusCentered,
   IconSparkles,
   IconTemplate,
   IconUpload,
@@ -22,14 +25,16 @@ import { openUpgrade, showActionError } from "@/components/crewcut/billing/upgra
 
 import { Button, Dialog, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, FieldRow, IconButton, Select, SkeletonLines, Switch, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ds";
 import { SaveTemplateDialog } from "./save-template";
+import { PackagingLabDialog } from "./packaging-lab";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { errorMessage, formatAgo } from "@/lib/crewcut";
 import { TAB_ID } from "@/lib/tab-id";
 import { cn } from "@/lib/utils";
 
-import { copySelection, cutSelection, deleteSelection, duplicateSelection, paste, run, selectionContext, splitAtPlayhead, transformOps, trimToPlayhead, currentSelection } from "./commands";
+import { applyBrandKit, copySelection, cutSelection, deleteSelection, duplicateSelection, paste, run, selectionContext, splitAtPlayhead, transformOps, trimToPlayhead, currentSelection } from "./commands";
 import { EditorAssistant } from "./assistant";
 import { useEditor } from "./editor-store";
+import { useFreshMediaLinks } from "./fresh-links";
 import { Inspector } from "./inspector";
 import { LeftPanel } from "./left-panel";
 import { MobileEditor } from "./mobile-editor";
@@ -671,6 +676,7 @@ function TopBar({ onExport, onPublish, onInspector, compact, short }: { onExport
   const title = useEditor((state) => state.composition?.title ?? "");
   const [shareOpen, setShareOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [labOpen, setLabOpen] = useState(false);
   const navigate = useNavigate();
   return (
     <header className={cn("flex shrink-0 items-center gap-2 px-3", short ? "h-12" : "h-14")}>
@@ -699,6 +705,15 @@ function TopBar({ onExport, onPublish, onInspector, compact, short }: { onExport
             <DropdownMenuItem icon={<IconTemplate />} onSelect={() => setTemplateOpen(true)}>
               Save as template
             </DropdownMenuItem>
+            <DropdownMenuItem icon={<IconPalette />} onSelect={() => void applyBrandKit()}>
+              Apply brand kit
+            </DropdownMenuItem>
+            <DropdownMenuItem icon={<IconPhotoStar />} onSelect={() => setLabOpen(true)}>
+              Thumbnail & title lab
+            </DropdownMenuItem>
+            <DropdownMenuItem icon={<IconFocusCentered />} onSelect={() => void import("./reframe-command").then(({ autoReframe }) => autoReframe())}>
+              Auto reframe videos
+            </DropdownMenuItem>
             {/* Only where the bar's own Pipeline button is hidden (narrower than lg). */}
             <DropdownMenuItem icon={<IconGitBranch />} className="lg:hidden" onSelect={() => navigate(`/videos/${videoId}`)}>
               Pipeline
@@ -706,6 +721,7 @@ function TopBar({ onExport, onPublish, onInspector, compact, short }: { onExport
           </DropdownMenuContent>
         </DropdownMenu>
         <SaveTemplateDialog open={templateOpen} onOpenChange={setTemplateOpen} />
+        <PackagingLabDialog open={labOpen} onOpenChange={setLabOpen} />
         {onInspector ? (
           <IconButton label="Properties" variant="soft" onClick={onInspector}>
             <IconAdjustmentsHorizontal />
@@ -756,6 +772,7 @@ export function EditorPage({ videoId }: { videoId: string }) {
     );
   }, [params]);
   useEditorKeys();
+  useFreshMediaLinks();
   useEffect(() => {
     const payload = query.data as CompositionPayload | undefined;
     if (!payload?.composition) return;

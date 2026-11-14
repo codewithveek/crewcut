@@ -196,7 +196,11 @@ export function AiCostsSection() {
                 </span>
               </span>,
               row.calls,
-              row.kind === "voice" ? `${count(row.characters)} characters` : `${count(row.inputTokens)} / ${count(row.cacheReadTokens)} / ${count(row.outputTokens)}`,
+              row.kind === "voice"
+                ? `${count(row.characters)} characters`
+                : row.kind === "transcription"
+                  ? `${count(row.characters)} s of audio`
+                  : `${count(row.inputTokens)} / ${count(row.cacheReadTokens)} / ${count(row.outputTokens)}`,
               usd(row.costUsd),
             ])}
           />
@@ -216,7 +220,7 @@ export function AiCostsSection() {
             SOURCE_LABEL[row.source] ?? row.source,
             <span key="m" className="font-mono">{row.model}</span>,
             row.stage,
-            row.kind === "voice" ? `${count(row.characters)} ch` : `${count(row.inputTokens)} / ${count(row.outputTokens)}`,
+            row.kind === "voice" ? `${count(row.characters)} ch` : row.kind === "transcription" ? `${count(row.characters)} s audio` : `${count(row.inputTokens)} / ${count(row.outputTokens)}`,
             usd(row.costUsd),
             row.credits ? row.credits.toFixed(2) : "—",
           ])}

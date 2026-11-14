@@ -21,12 +21,13 @@ import {
 import { deriveBridgedAppPages } from "@agent-native/toolkit/app/settings/shell/bridge";
 import { SettingsShellProvider } from "@agent-native/toolkit/app/settings/shell/context";
 import { BridgedTabSettingsPage } from "@agent-native/toolkit/app/settings/shell/core-pages";
-import { IconChevronLeft, IconChevronRight, IconCreditCard, IconPlugConnected } from "@tabler/icons-react";
+import { IconChevronLeft, IconChevronRight, IconCreditCard, IconPalette, IconPlugConnected } from "@tabler/icons-react";
 import { type ComponentType, Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { BillingPage } from "@/components/crewcut/billing/billing-page";
 import { ConnectionsPage } from "@/components/crewcut/connections-page";
+import { BrandPage } from "@/components/crewcut/settings/brand-page";
 import { cn } from "@/lib/utils";
 
 /**
@@ -54,6 +55,7 @@ interface OwnPage {
 const OWN_PAGES: readonly OwnPage[] = [
   { id: "plan", label: "Plan & credits", icon: IconCreditCard, component: BillingPage },
   { id: "connections", label: "Connections", icon: IconPlugConnected, component: ConnectionsPage },
+  { id: "brand", label: "Brand kit", icon: IconPalette, component: BrandPage },
 ];
 
 /** Our grouping, in plain words. Pages not named here (operator pages, anything new in the framework) land in "Advanced". */
@@ -62,7 +64,7 @@ const GROUPS: ReadonlyArray<{ id: string; label: string; pages: readonly string[
   { id: "plan", label: "Plan", pages: ["plan", "usage"] },
   { id: "connections", label: "Connections & AI", pages: ["connections", "model"] },
   { id: "crew", label: "The crew", pages: ["instructions", "personalization", "learnings", "automations", "creative-context"] },
-  { id: "workspace", label: "Workspace", pages: ["org", "members", "invite-members", "member-roles", "groups"] },
+  { id: "workspace", label: "Workspace", pages: ["brand", "org", "members", "invite-members", "member-roles", "groups"] },
 ];
 /** Plainer names where the framework has two pages called "General". */
 const LABELS: Readonly<Record<string, string>> = { org: "Workspace", app: "App", model: "AI model" };

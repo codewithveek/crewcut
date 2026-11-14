@@ -34,6 +34,7 @@ import {
   IconColorFilter,
   IconEye,
   IconHeart,
+  IconLink,
   IconMicrophone,
   IconMusic,
   IconPhoto,
@@ -62,8 +63,9 @@ import { Button, ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSe
 import { errorMessage } from "@/lib/crewcut";
 import { cn } from "@/lib/utils";
 
-import { addCaptionAt, addElementAt, addLibraryAudioAt, addMediaAt, applyFilter, applyMotion, applyTransition, currentSelection, generateCaptionsFromNarration, run, soloLayer } from "./commands";
+import { addCaptionAt, addElementAt, addLibraryAudioAt, addMediaAt, applyFilter, applyMotion, applyTransition, captionsFromSpeech, currentSelection, generateCaptionsFromNarration, run, soloLayer } from "./commands";
 import { type LeftTab, useEditor } from "./editor-store";
+import { LinkImportDialog } from "./link-import";
 import { ProBadge } from "../catalog/pro-badge";
 import { StockBrowser } from "./stock-browser";
 import { TransitionThumb } from "./transition-thumb";
@@ -215,6 +217,7 @@ function YourMedia() {
     if (list.current) list.current.scrollTop = 0;
   }, [listKey]);
   const [dropping, setDropping] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const { busy, upload } = useUploader(videoId, (done) => {
     void refetch();
@@ -251,6 +254,14 @@ function YourMedia() {
             <IconUpload className="size-5" />
             <span className="text-xs font-medium">{busy ? "Uploading…" : "Import"}</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setLinkOpen(true)}
+            className="pc-press flex aspect-[4/3] flex-col items-center justify-center gap-1.5 rounded-ds-sm bg-ds-surface-2 text-ds-text-2 shadow-[inset_0_0_0_1px_var(--ds-hairline)] outline-none hover:bg-ds-surface-3 hover:text-ds-text focus-visible:ring-2 focus-visible:ring-ds-accent"
+          >
+            <IconLink className="size-5" />
+            <span className="text-xs font-medium">From a link</span>
+          </button>
           {visible.map((asset) => (
             <MediaTile key={asset.id} asset={asset} onDeleted={() => void refetch()} />
           ))}
@@ -271,6 +282,15 @@ function YourMedia() {
           }}
         />
       </div>
+      <LinkImportDialog
+        open={linkOpen}
+        onOpenChange={setLinkOpen}
+        videoId={videoId || null}
+        onImported={(asset) => {
+          void refetch();
+          useEditor.getState().mergeAssetUrls({ [asset.id]: asset.url });
+        }}
+      />
     </div>
   );
 }
@@ -631,6 +651,9 @@ export function CaptionsTab() {
           <Button size="sm" variant="outline" className="pc-press min-w-0 justify-start" onClick={() => void generateCaptionsFromNarration()}>
             <IconWand className="size-4 shrink-0" /> <span className="truncate">From narration</span>
           </Button>
+          <Button size="sm" variant="outline" className="pc-press min-w-0 justify-start" onClick={() => void captionsFromSpeech()} title="Transcribe what's said in your videos and recordings">
+            <IconMicrophone className="size-4 shrink-0" /> <span className="truncate">From speech</span>
+          </Button>
         </div>
         {style ? (
           <div className="flex flex-wrap gap-1">
@@ -650,7 +673,7 @@ export function CaptionsTab() {
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
         {cues.length === 0 ? (
           <EmptyState icon={<IconBadgeCc className="size-6" />} title="No captions yet">
-            Generate them from the narration transcript, or add one at the playhead and type.
+            Generate them from the narration, transcribe what&rsquo;s said in your videos and recordings, or add one at the playhead and type.
           </EmptyState>
         ) : (
           cues.map((cue) => <CaptionRow key={cue.id} cue={cue} fps={composition.fps} active={playheadMs >= cue.startMs && playheadMs < cue.startMs + cue.durationMs} />)
