@@ -18,7 +18,8 @@ scope: runtime
 Write an art direction brief before composing (the person can edit it like the script):
 `mood` (one line), `palette` (background, surface, ink, muted, accent, optional accent2), `typePairing` (display/body/mono from: Inter, Inter Tight, Geist, Space Grotesk, Plus Jakarta Sans, DM Sans, Fraunces, Instrument Serif, Geist Mono, JetBrains Mono), `layoutGrid`, `motionSignature`, `transitionSet`, `pacing`.
 
-- Freeform by default. Use a preset (`editorial`, `studio`, `graphic`, `cinematic`) only when the person asks or a brand kit is locked.
+- Freeform by default. Use a preset (`editorial`, `studio`, `graphic`, `cinematic`) only when the person asks.
+- Brand kit: when the workspace has one set to apply to drafts, `compose-video` swaps its colours and fonts into your brief (the result says so). Call `get-brand-kit` first and pick layouts and motion that suit those colours. To restyle an existing video with the brand, use `apply-brand-kit`. Branded videos share a palette on purpose, so a close `check-sameness` score on colour alone is fine.
 - Read `check-sameness` afterwards; change palette, type or layout if it's too close to a recent video.
 - Keep text contrast ≥ 4.5:1 against what's behind it.
 

@@ -14,11 +14,11 @@ scope: runtime
 
 ## Steps
 
-0. Load this stage's actions in one call: `tool-search` with only `{"names": ["find-trends", "save-learning", "add-source"]}`. Send no other fields.
+0. Load this stage's actions in one call: `tool-search` with only `{"names": ["find-trends", "find-outliers", "save-learning", "add-source"]}`. Send no other fields.
 
 1. `get-video` for the brief, then `save-learning` (no text) to read the workspace's learnings — ideas should extend what already works.
 2. Gather evidence from sources the person could open themselves:
-   - Outlier videos in the niche (views far above their channel's median).
+   - Outlier videos in the niche: call `find-outliers` once or twice with the niche in a few plain words (pass `length: "short"` for Shorts ideas). Each result is real: quote its `metric` and `url` as an `outlier` evidence item. If it says it isn't set up, or fails, find outliers by web search instead and leave `metric` out unless the page shows the numbers.
    - Search interest and the questions people actually ask.
    - The channel's own top performers and comment requests.
    - Pages the person gave you (use `add-source` if you'll cite them later).
