@@ -7,6 +7,7 @@ import { getDb, schema } from "../server/db/index.js";
 import { assetsUsedElsewhere, deleteAssetFile } from "../server/lib/assets.js";
 import { requireHuman } from "../server/lib/identity.js";
 import { removeFile } from "../server/lib/blob-store.js";
+import { readPackaging } from "../server/lib/packaging.js";
 import { cancelRender } from "../server/lib/render-runner.js";
 import { loadVideo, requireOwner } from "../server/lib/store.js";
 
@@ -49,6 +50,9 @@ export default defineAction({
       schema.approvalEvents,
     ] as const;
     for (const table of byVideo) await db.delete(table).where(eq(table.videoId, videoId));
+    const packaging = await readPackaging(videoId);
+    await db.delete(schema.videoPackaging).where(eq(schema.videoPackaging.videoId, videoId));
+    if (packaging.rendered) await removeFile("renders", packaging.rendered.fileName);
     await db.delete(schema.dossiers).where(eq(schema.dossiers.videoId, videoId));
     await db.delete(schema.videoShares).where(eq(schema.videoShares.resourceId, videoId));
     await db.delete(schema.videos).where(eq(schema.videos.id, videoId));

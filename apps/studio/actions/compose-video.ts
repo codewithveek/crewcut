@@ -15,6 +15,7 @@ import { applyNarration, composeFromScript } from "@crewcut/pipeline";
 import { z } from "zod";
 
 import { beginStage, finishStage, summarizeComposition } from "../server/lib/pipeline-ops.js";
+import { brandNewVideo } from "../server/lib/brand.js";
 import { getProject, latestComposition, latestScript, loadDossier, loadVideo, recentFingerprints, saveComposition } from "../server/lib/store.js";
 import { lineAudioFor } from "../server/lib/voice-ops.js";
 import { UserError } from "../server/lib/errors.js";
@@ -67,14 +68,18 @@ export default defineAction({
 
     // Keep the Crewcut ending unless the person removed it from the previous version.
     const keepEnding = !previous?.composition || hasCrewcutEnding(previous.composition);
-    const version = await saveComposition(video, keepEnding ? withCrewcutEnding(composition) : composition, args.label);
-    const findings = lintMotion(composition);
-    const status = await finishStage(video, "motion", { note: `Draft video ready: ${composition.brief.mood}` });
+    // The workspace's brand kit, when it says drafts use it: its colours and fonts replace the brief's.
+    const ended = keepEnding ? withCrewcutEnding(composition) : composition;
+    const final = await brandNewVideo(ended, video.row, "drafts");
+    const version = await saveComposition(video, final, args.label);
+    const findings = lintMotion(final);
+    const status = await finishStage(video, "motion", { note: `Draft video ready: ${final.brief.mood}` });
     return {
       version,
       status,
-      brief: composition.brief,
-      summary: summarizeComposition(composition),
+      brief: final.brief,
+      ...(final.brief.basedOn === "Brand kit" && composition.brief.basedOn !== "Brand kit" ? { brand: "The workspace's brand kit set the colours and fonts." } : {}),
+      summary: summarizeComposition(final),
       motionFindings: findings.slice(0, 10),
       varietyNote: recent.length ? `Compared against ${recent.length} recent videos; run check-sameness for the score.` : "First video in this workspace.",
       threshold: project?.varietyThreshold,

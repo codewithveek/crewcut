@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import { defineAction } from "@agent-native/core/action";
 import { publishCopySchema, privacySchema } from "@crewcut/contracts";
 import { and, eq, inArray } from "drizzle-orm";
@@ -8,6 +10,8 @@ import { requireHuman } from "../server/lib/identity.js";
 import { nowIso, toJson } from "../server/lib/json.js";
 import { loadVideo, recordApproval, requireOwner, saveStages, updateVideo } from "../server/lib/store.js";
 import { localCopy } from "../server/lib/blob-store.js";
+import { readPackaging, savePackaging, traitsOf } from "../server/lib/packaging.js";
+import { thumbnailPicture } from "../server/lib/thumbnails.js";
 import { fileVideoSource, uploadsInFlight, youtubeClientFor, youtubeConnectionFor } from "../server/lib/youtube.js";
 import { approveStage } from "@crewcut/pipeline";
 import { runWithRequestContext } from "@agent-native/core/server";
@@ -69,18 +73,38 @@ export default defineAction({
       try {
         const youtube = youtubeClientFor(connection);
         const source = await fileVideoSource(await localCopy("renders", render.outputFile as string));
+        // The thumbnail chosen in the lab. Shorts can't take a custom thumbnail through the API.
+        const notes: string[] = [];
+        const packaging = await readPackaging(video.row.id);
+        const chosen = packaging.chosenThumbnailId ? packaging.thumbnails.find((option) => option.id === packaging.chosenThumbnailId) : undefined;
+        let thumbnail: { bytes: Uint8Array; mime: string } | undefined;
+        if (chosen && job.platform === "youtube_shorts") notes.push("Shorts can't take a custom thumbnail from Crewcut; pick a frame in the YouTube app.");
+        else if (chosen) {
+          try {
+            const { fileName } = await thumbnailPicture(video.row, chosen);
+            thumbnail = { bytes: new Uint8Array(await readFile(await localCopy("renders", fileName))), mime: "image/jpeg" };
+          } catch (error) {
+            console.error(`[publish ${job.id}] thumbnail not made:`, error instanceof Error ? error.message : error);
+            notes.push("The chosen thumbnail couldn't be made, so YouTube picked one from the video.");
+          }
+        }
         const result = await youtube.upload({
           video: source,
           copy,
           privacy: finalPrivacy,
           containsSyntheticMedia: true,
           shorts: job.platform === "youtube_shorts",
+          ...(thumbnail ? { thumbnail } : {}),
           ...(job.scheduledAt ? { publishAt: job.scheduledAt } : {}),
         });
         await db
           .update(schema.publishJobs)
-          .set({ status: "published", platformPostId: result.videoId, url: result.url, warnings: toJson(result.warnings) })
+          .set({ status: "published", platformPostId: result.videoId, url: result.url, warnings: toJson([...result.warnings, ...notes]) })
           .where(eq(schema.publishJobs.id, job.id));
+        // What went out, so later videos are scored against how it did.
+        const latest = await readPackaging(video.row.id);
+        latest.published = { title: copy.title, thumbnail: thumbnail && chosen ? traitsOf(chosen) : null, at: nowIso() };
+        await savePackaging(video.row, latest).catch((error: unknown) => console.error(`[publish ${job.id}] could not record the packaging:`, error));
         await db.update(schema.connections).set({ lastUsedAt: nowIso(), status: "healthy" }).where(eq(schema.connections.id, connection.id));
         await updateVideo(video.row.id, { status: "published" });
         await recordApproval(video, { stage: "publish", decision: "published", subject: result.url, reason: result.warnings.join(" ") || `Uploaded as ${result.privacyStatus}`, actor: who });

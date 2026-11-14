@@ -187,7 +187,33 @@ async function main(): Promise<void> {
 
   // 14. Remote file storage (R2/S3/Builder) through a fake provider: one index, any backend.
   await checkRemoteStorage();
+
+  // 15. Thumbnail & title lab and brand kit: options stay with their own video.
+  await checkPackagingAndBrand();
   console.log(`\nAll ${passed} checks passed.`);
+}
+
+async function checkPackagingAndBrand(): Promise<void> {
+  type Options = { titles: Array<{ id: string; text: string; score: { predictedCtr: number | null } }>; thumbnails: Array<{ id: string }>; chosenTitleId: string | null };
+  const a = await call<{ videoId: string }>("create-blank-video", { title: "Lab A", ratio: "16:9" }, human);
+  const b = await call<{ videoId: string }>("create-blank-video", { title: "Lab B", ratio: "16:9" }, human);
+  const saved = await call<Options>("save-packaging", { videoId: a.videoId, addTitles: [{ text: "First option" }, { text: "First option" }], addThumbnails: [{ atMs: 500, headline: "Hi" }] }, human);
+  check(saved.titles.length === 1 && saved.thumbnails.length === 1, "lab options are saved once (the same title twice is kept once)");
+  check(saved.titles[0]?.score.predictedCtr === null, "titles aren't scored without click-through history");
+  const other = await call<Options>("get-packaging", { videoId: b.videoId }, human);
+  check(other.titles.length === 0 && other.thumbnails.length === 0, "another video's lab starts empty (options never leak between videos)");
+  await call("save-packaging", { videoId: b.videoId, addTitles: [{ text: "Second video" }] }, human);
+  const again = await call<Options>("get-packaging", { videoId: a.videoId }, human);
+  check(again.titles.map((title) => title.text).join() === "First option", "each video keeps only its own options");
+  await expectFailure(call("save-packaging", { videoId: a.videoId, chooseTitle: "ttl_missing" }, human), /No title option/, "choosing an option that isn't there is refused");
+
+  await call("set-brand-kit", { colors: { accent: "#123456" }, fonts: { display: "Syne" } }, human);
+  const brand = await call<{ kit: { colors: { accent?: string } } }>("set-brand-kit", { colors: { accent: null } }, human);
+  check(brand.kit.colors.accent === undefined, "clearing a brand colour removes it");
+  const applied = await call<{ applied: string[] }>("apply-brand-kit", { videoId: a.videoId }, human);
+  check(applied.applied.join() === "fonts", "applying the brand kit uses only what it has");
+  await call("set-brand-kit", { fonts: { display: null } }, human);
+  await expectFailure(call("apply-brand-kit", { videoId: a.videoId }, human), /no brand kit/, "an empty brand kit can't be applied");
 }
 
 async function checkCreditsAndBilling(): Promise<void> {

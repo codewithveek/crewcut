@@ -19,6 +19,7 @@ import { type ResolvedItem, variantOf, variantRatios, visibleItems } from "../se
 import { identity } from "../server/lib/identity.js";
 import { toJson } from "../server/lib/json.js";
 import { newId } from "../server/lib/storage.js";
+import { brandNewVideo } from "../server/lib/brand.js";
 import { ensureDefaultProject, loadVideo, ownership, saveComposition } from "../server/lib/store.js";
 import { attachTemplateMusic, importStockPhoto, stockPicks } from "../server/lib/templates.js";
 import { UserError } from "../server/lib/errors.js";
@@ -79,15 +80,19 @@ export default defineAction({
     }
     const music = await attachTemplateMusic(template, owner);
     // New videos end with the Crewcut ending (a normal clip: delete it, or switch it off in Export).
-    const composition = withCrewcutEnding(
-      buildTemplate(template, {
-        id,
-        title: name,
-        ratio: designed,
-        values: filled,
-        seed,
-        ...(music ? { music: { src: `asset:${music.assetId}`, label: music.label, assetId: music.assetId } } : {}),
-      }),
+    const composition = await brandNewVideo(
+      withCrewcutEnding(
+        buildTemplate(template, {
+          id,
+          title: name,
+          ratio: designed,
+          values: filled,
+          seed,
+          ...(music ? { music: { src: `asset:${music.assetId}`, label: music.label, assetId: music.assetId } } : {}),
+        }),
+      ),
+      video.row,
+      "templates",
     );
     const version = await saveComposition(video, composition, `From template: ${entry.item.name}`);
     if (entry.tier === "pro") notes.push(PRO_NOTE);
@@ -148,7 +153,7 @@ async function useDataTemplate(entry: ResolvedItem, input: { ratio: z.infer<type
     remap[assetId] = copy;
   }
   const filled = fillTemplateSlots(remapAssetRefs(variant, remap), input.values);
-  const composition = withCrewcutEnding({ ...filled, id, title: name, seed, brief: { ...filled.brief, basedOn: `template:${entry.item.id}` } });
+  const composition = await brandNewVideo(withCrewcutEnding({ ...filled, id, title: name, seed, brief: { ...filled.brief, basedOn: `template:${entry.item.id}` } }), video.row, "templates");
   const version = await saveComposition(video, composition, `From template: ${entry.item.name}`);
   const notes = entry.tier === "pro" ? [PRO_NOTE] : [];
   return {
